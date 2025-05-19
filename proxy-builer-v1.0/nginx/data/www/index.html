@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Terminal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            color: #0f0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        #terminal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            text-align: center;
+            z-index: 1; /* 确保终端文本在字符雨之上 */
+            mix-blend-mode: difference; /* 文字颜色反转，效果更好 */
+
+        }
+         /* 链接样式 */
+        a {
+          color: #4CAF50;
+          text-decoration: none;
+        }
+
+        a:hover {
+          text-decoration: underline;
+        }
+            /* 可点击图标 */
+        .clickable-icon {
+            cursor: pointer;
+            font-size: 1.5em;
+            margin-right: 5px;
+            transition: transform 0.2s; /* 添加过渡效果 */
+        }
+        .clickable-icon:hover{
+            transform: scale(1.2);
+        }
+        .code {
+          background-color: #2b2b2b;
+          border: 1px solid #444;
+          color: #e0e0e0;
+          padding: 10px;
+          margin: 10px 0;
+          border-radius: 5px;
+          overflow-x: auto; /* For long lines of code */
+          white-space: pre;
+        }
+         /* 语法高亮 (简单示例) */
+        .code .keyword { color: #569cd6; } /* 关键字 */
+        .code .string { color: #ce9178; }  /* 字符串 */
+        .code .comment { color: #6a9955; } /* 注释 */
+        .code .number { color: #b5cea8; }   /* 数字 */
+
+    </style>
+</head>
+<body>
+    <div id="terminal">
+        <div id="output"></div>
+    </div>
+    <canvas id="matrixCanvas"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // 动态文本部分
+        const output = document.getElementById('output');
+        const promptText = "user@hackerspace:~$ ";
+        let text = [
+            "Initializing systems...\n",
+            "Loading modules...\n",
+          {type:"link", text:"Click here to visit my GitHub!", url: "https://github.com"},"\n", //超链接
+            "Booting up virtual environment...\n",
+            "Running diagnostics...\n",
+            "All systems nominal.\n\n",
+            "Welcome to the Hacker Terminal!\n\n",
+            "Here's a snippet of code:\n",
+            {type:"code", text:
+            `
+            // This is a simple JavaScript function
+            function greet(name) {
+                // Check if the name is valid
+                if (typeof name !== 'string' || name.length === 0) {
+                    return "Please provide a valid name."; // Return an error message
+                }
+                return "Hello, " + name + "!"; // Return a greeting
+            }
+
+            console.log(greet("World")); // Prints: Hello, World!
+            console.log(greet(123));      // Prints: Please provide a valid name
+            `
+            },"\n",
+            "Feel free to explore!\n",
+            " ",
+            {type:"icons", icons: [ //可点击的图标
+                {class: "fab fa-github", url: "https://github.com"},
+                {class: "fab fa-twitter", url: "https://twitter.com"},
+                {class: "fab fa-linkedin", url: "https://linkedin.com"}
+            ]},
+             "\nType 'help' for a list of commands, or click on any of the links above.\n"
+        ];
+        let line = 0;
+        let char = 0;
+
+        function type() {
+            if (line >= text.length) {
+                 output.innerHTML += "<br/>" + promptText;
+                return;
+            }
+
+            if (typeof text[line] === 'string') {
+                if (char < text[line].length) {
+                    output.innerHTML += text[line][char];
+                    char++;
+                    setTimeout(type, 20); // Typing speed
+                } else {
+                    line++;
+                    char = 0;
+                    setTimeout(type, 100); // Pause between lines
+                }
+             } else if(text[line].type === 'link'){
+                 const link = document.createElement('a');
+                 link.href = text[line].url;
+                 link.textContent = text[line].text;
+                 link.target = "_blank"; // Open in a new tab
+                 output.appendChild(link);
+                 line++;
+                 char = 0;
+                 setTimeout(type, 100);
+            }else if (text[line].type === 'code'){
+                 // 创建 pre 元素用于代码块
+                const pre = document.createElement('pre');
+                pre.classList.add('code');
+
+                // 使用正则表达式进行简单的语法高亮
+                let codeText = text[line].text;
+                codeText = codeText.replace(/\/\/.*/g, '<span class="comment">$&</span>'); // 注释
+                codeText = codeText.replace(/\b(function|if|return|var|const|let|else|console)\b/g, '<span class="keyword">$&</span>');  //关键字
+                codeText = codeText.replace(/("[^"]*")/g, '<span class="string">$&</span>');      // 字符串
+                codeText = codeText.replace(/(\b\d+\b)/g, '<span class="number">$&</span>');  //数字
+
+                pre.innerHTML = codeText;
+                output.appendChild(pre);
+
+                line++;
+                char = 0;
+                setTimeout(type, 100);
+
+            } else if(text[line].type === 'icons'){
+                const iconContainer = document.createElement('span');
+                text[line].icons.forEach(icon => {
+                   const iconElement = document.createElement('i');
+                    iconElement.className = icon.class + " clickable-icon";
+
+                    const link = document.createElement('a');
+                    link.href = icon.url;
+                    link.target = "_blank"; // 在新标签页打开
+                    link.appendChild(iconElement);
+                    iconContainer.appendChild(link)
+                });
+                output.appendChild(iconContainer);
+                line++;
+                char = 0;
+                setTimeout(type, 100);
+
+            }
+        }
+
+        type(); //启动动画
+
+        // Three.js 数字雨效果
+        let scene, camera, renderer, characters = [], rainCount = 5000;
+
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('matrixCanvas'), antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setClearColor(0x000000, 1); // Black background
+
+            const loader = new THREE.FontLoader();
+            loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) { //你需要一个字体文件
+                createRain(font);
+                animate();
+            });
+
+
+        }
+
+        function createRain(font) {
+            const characterGeometry = new THREE.TextGeometry('0', {
+                font: font,
+                size: 0.5,
+                height: 0.1,
+            });
+            const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+
+            for (let i = 0; i < rainCount; i++) {
+                const character = new THREE.Mesh(characterGeometry, material);
+
+                // Randomize position and scale
+                character.position.x = (Math.random() - 0.5) * 20;
+                character.position.y = (Math.random() - 0.5) * 20;
+                character.position.z = (Math.random() - 0.5) * 20;
+                character.rotation.y = Math.random() * Math.PI;
+                character.scale.set(Math.random() * 0.5 + 0.2, Math.random() * 0.5 + 0.2, Math.random() * 0.2 + 0.1);
+
+                // Store initial y position for falling effect
+                character.initialY = character.position.y;
+                // Set random fall speed
+                character.speed = Math.random() * 0.05 + 0.02;
+
+                characters.push(character);
+                scene.add(character);
+            }
+        }
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Make characters fall and wrap around
+            characters.forEach(character => {
+              character.position.y -= character.speed;
+                if (character.position.y < -10) {
+                   character.position.y = character.initialY +10; // 循环
+                   character.position.x = (Math.random() - 0.5) * 20;//调整x的位置
+                }
+                 // Randomly change some characters
+                if (Math.random() > 0.99) {
+                    character.geometry.dispose(); // 清除旧的几何体
+                    const newChar = Math.random() > 0.5 ? '1' : '0'; //新的字符,1或者0
+                    character.geometry = new THREE.TextGeometry(newChar, {
+                        font:  new THREE.Font(getFontData()), // 使用更新后的字体数据.
+                        size: 0.5,
+                        height: 0.1,
+                    });
+                }
+
+            });
+
+            renderer.render(scene, camera);
+        }
+        //字体数据, 需要一个函数来获取
+       function getFontData() {
+            return {
+                "glyphs": {
+                    "0": { "x_min": 0, "x_max": 166, "ha": 166, "o": "m 48 -18 q -29 0 -48 19 t -19 48 t 19 48 t 48 19 t 48 -19 t -19 -48 t -19 -48 Z m 48 93 q -16 0 -30 -7 t -23 -19 t -15 -28 l 12 -3 q 17 34 48 34 q 17 0 32 -8 t 25 -21 t 11 -28 q 0 -29 -39 -50 l -13 -6 q -9 17 -25 27 t -33 10 Z" },
+                    "1": { "x_min": 0, "x_max": 166, "ha": 166, "o": "m 57 158 l -10 -23 l 27 0 l 0 -131 l 31 0 l 0 131 l 27 0 l -10 23 l -65 0 Z" }
+                },
+                "familyName": "Helvetica Neue",
+                "cssFontWeight": "normal",
+                "cssFontStyle": "normal",
+                "resolution": 1000,
+                "boundingBox": { "yMin": -50, "xMin": 0, "yMax": 116, "xMax": 166 },
+                "underlineThickness": 50,
+                "underlinePosition": -100,
+                "stemV": 50,
+                "stemH": 50,
+                "ascent": 116,
+                "descent": -50,
+                "lineHeight": 166
+            };
+        }
+         // Resize handler
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+         window.addEventListener('resize', onWindowResize, false);
+
+        init();
+
+    </script>
+</body>
+</html>

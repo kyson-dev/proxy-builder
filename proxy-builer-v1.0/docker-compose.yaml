@@ -1,0 +1,51 @@
+services:
+  hysteria:
+    image: tobyxdd/hysteria:latest
+    container_name: hysteria
+    volumes:
+      - ./hysteria/config.yaml:/etc/hysteria/config.yaml
+#      - ./hysteria/log:/var/log/hysteria  # 映射日志目录
+      - /etc/letsencrypt:/etc/letsencrypt
+    restart: always
+    ports:
+      - "8443:8443/udp"
+    networks:
+      - proxy-network
+    command: ["server", "-c", "/etc/hysteria/config.yaml"]
+
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    container_name: xray
+    volumes:
+      - ./xray/config.json:/etc/xray/config.json
+ #     - ./xray/log:/var/log/xray # 创建并映射一个目录给Xray日志
+      - /etc/letsencrypt:/etc/letsencrypt
+    restart: always
+    ports:
+      - "1080:1080"
+      - "2080:2080"
+    networks:
+      - proxy-network
+    command: ["run", "-config", "/etc/xray/config.json"]
+
+  nginx:
+    image: nginx:alpine  # 使用轻量级的 Alpine 版本
+    container_name: nginx
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d  # http配置文件
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf # 主配置文件 
+      - ./nginx/data/www:/data/www:ro  # 将宿主机的 /data/www 映射到容器内的 /data/www，只读模式
+      - /etc/letsencrypt:/etc/letsencrypt
+      # 日志
+#      - ./nginx/log:/var/log/nginx  
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: always
+    networks:
+      - proxy-network
+
+
+networks:
+  proxy-network:
+    driver: bridge
