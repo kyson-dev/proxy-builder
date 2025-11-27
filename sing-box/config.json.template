@@ -1,0 +1,75 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-reality",
+      "listen": "::",
+      "listen_port": 443,
+      "users": [
+        {
+          "uuid": "${VLESS_UUID}",
+          "flow": "xtls-rprx-vision"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "www.microsoft.com",
+        "reality": {
+          "enabled": true,
+          "handshake": {
+            "server": "www.microsoft.com",
+            "server_port": 443
+          },
+          "private_key": "${REALITY_PRIVATE_KEY}",
+          "short_id": [
+            "${REALITY_SHORT_ID}"
+          ]
+        }
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "hysteria2",
+      "listen": "::",
+      "listen_port": 443,
+      "users": [
+        {
+          "password": "${PROXY_PASSWORD}"
+        }
+      ],
+      "tls": {
+        "enabled": true,
+        "certificate_path": "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem",
+        "key_path": "/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
+      }
+    },
+    {
+      "type": "tuic",
+      "tag": "tuic",
+      "listen": "::",
+      "listen_port": 5443,
+      "users": [
+        {
+          "uuid": "${VLESS_UUID}",
+          "password": "${PROXY_PASSWORD}"
+        }
+      ],
+      "congestion_control": "bbr",
+      "tls": {
+        "enabled": true,
+        "certificate_path": "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem",
+        "key_path": "/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ]
+}
