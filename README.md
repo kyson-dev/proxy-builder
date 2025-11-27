@@ -6,16 +6,56 @@ proxy-builder/
 ├── .env                 # 环境变量（敏感信息）
 ├── docker-compose.yml   # Docker 服务配置
 ├── deploy.sh           # 一键部署脚本
+├── change-domain.sh    # 域名替换工具
 ├── README.md           # 本文档
+├── .github/
+│   └── workflows/
+│       └── deploy.yml  # GitHub Actions 自动部署配置
+├── docs/
+│   ├── github-secrets-setup.md    # GitHub Secrets 配置指南
+│   └── deployment-workflow.md     # 部署流程详解
 ├── nginx/
 │   └── nginx.conf      # Nginx 配置
 ├── sing-box/
-│   └── config.json.template # Sing-box 配置模板
+│   ├── config.json.template # Sing-box 配置模板
+│   └── entrypoint.sh   # 容器启动脚本
 ├── webroot/            # Certbot HTTP-01 验证目录
 └── certs/              # 证书存储目录（自动生成）
 ```
 
 ## 🚀 部署步骤
+
+本项目支持两种部署方式：
+
+### 方式 1: GitHub Actions 自动部署（推荐）
+
+通过 GitHub Actions 实现自动化部署，支持零停机更新。
+
+#### 配置步骤：
+
+1. **配置 GitHub Secrets**
+   - 查看详细指南：[docs/github-secrets-setup.md](docs/github-secrets-setup.md)
+   - 需要配置：SSH 密钥、VM 信息、域名、证书邮箱、代理凭证等
+
+2. **推送代码触发部署**
+   ```bash
+   git add .
+   git commit -m "Update configuration"
+   git push origin main
+   ```
+
+3. **查看部署进度**
+   - 在 GitHub 仓库的 **Actions** 标签页查看部署状态
+   - 首次部署会自动运行 `deploy.sh` 申请证书
+   - 后续更新会进行零停机重启
+
+📖 **了解更多**：查看 [部署流程详解](docs/deployment-workflow.md)
+
+---
+
+### 方式 2: 手动部署
+
+适合本地测试或不使用 GitHub Actions 的场景。
 
 ### 1. 配置环境变量
 复制 `.env` 文件并修改其中的配置：
