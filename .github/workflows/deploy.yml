@@ -24,7 +24,7 @@ jobs:
           sed \
             -e "s|\${DOMAIN}|test.example.com|g" \
             -e "s|\${VLESS_UUID}|11111111-1111-1111-1111-111111111111|g" \
-            -e "s|\${REALITY_PRIVATE_KEY}|FAKEKEY|g" \
+            -e "s|\${REALITY_PRIVATE_KEY}|SLwxKroHNRPHuy-3e4Unic6k_X4aAIJNa_L6gHJo9Uc|g" \
             -e "s|\${REALITY_SHORT_ID}|12345678|g" \
             -e "s|\${PROXY_PASSWORD}|TESTPASS|g" \
             sing-box/config.json.template \
