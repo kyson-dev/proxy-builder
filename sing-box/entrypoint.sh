@@ -23,7 +23,7 @@ cp /etc/sing-box/config.json.template /etc/sing-box/config.json
 # 使用 | 作为分隔符，避免与路径中的 / 冲突
 sed -i "s|\${DOMAIN}|$DOMAIN|g" /etc/sing-box/config.json
 sed -i "s|\${VLESS_UUID}|$VLESS_UUID|g" /etc/sing-box/config.json
-sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json`
+sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_SHORT_ID}|$REALITY_SHORT_ID|g" /etc/sing-box/config.json
 sed -i "s|\${H2_PASSWORD}|$H2_PASSWORD|g" /etc/sing-box/config.json
 sed -i "s|\${TUIC_UUID}|$TUIC_UUID|g" /etc/sing-box/config.json
