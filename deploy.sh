@@ -3,7 +3,9 @@ set -e
 
 # 加载环境变量
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+    set -a
+    source .env
+    set +a
 else
     echo "❌ 未找到 .env 文件，请先创建"
     exit 1
