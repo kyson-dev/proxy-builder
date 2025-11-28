@@ -41,7 +41,8 @@ trap cleanup EXIT INT TERM
 echo ""
 echo "🔍 检查 SSL 证书状态..."
 
-if [ ! -f "certs/live/$DOMAIN/fullchain.pem" ] || [ ! -f "certs/live/$DOMAIN/privkey.pem" ]; then
+# 使用容器内部检查证书，避免宿主机权限问题导致误判
+if ! docker compose run --rm --entrypoint "test" certbot -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem; then
     echo "   ⚠️  未检测到证书，准备申请..."
     echo "   1️⃣  启动临时 Nginx (HTTP 模式)..."
     
