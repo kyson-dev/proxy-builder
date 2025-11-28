@@ -11,6 +11,11 @@ services:
       - ./webroot:/var/www/html
     networks:
       - proxy-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Certbot - 自动续期证书
   certbot:
@@ -24,8 +29,14 @@ services:
       - nginx
     networks:
       - proxy-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Sing-box - 代理服务（VLESS Reality + Hysteria2 + TUIC）
+  # docker logs -f sing-box 持续日志输出
   sing-box:
     image: ghcr.io/sagernet/sing-box:latest
     container_name: sing-box
@@ -49,6 +60,11 @@ services:
       - NET_ADMIN
     depends_on:
       - certbot
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   proxy-net:

@@ -17,25 +17,11 @@
       ],
       "tls": {
         "enabled": true,
-        "server_name": [
-          "www.microsoft.com",
-          "www.cloudflare.com",
-          "www.apple.com",
-          "www.google.com",
-          "www.youtube.com",
-          "www.amazon.com"
-        ],
+        "server_name": "www.microsoft.com",
         "reality": {
           "enabled": true,
           "handshake": {
-            "server": [
-              "www.microsoft.com",
-              "www.cloudflare.com",
-              "www.apple.com",
-              "www.google.com",
-              "www.youtube.com",
-              "www.amazon.com"
-            ],
+            "server": "www.microsoft.com",
             "server_port": 443
           },
           "private_key": "${REALITY_PRIVATE_KEY}",
@@ -67,15 +53,17 @@
       "users": [
         {
           "uuid": "${TUIC_UUID}",
-          "password": "${TUIC_PASSWORD}",
-          "hmac": "sha256"
+          "password": "${TUIC_PASSWORD}"
         }
       ],
       "congestion_control": "bbr",
       "tls": {
         "enabled": true,
         "certificate_path": "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem",
-        "key_path": "/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
+        "key_path": "/etc/letsencrypt/live/${DOMAIN}/privkey.pem",
+        "alpn": [
+          "h3"
+        ]
       }
     }
   ],
