@@ -44,6 +44,7 @@ services:
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
       - H2_PASSWORD=${H2_PASSWORD}
       - TUIC_UUID=${TUIC_UUID}
+      - TUIC_PASSWORD=${TUIC_PASSWORD}
     cap_add:
       - NET_ADMIN
     depends_on:

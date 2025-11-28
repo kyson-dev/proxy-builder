@@ -25,9 +25,7 @@
             "server_port": 443
           },
           "private_key": "${REALITY_PRIVATE_KEY}",
-          "short_id": [
-            "${REALITY_SHORT_ID}"
-          ]
+          "short_id": ["${REALITY_SHORT_ID}"]
         }
       }
     },
@@ -35,7 +33,7 @@
       "type": "hysteria2",
       "tag": "hysteria2",
       "listen": "::",
-      "listen_port": 8443,
+      "listen_port": 9443,
       "users": [
         {
           "password": "${H2_PASSWORD}"
@@ -54,7 +52,8 @@
       "listen_port": 5443,
       "users": [
         {
-          "uuid": "${TUIC_UUID}"
+          "uuid": "${TUIC_UUID}",
+          "password": "${TUIC_PASSWORD}"
         }
       ],
       "congestion_control": "bbr",
