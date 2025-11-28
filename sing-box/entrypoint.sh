@@ -7,6 +7,13 @@ if [ ! -f /etc/sing-box/config.json.template ]; then
   exit 1
 fi
 
+# Check required environment variables
+if [ -z "$DOMAIN" ] || [ -z "$VLESS_UUID" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_PASSWORD" ] || [ -z "$TUIC_UUID" ]; then
+  echo "Error: One or more required environment variables are missing."
+  echo "Required: DOMAIN, VLESS_UUID, REALITY_PRIVATE_KEY, REALITY_SHORT_ID, H2_PASSWORD, TUIC_UUID"
+  exit 1
+fi
+
 echo "Generating configuration from template..."
 
 # 复制模板
@@ -23,8 +30,14 @@ sed -i "s|\${TUIC_UUID}|$TUIC_UUID|g" /etc/sing-box/config.json
 
 echo "Configuration generated successfully."
 
-# 显示生成的配置（仅用于调试，生产环境应注释掉）
-# cat /etc/sing-box/config.json
+# Validate configuration
+echo "Validating configuration..."
+if ! sing-box check -c /etc/sing-box/config.json; then
+  echo "Error: Invalid configuration generated."
+  echo "Dumping generated configuration for debugging:"
+  cat /etc/sing-box/config.json
+  exit 1
+fi
 
 # 启动 sing-box
 exec sing-box run -c /etc/sing-box/config.json

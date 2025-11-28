@@ -54,7 +54,7 @@
       "listen_port": 5443,
       "users": [
         {
-          "uuid": "${TUIC_UUID}",
+          "uuid": "${TUIC_UUID}"
         }
       ],
       "congestion_control": "bbr",
