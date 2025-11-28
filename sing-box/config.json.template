@@ -17,11 +17,25 @@
       ],
       "tls": {
         "enabled": true,
-        "server_name": "www.microsoft.com",
+        "server_name": [
+          "www.microsoft.com",
+          "www.cloudflare.com",
+          "www.apple.com",
+          "www.google.com",
+          "www.youtube.com",
+          "www.amazon.com"
+        ],
         "reality": {
           "enabled": true,
           "handshake": {
-            "server": "www.microsoft.com",
+            "server": [
+              "www.microsoft.com",
+              "www.cloudflare.com",
+              "www.apple.com",
+              "www.google.com",
+              "www.youtube.com",
+              "www.amazon.com"
+            ],
             "server_port": 443
           },
           "private_key": "${REALITY_PRIVATE_KEY}",
@@ -53,7 +67,8 @@
       "users": [
         {
           "uuid": "${TUIC_UUID}",
-          "password": "${TUIC_PASSWORD}"
+          "password": "${TUIC_PASSWORD}",
+          "hmac": "sha256"
         }
       ],
       "congestion_control": "bbr",
