@@ -42,7 +42,8 @@ services:
       - VLESS_UUID=${VLESS_UUID}
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
-      - PROXY_PASSWORD=${PROXY_PASSWORD}
+      - H2_PASSWORD=${H2_PASSWORD}
+      - TUIC_UUID=${TUIC_UUID}
     cap_add:
       - NET_ADMIN
     depends_on:

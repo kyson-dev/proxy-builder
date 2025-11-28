@@ -18,7 +18,8 @@ sed -i "s|\${DOMAIN}|$DOMAIN|g" /etc/sing-box/config.json
 sed -i "s|\${VLESS_UUID}|$VLESS_UUID|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_SHORT_ID}|$REALITY_SHORT_ID|g" /etc/sing-box/config.json
-sed -i "s|\${PROXY_PASSWORD}|$PROXY_PASSWORD|g" /etc/sing-box/config.json
+sed -i "s|\${H2_PASSWORD}|$H2_PASSWORD|g" /etc/sing-box/config.json
+sed -i "s|\${TUIC_UUID}|$TUIC_UUID|g" /etc/sing-box/config.json
 
 echo "Configuration generated successfully."
 

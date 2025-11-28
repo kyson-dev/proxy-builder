@@ -38,7 +38,7 @@
       "listen_port": 8443,
       "users": [
         {
-          "password": "${PROXY_PASSWORD}"
+          "password": "${H2_PASSWORD}"
         }
       ],
       "tls": {
@@ -54,8 +54,7 @@
       "listen_port": 5443,
       "users": [
         {
-          "uuid": "${VLESS_UUID}",
-          "password": "${PROXY_PASSWORD}"
+          "uuid": "${TUIC_UUID}",
         }
       ],
       "congestion_control": "bbr",

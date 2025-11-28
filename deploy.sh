@@ -41,7 +41,7 @@ trap cleanup EXIT INT TERM
 echo ""
 echo "🔍 检查 SSL 证书状态..."
 
-if [ ! -d "certs/live/$DOMAIN" ]; then
+if [ ! -f "certs/live/$DOMAIN/fullchain.pem" ] || [ ! -f "certs/live/$DOMAIN/privkey.pem" ]; then
     echo "   ⚠️  未检测到证书，准备申请..."
     echo "   1️⃣  启动临时 Nginx (HTTP 模式)..."
     
