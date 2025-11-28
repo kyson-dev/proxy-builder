@@ -25,30 +25,72 @@ if ! host $DOMAIN > /dev/null 2>&1; then
     fi
 fi
 
-# 启动 Nginx
-echo ""
-echo "1️⃣  启动 Nginx..."
-docker compose up -d nginx
-
-# 等待 Nginx 启动并检查健康状态
-echo "   等待 Nginx 启动..."
-for i in {1..10}; do
-    if docker compose ps nginx | grep -q "Up"; then
-        echo "   ✅ Nginx 已启动"
-        break
+# 注册清理函数：确保脚本退出或中断时恢复 Nginx 配置
+cleanup() {
+    if [ -f nginx/nginx.conf.bak ]; then
+        echo ""
+        echo "🧹 检测到脚本中断，正在恢复 Nginx 原始配置..."
+        mv nginx/nginx.conf.bak nginx/nginx.conf
     fi
-    if [ $i -eq 10 ]; then
-        echo "   ❌ Nginx 启动超时"
-        exit 1
-    fi
-    sleep 1
-done
+}
+trap cleanup EXIT INT TERM
 
-# 申请证书
+# -----------------------------------------------------------------------------
+# 1. 证书检查与申请模块
+# -----------------------------------------------------------------------------
 echo ""
-echo "2️⃣  申请 SSL 证书..."
+echo "🔍 检查 SSL 证书状态..."
+
 if [ ! -d "certs/live/$DOMAIN" ]; then
-    # 使用 docker compose run 会忽略 depends_on，但我们已经确保 nginx 在运行
+    echo "   ⚠️  未检测到证书，准备申请..."
+    echo "   1️⃣  启动临时 Nginx (HTTP 模式)..."
+    
+    # 备份现有配置
+    if [ -f nginx/nginx.conf ]; then
+        cp nginx/nginx.conf nginx/nginx.conf.bak
+    fi
+    
+    # 创建一个仅 HTTP 的临时配置
+    cat > nginx/nginx.conf <<EOF
+events {
+    worker_connections 1024;
+}
+http {
+    server {
+        listen 80;
+        server_name $DOMAIN;
+        location /.well-known/acme-challenge/ {
+            root /var/www/html;
+        }
+        location / {
+            return 200 'Nginx is running for Certbot validation';
+            add_header Content-Type text/plain;
+        }
+    }
+}
+EOF
+
+    # 启动 Nginx
+    docker compose up -d nginx
+
+    # 等待 Nginx 启动
+    echo "      等待 Nginx 启动..."
+    for i in {1..10}; do
+        if docker compose ps nginx | grep -q "Up"; then
+            echo "      ✅ Nginx 已启动"
+            break
+        fi
+        if [ $i -eq 10 ]; then
+            echo "      ❌ Nginx 启动超时"
+            exit 1
+        fi
+        sleep 1
+    done
+
+    echo "   2️⃣  申请 SSL 证书..."
+    echo "      ⚠️  注意：如果卡住，请检查防火墙是否开放 80 端口"
+    
+    # 申请证书
     docker compose run --rm certbot certbot certonly \
       --webroot -w /var/www/html \
       -d $DOMAIN \
@@ -56,33 +98,58 @@ if [ ! -d "certs/live/$DOMAIN" ]; then
       --email $EMAIL \
       --non-interactive
     
-    if [ $? -eq 0 ]; then
-        echo "✅ 证书申请成功"
+    CERT_EXIT_CODE=$?
+    
+    # 无论成功失败，都恢复原始配置
+    if [ -f nginx/nginx.conf.bak ]; then
+        echo "   3️⃣  恢复原始 Nginx 配置..."
+        mv nginx/nginx.conf.bak nginx/nginx.conf
+    fi
+
+    if [ $CERT_EXIT_CODE -eq 0 ]; then
+        echo "      ✅ 证书申请成功"
+        # 停止临时 Nginx，让后续的主流程统一启动
+        docker compose stop nginx
     else
-        echo "❌ 证书申请失败，请检查日志"
+        echo "      ❌ 证书申请失败"
         exit 1
     fi
 else
-    echo "✅ 证书已存在，跳过申请"
+    echo "   ✅ 证书已存在，跳过申请"
 fi
 
-# 启动所有服务
+# -----------------------------------------------------------------------------
+# 2. 服务启动/更新模块
+# -----------------------------------------------------------------------------
 echo ""
-echo "3️⃣  启动所有服务..."
-docker compose up -d
+echo "🚀 启动/更新服务..."
 
-# 等待服务启动
+# 拉取最新镜像
+echo "   ⬇️  拉取最新镜像..."
+docker compose pull
+
+# 启动所有服务
+echo "   🔥 启动服务 (Zero Downtime)..."
+docker compose up -d --remove-orphans
+
+# -----------------------------------------------------------------------------
+# 3. 健康检查模块
+# -----------------------------------------------------------------------------
 echo ""
-echo "⏳ 等待服务启动..."
+echo "⏳ 等待服务就绪..."
 sleep 5
 
-# 显示状态
-echo ""
 echo "📊 服务状态:"
 docker compose ps
 
-echo ""
-echo "✅ 部署完成！"
-echo ""
-echo "📝 查看日志: docker compose logs -f"
-echo "📱 客户端配置信息请查看 README.md"
+# 简单验证 Sing-box 是否运行
+if docker compose ps sing-box | grep -q "Up"; then
+    echo ""
+    echo "✅ 部署成功！"
+    echo "📝 查看日志: docker compose logs -f"
+else
+    echo ""
+    echo "❌ 部署可能存在问题，Sing-box 未正常运行"
+    docker compose logs sing-box
+    exit 1
+fi

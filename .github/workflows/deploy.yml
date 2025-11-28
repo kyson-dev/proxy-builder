@@ -36,85 +36,10 @@ jobs:
           EOF
           "
 
-      - name: Check if certificates exist for current domain
-        id: check_certs
-        run: |
-          # 检查当前域名的证书是否存在
-          # sing-box 需要证书才能启动，所以证书是关键判断条件
-          CERT_EXISTS=$(ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} '
-            # 从 .env 文件中提取域名
-            if [ -f /home/${{ secrets.VM_USER }}/app/.env ]; then
-              DOMAIN=$(grep "^DOMAIN=" /home/${{ secrets.VM_USER }}/app/.env | cut -d= -f2)
-              
-              # 检查该域名的证书是否存在
-              if [ -n "$DOMAIN" ] && \
-                 [ -d "/home/${{ secrets.VM_USER }}/app/certs/live/$DOMAIN" ] && \
-                 [ -f "/home/${{ secrets.VM_USER }}/app/certs/live/$DOMAIN/fullchain.pem" ] && \
-                 [ -f "/home/${{ secrets.VM_USER }}/app/certs/live/$DOMAIN/privkey.pem" ]; then
-                echo "true"
-              else
-                echo "false"
-              fi
-            else
-              echo "false"
-            fi
-          ')
-          echo "cert_exists=$CERT_EXISTS" >> $GITHUB_OUTPUT
-          echo "📋 当前域名证书检测结果: $CERT_EXISTS"
-
-      - name: First deployment - Apply certificates and start services
-        if: steps.check_certs.outputs.cert_exists == 'false'
+      - name: Execute Deployment Script
         run: |
           ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "
             cd /home/${{ secrets.VM_USER }}/app &&
             chmod +x deploy.sh &&
             ./deploy.sh
-          "
-
-      - name: Update deployment - Zero downtime restart
-        if: steps.check_certs.outputs.cert_exists == 'true'
-        run: |
-          ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "
-            cd /home/${{ secrets.VM_USER }}/app &&
-            
-            # 拉取最新镜像
-            docker compose pull
-            
-            # 更新 nginx 和 certbot（如果有变化）
-            docker compose up -d nginx certbot
-            
-            # 零停机重启 sing-box
-            # 因为证书已存在，sing-box 可以正常启动
-            docker compose up -d --no-deps --force-recreate sing-box
-            
-            # 等待 sing-box 容器启动
-            sleep 3
-            
-            # 验证 sing-box 是否正常运行
-            if docker compose ps sing-box | grep -q 'Up'; then
-              echo '✅ Sing-box 已成功重启'
-            else
-              echo '❌ Sing-box 启动失败'
-              docker compose logs sing-box
-              exit 1
-            fi
-            
-            # 清理未使用的 Docker 资源
-            echo '🧹 清理未使用的 Docker 资源...'
-            docker image prune -f --filter 'until=24h'
-            docker container prune -f
-            docker network prune -f
-            docker volume prune -f
-            echo '✅ 清理完成'
-          "
-
-      - name: Verify deployment
-        run: |
-          ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "
-            cd /home/${{ secrets.VM_USER }}/app &&
-            echo '📊 服务状态:' &&
-            docker compose ps &&
-            echo '' &&
-            echo '📝 最近日志:' &&
-            docker compose logs --tail=20 sing-box
           "
