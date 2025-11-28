@@ -8,7 +8,7 @@
       "type": "vless",
       "tag": "vless-reality",
       "listen": "::",
-      "listen_port": 443,
+      "listen_port": 8443,
       "users": [
         {
           "uuid": "${VLESS_UUID}",
@@ -35,7 +35,7 @@
       "type": "hysteria2",
       "tag": "hysteria2",
       "listen": "::",
-      "listen_port": 443,
+      "listen_port": 8443,
       "users": [
         {
           "password": "${PROXY_PASSWORD}"
