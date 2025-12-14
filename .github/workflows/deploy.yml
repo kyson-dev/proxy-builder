@@ -1,7 +1,7 @@
-name: Deploy to GCP VM (WIF)
+name: Deploy to GCP VM
 
 on:
-  workflow_dispatch: # Allow manual triggering from any branch
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -10,105 +10,32 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Select environment based on branch
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
           install_components: "beta"
 
-      - name: Debug - Check VM Status
+      - name: Deploy
         run: |
-          echo "📋 Checking VM status..."
-          gcloud compute instances describe ${{ secrets.GCP_VM_NAME }} \
-            --zone=${{ secrets.GCP_VM_ZONE }} \
-            --format="table(name,status,networkInterfaces[0].accessConfigs[0].natIP,networkInterfaces[0].networkIP)" || true
+          VM="${{ secrets.GCP_VM_NAME }}"
+          ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          echo ""
-          echo "📋 Checking current identity..."
-          gcloud auth list
-
-          echo ""
-          echo "📋 Checking service account permissions..."
-          gcloud projects get-iam-policy ${{ secrets.GCP_PROJECT_ID }} \
-            --flatten="bindings[].members" \
-            --format="table(bindings.role)" \
-            --filter="bindings.members:${{ secrets.GCP_SERVICE_ACCOUNT }}" || true
-
-      - name: SSH Connection
-        run: |
-          echo "🔄 Attempting SSH connection..."
-
-          # Try direct SSH first, then fall back to IAP tunnel
-          for i in {1..10}; do
-            echo "Attempt $i/10..."
-            
-            # Try with verbose output on last few attempts
-            if [ $i -ge 8 ]; then
-              VERBOSE="--verbosity=debug"
-            else
-              VERBOSE="--quiet"
-            fi
-            
-            # Try direct SSH
-            if gcloud beta compute ssh ${{ secrets.GCP_VM_NAME }} \
-              --zone=${{ secrets.GCP_VM_ZONE }} \
-              --command="echo '✅ SSH Ready'" \
-              $VERBOSE 2>&1; then
-              echo "✅ SSH connection established (direct)"
-              echo "SSH_METHOD=direct" >> $GITHUB_ENV
-              exit 0
-            fi
-            
-            # Try IAP tunnel if direct fails
-            if gcloud beta compute ssh ${{ secrets.GCP_VM_NAME }} \
-              --zone=${{ secrets.GCP_VM_ZONE }} \
-              --tunnel-through-iap \
-              --command="echo '✅ SSH Ready via IAP'" \
-              $VERBOSE 2>&1; then
-              echo "✅ SSH connection established (IAP tunnel)"
-              echo "SSH_METHOD=iap" >> $GITHUB_ENV
-              exit 0
-            fi
-            
-            echo "⏳ Waiting... ($i/10)"
-            sleep 15
-          done
-
-          echo ""
-          echo "❌ Failed to establish SSH connection"
-          echo ""
-          echo "🔍 Troubleshooting tips:"
-          echo "1. Check if VM is running: gcloud compute instances list"
-          echo "2. Check if VM has external IP or IAP is enabled"
-          echo "3. Check service account has 'Compute OS Login' role"
-          echo "4. Check service account has 'IAP-secured Tunnel User' role (if using IAP)"
-          echo "5. Check firewall allows SSH (port 22) or IAP"
-          exit 1
-
-      - name: Sync files to server
-        run: |
-          # Determine SSH options based on connection method
-          if [ "$SSH_METHOD" = "iap" ]; then
-            SSH_OPTS="--tunnel-through-iap"
-          else
-            SSH_OPTS=""
-          fi
-
-          # Create tarball
-          tar --exclude='.env' \
-              --exclude='.env.*' \
+          # 1. 打包文件（排除不需要的内容）
+          echo "� 打包文件..."
+          tar --exclude='.env*' \
               --exclude='.git' \
               --exclude='.github' \
               --exclude='sing-box/certs' \
@@ -116,45 +43,24 @@ jobs:
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
-          # Copy tarball to server
-          gcloud beta compute scp /tmp/app.tar.gz \
-            ${{ secrets.GCP_VM_NAME }}:~/app.tar.gz \
-            --zone=${{ secrets.GCP_VM_ZONE }} \
-            $SSH_OPTS \
-            --quiet
+          # 2. 创建 .env 文件
+          echo '${{ secrets.ENV_FILE }}' > /tmp/.env
 
-          # Extract on server
-          gcloud beta compute ssh ${{ secrets.GCP_VM_NAME }} \
-            --zone=${{ secrets.GCP_VM_ZONE }} \
-            $SSH_OPTS \
-            --command="mkdir -p ~/app && tar -xzf ~/app.tar.gz -C ~/app && rm ~/app.tar.gz" \
-            --quiet
+          # 3. 上传文件到服务器
+          echo "📤 上传文件..."
+          gcloud beta compute scp /tmp/app.tar.gz /tmp/.env ${VM}:~/ --zone=${ZONE} --quiet
 
-      - name: Create .env file
-        run: |
-          if [ "$SSH_METHOD" = "iap" ]; then
-            SSH_OPTS="--tunnel-through-iap"
-          else
-            SSH_OPTS=""
-          fi
+          # 4. 在服务器上解压并部署
+          echo "🚀 执行部署..."
+          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
+            set -e
+            mkdir -p ~/app
+            tar -xzf ~/app.tar.gz -C ~/app
+            mv ~/.env ~/app/.env
+            rm ~/app.tar.gz
+            cd ~/app
+            chmod +x deploy.sh
+            ./deploy.sh
+          "
 
-          echo '${{ secrets.ENV_FILE }}' > /tmp/.env.temp
-
-          gcloud beta compute scp /tmp/.env.temp \
-            ${{ secrets.GCP_VM_NAME }}:~/app/.env \
-            --zone=${{ secrets.GCP_VM_ZONE }} \
-            $SSH_OPTS \
-            --quiet
-
-      - name: Execute Deployment
-        run: |
-          if [ "$SSH_METHOD" = "iap" ]; then
-            SSH_OPTS="--tunnel-through-iap"
-          else
-            SSH_OPTS=""
-          fi
-
-          gcloud beta compute ssh ${{ secrets.GCP_VM_NAME }} \
-            --zone=${{ secrets.GCP_VM_ZONE }} \
-            $SSH_OPTS \
-            --command="cd ~/app && chmod +x deploy.sh && ./deploy.sh"
+          echo "✅ 部署完成"
