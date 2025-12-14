@@ -1,45 +1,72 @@
-name: Deploy to GCP VM (Safe Env + Config Check + Zero Downtime)
+name: Deploy to GCP VM (WIF + Zero Downtime)
 
 on:
   push:
     branches: ["main"]
+  workflow_dispatch: # Allow manual triggering from any branch
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
-  # 部署步骤
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Sync files to server (excluding .env)
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure SSH
         run: |
+          # Update SSH configuration to allow connectivity to the VM
+          gcloud compute config-ssh --project=${{ secrets.GCP_PROJECT_ID }}
+
+          # Construct the hostname alias (format: name.zone.project)
+          HOST="${{ secrets.GCP_VM_NAME }}.${{ secrets.GCP_VM_ZONE }}.${{ secrets.GCP_PROJECT_ID }}"
+          echo "VM_HOST=$HOST" >> $GITHUB_ENV
+
+      - name: Prepare Remote Directory
+        run: |
+          # Get the remote user's home directory dynamically
+          REMOTE_HOME=$(ssh -o StrictHostKeyChecking=no ${{ env.VM_HOST }} "pwd")
+          echo "Remote Home: $REMOTE_HOME"
+
+          APP_DIR="$REMOTE_HOME/app"
+          echo "APP_DIR=$APP_DIR" >> $GITHUB_ENV
+
+          # Ensure the app directory exists
+          ssh ${{ env.VM_HOST }} "mkdir -p $APP_DIR"
+
+      - name: Sync files to server
+        run: |
+          # Sync files using the configured SSH alias
           rsync -avz --delete \
             --exclude ".env" \
             --exclude ".git" \
             --exclude "certs" \
-            -e "ssh -i ~/.ssh/id_ed25519" \
-            ./ ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:/home/${{ secrets.VM_USER }}/app/
+            ./ ${{ env.VM_HOST }}:${{ env.APP_DIR }}/
 
-      - name: Create/Update .env file from GitHub Secrets
+      - name: Create/Update .env file
         run: |
-          ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "
-            cat > /home/${{ secrets.VM_USER }}/app/.env << 'EOF'
+          # Write the environment variables from GitHub Secrets to the remote .env file
+          ssh ${{ env.VM_HOST }} "cat > ${{ env.APP_DIR }}/.env << 'EOF'
           ${{ secrets.ENV_FILE }}
-          EOF
-          "
+          EOF"
 
       - name: Execute Deployment Script
         run: |
-          ssh -i ~/.ssh/id_ed25519 ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} "
-            cd /home/${{ secrets.VM_USER }}/app &&
+          # Execute the deployment script on the remote server
+          ssh ${{ env.VM_HOST }} "
+            cd ${{ env.APP_DIR }} &&
             chmod +x deploy.sh &&
             ./deploy.sh
           "

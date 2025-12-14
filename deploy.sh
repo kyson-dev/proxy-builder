@@ -15,6 +15,18 @@ echo "🚀 开始部署代理服务..."
 echo "   域名: $DOMAIN"
 echo ""
 
+# 检查 Docker 权限
+DOCKER_CMD="docker"
+if ! docker info >/dev/null 2>&1; then
+    if sudo docker info >/dev/null 2>&1; then
+        echo "🔒 需要 sudo 权限来运行 Docker"
+        DOCKER_CMD="sudo docker"
+    else
+        echo "❌ 无法运行 Docker (即使使用 sudo)。请检查 Docker 是否安装及权限配置。"
+        exit 1
+    fi
+fi
+
 # 检查 DNS
 echo "📡 检查 DNS 配置..."
 if ! host $DOMAIN > /dev/null 2>&1; then
@@ -44,7 +56,7 @@ echo ""
 echo "🔍 检查 SSL 证书状态..."
 
 # 使用容器内部检查证书，避免宿主机权限问题导致误判
-if ! docker compose run --rm --entrypoint "test" certbot -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem; then
+if ! $DOCKER_CMD compose run --rm --entrypoint "test" certbot -f /etc/letsencrypt/live/$DOMAIN/fullchain.pem; then
     echo "   ⚠️  未检测到证书，准备申请..."
     echo "   1️⃣  启动临时 Nginx (HTTP 模式)..."
     
@@ -74,12 +86,12 @@ http {
 EOF
 
     # 启动 Nginx
-    docker compose up -d nginx
+    $DOCKER_CMD compose up -d nginx
 
     # 等待 Nginx 启动
     echo "      等待 Nginx 启动..."
     for i in {1..10}; do
-        if docker compose ps nginx | grep -q "Up"; then
+        if $DOCKER_CMD compose ps nginx | grep -q "Up"; then
             echo "      ✅ Nginx 已启动"
             break
         fi
@@ -95,7 +107,7 @@ EOF
     
     # 申请证书
     # 注意：必须使用 --entrypoint 覆盖 docker-compose.yml 中定义的自动续期(死循环)脚本
-    docker compose run --rm --entrypoint "certbot" certbot certonly \
+    $DOCKER_CMD compose run --rm --entrypoint "certbot" certbot certonly \
       --webroot -w /var/www/html \
       -d $DOMAIN \
       --agree-tos \
@@ -113,7 +125,7 @@ EOF
     if [ $CERT_EXIT_CODE -eq 0 ]; then
         echo "      ✅ 证书申请成功"
         # 停止临时 Nginx，让后续的主流程统一启动
-        docker compose stop nginx
+        $DOCKER_CMD compose stop nginx
     else
         echo "      ❌ 证书申请失败"
         exit 1
@@ -130,11 +142,11 @@ echo "🚀 启动/更新服务..."
 
 # 拉取最新镜像
 echo "   ⬇️  拉取最新镜像..."
-docker compose pull
+$DOCKER_CMD compose pull
 
 # 启动所有服务
 echo "   🔥 启动服务 (Zero Downtime)..."
-docker compose up -d --remove-orphans
+$DOCKER_CMD compose up -d --remove-orphans
 
 # -----------------------------------------------------------------------------
 # 3. 健康检查模块
@@ -144,16 +156,16 @@ echo "⏳ 等待服务就绪..."
 sleep 5
 
 echo "📊 服务状态:"
-docker compose ps
+$DOCKER_CMD compose ps
 
 # 简单验证 Sing-box 是否运行
-if docker compose ps sing-box | grep -q "Up"; then
+if $DOCKER_CMD compose ps sing-box | grep -q "Up"; then
     echo ""
     echo "✅ 部署成功！"
-    echo "📝 查看日志: docker compose logs -f"
+    echo "📝 查看日志: $DOCKER_CMD compose logs -f"
 else
     echo ""
     echo "❌ 部署可能存在问题，Sing-box 未正常运行"
-    docker compose logs sing-box
+    $DOCKER_CMD compose logs sing-box
     exit 1
 fi

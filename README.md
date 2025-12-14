@@ -4,16 +4,19 @@
 ```
 proxy-builder/
 ├── .env                 # 环境变量（敏感信息）
+├── Makefile            # 便捷工具命令
 ├── docker-compose.yml   # Docker 服务配置
 ├── deploy.sh           # 一键部署脚本
 ├── change-domain.sh    # 域名替换工具
 ├── README.md           # 本文档
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml  # GitHub Actions 自动部署配置
+│       └── deploy.yml  # GitHub Actions WIF 自动部署
 ├── docs/
-│   ├── github-secrets-setup.md    # GitHub Secrets 配置指南
-│   └── deployment-workflow.md     # 部署流程详解
+│   ├── WIF-SETUP-GUIDE.md    # WIF 完整配置指南
+│   └── WIF-CHECKLIST.md      # WIF 快速清单
+├── scripts/
+│   └── setup-wif.sh    # WIF 自动配置脚本
 ├── nginx/
 │   └── nginx.conf      # Nginx 配置
 ├── sing-box/
@@ -29,27 +32,38 @@ proxy-builder/
 
 ### 方式 1: GitHub Actions 自动部署（推荐）
 
-通过 GitHub Actions 实现自动化部署，支持零停机更新。
+通过 GitHub Actions + GCP Workload Identity Federation (WIF) 实现安全的自动化部署，支持零停机更新。
 
-#### 配置步骤：
+#### 快速开始（3 步）：
 
-1. **配置 GitHub Secrets**
-   - 查看详细指南：[docs/github-secrets-setup.md](docs/github-secrets-setup.md)
-   - 需要配置：SSH 密钥、VM 信息、域名、证书邮箱、代理凭证等
+1. **配置 WIF（一次性）**
+   ```bash
+   make setup-wif
+   ```
+   脚本会自动配置 GCP 和 GitHub Secrets。
+   
+   📋 **配置清单**：[docs/WIF-CHECKLIST.md](docs/WIF-CHECKLIST.md)
 
-2. **推送代码触发部署**
+2. **上传环境变量**
+   ```bash
+   make push-env
+   ```
+
+3. **推送代码触发部署**
    ```bash
    git add .
    git commit -m "Update configuration"
    git push origin main
    ```
 
-3. **查看部署进度**
-   - 在 GitHub 仓库的 **Actions** 标签页查看部署状态
-   - 首次部署会自动运行 `deploy.sh` 申请证书
-   - 后续更新会进行零停机重启
+#### 查看部署进度
+- 在 GitHub 仓库的 **Actions** 标签页查看部署状态
+- 首次部署会自动运行 `deploy.sh` 申请证书
+- 后续更新会进行零停机重启
 
-📖 **了解更多**：查看 [部署流程详解](docs/deployment-workflow.md)
+📖 **详细指南**：
+- [WIF 配置指南](docs/WIF-SETUP-GUIDE.md)（完整说明）
+- [WIF 快速清单](docs/WIF-CHECKLIST.md)（快速参考）
 
 ---
 
@@ -77,13 +91,16 @@ PROXY_PASSWORD=your-secure-password-here
 如果需要生成新的 UUID 或 Reality 密钥：
 ```bash
 # 生成 UUID
-uuidgen
+make uuid
 
 # 生成 Reality 密钥对
-docker run --rm ghcr.io/sagernet/sing-box:latest generate reality-keypair
+make reality-key
 
 # 生成随机密码
-openssl rand -hex 16
+make password
+
+# 生成 Short ID
+make short-id
 ```
 
 ### 3. 一键部署
