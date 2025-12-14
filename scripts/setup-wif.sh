@@ -83,17 +83,35 @@ POOL_ID=$(gcloud iam workload-identity-pools describe "$POOL_NAME" --project "$P
 # 7. Create Workload Identity Provider
 echo "Creating Workload Identity Provider ($PROVIDER_NAME)..."
 if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_NAME" --workload-identity-pool="$POOL_NAME" --project "$PROJECT_ID" --location="global" &>/dev/null; then
-    gcloud iam workload-identity-pools providers create "$PROVIDER_NAME" \
+    gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_NAME" \
         --workload-identity-pool="$POOL_NAME" \
         --project "$PROJECT_ID" \
         --location="global" \
-        --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository" \
-        --issuer-uri="https://token.actions.githubusercontent.com"
+        --issuer-uri="https://token.actions.githubusercontent.com" \
+        --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
+        --attribute-condition="assertion.repository_owner == '$(echo $REPO | cut -d'/' -f1)'"
+    
+    echo "Waiting for provider to be ready..."
+    sleep 5
 else
     echo "Provider already exists, skipping creation."
 fi
 
-PROVIDER_ID=$(gcloud iam workload-identity-pools providers describe "$PROVIDER_NAME" --workload-identity-pool="$POOL_NAME" --project "$PROJECT_ID" --location="global" --format="value(name)")
+# Retry logic to get PROVIDER_ID
+echo "Retrieving Provider ID..."
+for i in {1..5}; do
+    PROVIDER_ID=$(gcloud iam workload-identity-pools providers describe "$PROVIDER_NAME" --workload-identity-pool="$POOL_NAME" --project "$PROJECT_ID" --location="global" --format="value(name)" 2>/dev/null)
+    if [ -n "$PROVIDER_ID" ]; then
+        break
+    fi
+    echo "Waiting for provider to propagate (attempt $i/5)..."
+    sleep 3
+done
+
+if [ -z "$PROVIDER_ID" ]; then
+    echo "❌ Failed to retrieve Provider ID after multiple attempts"
+    exit 1
+fi
 
 # 8. Allow GitHub Repo to impersonate Service Account
 echo "Binding GitHub repo to Service Account..."
