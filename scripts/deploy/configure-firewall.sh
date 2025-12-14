@@ -59,10 +59,10 @@ ensure_firewall_rule() {
         --direction=INGRESS \
         --priority=1000 \
         --network=default \
-        --action=ALLOW \
         --allow="${protocol}:${port}" \
         --source-ranges=0.0.0.0/0 \
         --description="$description"
+
 }
 
 # ------------------------------------------------------------------------------

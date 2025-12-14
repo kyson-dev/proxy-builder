@@ -47,10 +47,10 @@ ensure_ssh_firewall() {
         --direction=INGRESS \
         --priority=1000 \
         --network=default \
-        --action=ALLOW \
         --allow=tcp:22 \
         --source-ranges=0.0.0.0/0 \
         --description="Allow SSH access to all instances"
+
 }
 
 # ------------------------------------------------------------------------------
