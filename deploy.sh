@@ -178,25 +178,12 @@ fi
 echo ""
 
 # =============================================================================
-# 2. 加载环境变量
+# 2. 环境变量处理
 # =============================================================================
-if [ -f .env ]; then
-    set -a
-    source .env
-    set +a
-else
-    echo "❌ 未找到 .env 文件，请先创建"
-    exit 1
-fi
-
-# 检查必需的环境变量
-if [ -z "$VLESS_USERS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_USERS" ]; then
-    echo "❌ 错误: 缺少必要的环境变量"
-    echo "   需要: VLESS_USERS (JSON), H2_USERS (JSON), REALITY_PRIVATE_KEY, REALITY_SHORT_ID"
-    exit 1
-fi
-
-echo "📊 环境配置检查通过"
+# 注意：这里不再 source .env 文件，亦不检查变量。
+# 复杂的 JSON 环境变量由 Docker Compose 直接读取，避免 Shell 解析错误。
+# 具体的变量检查将在 Sing-box 容器内进行。
+echo "⏩ 跳过本地环境变量检查 (交由容器处理)"
 
 # =============================================================================
 # 3. 检查 Docker 权限
