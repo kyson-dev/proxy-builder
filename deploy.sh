@@ -190,22 +190,13 @@ else
 fi
 
 # 检查必需的环境变量
-if [ -z "$VLESS_UUIDS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_PASSWORDS" ]; then
+if [ -z "$VLESS_USERS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_USERS" ]; then
     echo "❌ 错误: 缺少必要的环境变量"
-    echo "   需要: VLESS_UUIDS, REALITY_PRIVATE_KEY, REALITY_SHORT_ID, H2_PASSWORDS"
+    echo "   需要: VLESS_USERS (JSON), H2_USERS (JSON), REALITY_PRIVATE_KEY, REALITY_SHORT_ID"
     exit 1
 fi
 
-# 显示用户数量
-VLESS_COUNT=$(echo "$VLESS_UUIDS" | tr ',' '\n' | grep -c . || echo 0)
-H2_COUNT=$(echo "$H2_PASSWORDS" | tr ',' '\n' | grep -c . || echo 0)
-
-if [ "$VLESS_COUNT" -eq 0 ] || [ "$H2_COUNT" -eq 0 ]; then
-    echo "❌ 错误: 至少需要配置一个用户"
-    exit 1
-fi
-
-echo "📊 用户配置: VLESS=$VLESS_COUNT 个, Hysteria2=$H2_COUNT 个"
+echo "📊 环境配置检查通过"
 
 # =============================================================================
 # 3. 检查 Docker 权限

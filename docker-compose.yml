@@ -12,8 +12,8 @@ services:
       - ./sing-box/config.json.template:/etc/sing-box/config.json.template:ro
       - ./sing-box/certs:/etc/sing-box/certs:ro
     environment:
-      - VLESS_UUIDS=${VLESS_UUIDS}
-      - H2_PASSWORDS=${H2_PASSWORDS}
+      - VLESS_USERS=${VLESS_USERS}
+      - H2_USERS=${H2_USERS}
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
     cap_add:

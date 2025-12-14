@@ -8,85 +8,44 @@ if [ ! -f /etc/sing-box/config.json.template ]; then
 fi
 
 # Check required environment variables
-if [ -z "$VLESS_UUIDS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_PASSWORDS" ]; then
+if [ -z "$VLESS_USERS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_USERS" ]; then
   echo "Error: Missing required environment variables"
-  echo "Required: VLESS_UUIDS, REALITY_PRIVATE_KEY, REALITY_SHORT_ID, H2_PASSWORDS"
+  echo "Required: VLESS_USERS (JSON), H2_USERS (JSON), REALITY_PRIVATE_KEY, REALITY_SHORT_ID"
   exit 1
 fi
 
 echo "Generating configuration from template..."
 
-# =============================================================================
-# Generate VLESS users JSON
-# =============================================================================
-generate_vless_users() {
-  local uuids="$1"
-  local first=true
-  local result=""
-  
-  echo "$uuids" | tr ',' '\n' | while read -r uuid; do
-    [ -z "$uuid" ] && continue
-    
-    if [ "$first" = true ]; then
-      first=false
-    else
-      printf ","
-    fi
-    
-    printf '{"uuid":"%s","flow":"xtls-rprx-vision"}' "$uuid"
-  done
-}
-
-# =============================================================================
-# Generate Hysteria2 users JSON
-# =============================================================================
-generate_h2_users() {
-  local passwords="$1"
-  local first=true
-  
-  echo "$passwords" | tr ',' '\n' | while read -r pass; do
-    [ -z "$pass" ] && continue
-    
-    if [ "$first" = true ]; then
-      first=false
-    else
-      printf ","
-    fi
-    
-    printf '{"password":"%s"}' "$pass"
-  done
-}
-
-# Generate user JSON strings
-VLESS_USERS_JSON=$(generate_vless_users "$VLESS_UUIDS")
-H2_USERS_JSON=$(generate_h2_users "$H2_PASSWORDS")
-
-# Validate we have at least one user for each protocol
-if [ -z "$VLESS_USERS_JSON" ]; then
-  echo "Error: No valid VLESS users found"
+# Check if inputs are valid JSON (basic check)
+if ! echo "$VLESS_USERS" | grep -q '^\['; then
+  echo "Error: VLESS_USERS must be a JSON array starting with ["
   exit 1
 fi
 
-if [ -z "$H2_USERS_JSON" ]; then
-  echo "Error: No valid Hysteria2 users found"
+if ! echo "$H2_USERS" | grep -q '^\['; then
+  echo "Error: H2_USERS must be a JSON array starting with ["
   exit 1
 fi
 
-# Count users
-VLESS_COUNT=$(echo "$VLESS_UUIDS" | tr ',' '\n' | grep -c . || echo 0)
-H2_COUNT=$(echo "$H2_PASSWORDS" | tr ',' '\n' | grep -c . || echo 0)
-
-echo "  VLESS users: $VLESS_COUNT"
-echo "  Hysteria2 users: $H2_COUNT"
+echo "  VLESS users configured (JSON)"
+echo "  Hysteria2 users configured (JSON)"
 
 # Copy template
 cp /etc/sing-box/config.json.template /etc/sing-box/config.json
 
 # Replace variables using sed
-sed -i "s|\${VLESS_USERS_JSON}|$VLESS_USERS_JSON|g" /etc/sing-box/config.json
-sed -i "s|\${H2_USERS_JSON}|$H2_USERS_JSON|g" /etc/sing-box/config.json
+# Note: Use different delimiter for sed to avoid issues with special chars
+# We use a temporary file to handle multiline JSON strings correctly with sed
 sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_SHORT_ID}|$REALITY_SHORT_ID|g" /etc/sing-box/config.json
+
+# For JSON arrays, we use awkward implementation to prevent sed from breaking on newlines
+# 1. Escape newlines in the JSON string
+VLESS_USERS_ESCAPED=$(echo "$VLESS_USERS" | tr '\n' ' ' | sed 's/  */ /g')
+H2_USERS_ESCAPED=$(echo "$H2_USERS" | tr '\n' ' ' | sed 's/  */ /g')
+
+sed -i "s|\${VLESS_USERS}|$VLESS_USERS_ESCAPED|g" /etc/sing-box/config.json
+sed -i "s|\${H2_USERS}|$H2_USERS_ESCAPED|g" /etc/sing-box/config.json
 
 echo "Configuration generated successfully."
 

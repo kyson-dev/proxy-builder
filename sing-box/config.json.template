@@ -9,9 +9,7 @@
       "tag": "vless-reality",
       "listen": "::",
       "listen_port": 8443,
-      "users": [
-        ${VLESS_USERS_JSON}
-      ],
+      "users": ${VLESS_USERS},
       "tls": {
         "enabled": true,
         "server_name": "www.microsoft.com",
@@ -31,9 +29,7 @@
       "tag": "hysteria2",
       "listen": "::",
       "listen_port": 9443,
-      "users": [
-        ${H2_USERS_JSON}
-      ],
+      "users": ${H2_USERS},
       "tls": {
         "enabled": true,
         "certificate_path": "/etc/sing-box/certs/cert.pem",
