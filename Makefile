@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder
 # 支持多环境部署 (production / development)
 
-.PHONY: all uuid short-id password reality-key setup-wif push-env push-env-prod push-env-dev help
+.PHONY: all uuid short-id password reality-key setup-wif push-config help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -18,8 +18,7 @@ help:
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
 	@echo ""
 	@echo "📦 Configuration Push:"
-	@echo "  make push-config-prod  - Convert singbox.config.json and push to production"
-	@echo "  make push-config-dev   - Convert singbox.config.json and push to development"
+	@echo "  make push-config       - Push config vars to GitHub Environment (interactive)"
 	@echo ""
 	@echo "🛠️  Utilities:"
 	@echo "  make generate-cert     - Generate self-signed certificate for Hysteria2"
@@ -55,29 +54,11 @@ setup-wif:
 # Configuration Push (上传变量配置)
 # ============================================================
 
-# Push production config
-push-config-prod:
-	@if [ ! -f vars.production.json ]; then \
-		echo "❌ vars.production.json not found!"; \
-		echo "   Please copy vars.production.example.json to vars.production.json and fill in your values."; \
-		exit 1; \
-	fi
-	@echo "📦 Pushing vars.production.json to 'production' environment..."
-	@gh secret set VARS_JSON --env production < vars.production.json
-	@echo ""
-	@echo "✅ Production variables uploaded!"
+# Push config (auto-detect environment)
+push-config:
+	@chmod +x scripts/push-config.sh
+	@./scripts/push-config.sh
 
-# Push development config
-push-config-dev:
-	@if [ ! -f vars.development.json ]; then \
-		echo "❌ vars.development.json not found!"; \
-		echo "   Please copy vars.development.example.json to vars.development.json and fill in your values."; \
-		exit 1; \
-	fi
-	@echo "📦 Pushing vars.development.json to 'development' environment..."
-	@gh secret set VARS_JSON --env development < vars.development.json
-	@echo ""
-	@echo "✅ Development variables uploaded!"
 
 # ============================================================
 # Generate certificate for Hysteria2
