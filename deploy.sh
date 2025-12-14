@@ -106,7 +106,6 @@ EOF
     echo "      ⚠️  注意：如果卡住，请检查防火墙是否开放 80 端口"
     
     # 申请证书
-    # 注意：必须使用 --entrypoint 覆盖 docker-compose.yml 中定义的自动续期(死循环)脚本
     $DOCKER_CMD compose run --rm --entrypoint "certbot" certbot certonly \
       --webroot -w /var/www/html \
       -d $DOMAIN \
