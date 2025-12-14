@@ -309,6 +309,12 @@ fi
 echo ""
 echo "🚀 启动服务..."
 
+# 清理旧的 .env 文件（避免 docker compose 误读）
+if [ -f .env ]; then
+    echo "   🧹 清理旧的 .env 文件..."
+    rm -f .env
+fi
+
 # 拉取最新镜像
 echo "   ⬇️  拉取最新镜像..."
 $DOCKER_CMD compose pull
