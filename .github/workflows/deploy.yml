@@ -25,6 +25,8 @@ jobs:
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: "beta"
 
       - name: Debug - Check VM Status
         run: |
