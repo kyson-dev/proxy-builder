@@ -12,10 +12,10 @@ services:
       - ./sing-box/config.json.template:/etc/sing-box/config.json.template:ro
       - ./sing-box/certs:/etc/sing-box/certs:ro
     environment:
-      - VLESS_UUID=${VLESS_UUID}
+      - VLESS_UUIDS=${VLESS_UUIDS}
+      - H2_PASSWORDS=${H2_PASSWORDS}
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
-      - H2_PASSWORD=${H2_PASSWORD}
     cap_add:
       - NET_ADMIN
     logging:

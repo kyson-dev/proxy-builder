@@ -64,3 +64,38 @@ jobs:
           "
 
           echo "✅ 部署完成"
+
+      - name: Debug - Investigate Native SSH
+        if: always() # 无论前面是否成功都运行
+        run: |
+          echo "🔍 === 开始 SSH 侦探实验 ==="
+
+          echo "1. 尝试生成 SSH 配置"
+          gcloud beta compute config-ssh --project=${{ secrets.GCP_PROJECT_ID }} --quiet
+
+          echo ""
+          echo "2. 查看 ~/.ssh/config 内容"
+          cat ~/.ssh/config || echo "No config file found"
+
+          echo ""
+          echo "3. 查看生成的密钥文件"
+          ls -la ~/.ssh/
+
+          echo ""
+          echo "4. 尝试解析主机名"
+          # 提取 Host 别名
+          HOST_ALIAS="${{ secrets.GCP_VM_NAME }}.${{ secrets.GCP_VM_ZONE }}.${{ secrets.GCP_PROJECT_ID }}"
+          echo "Host Alias: $HOST_ALIAS"
+
+          echo ""
+          echo "5. 尝试原生 SSH 连接 (Dry Run)"
+          # 使用 -G 选项只打印配置，不实际连接，看看 SSH 到底想用什么配置连
+          ssh -G $HOST_ALIAS || true
+
+          echo ""
+          echo "6. 尝试真实连接 (带详细日志)"
+          # 尝试连接，看看会在哪一步挂掉
+          # 注意：这里很可能会失败，这是预期的
+          ssh -v -o ConnectTimeout=5 $HOST_ALIAS "echo 'I am Native SSH'" || echo "❌ Native SSH Failed as expected"
+
+          echo "🔍 === 实验结束 ==="

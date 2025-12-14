@@ -38,7 +38,7 @@ short-id:
 	@openssl rand -hex 4
 
 password:
-	@openssl rand -base64 16
+	@openssl rand -base64 32
 
 reality-key:
 	@echo "Generating REALITY key pair using sing-box docker image..."

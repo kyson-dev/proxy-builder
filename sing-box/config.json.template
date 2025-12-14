@@ -10,10 +10,7 @@
       "listen": "::",
       "listen_port": 8443,
       "users": [
-        {
-          "uuid": "${VLESS_UUID}",
-          "flow": "xtls-rprx-vision"
-        }
+        ${VLESS_USERS_JSON}
       ],
       "tls": {
         "enabled": true,
@@ -35,9 +32,7 @@
       "listen": "::",
       "listen_port": 9443,
       "users": [
-        {
-          "password": "${H2_PASSWORD}"
-        }
+        ${H2_USERS_JSON}
       ],
       "tls": {
         "enabled": true,
