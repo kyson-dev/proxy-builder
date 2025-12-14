@@ -1,7 +1,185 @@
 #!/bin/bash
 set -e
 
-# 加载环境变量
+echo "🚀 开始部署简化代理服务..."
+echo ""
+
+# =============================================================================
+# 0. 启用 BBR 拥塞控制算法
+# =============================================================================
+enable_bbr() {
+    echo "🚀 检查 BBR 拥塞控制..."
+    
+    # 检查当前拥塞控制算法
+    CURRENT_CC=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    
+    if [ "$CURRENT_CC" = "bbr" ]; then
+        echo "   ✅ BBR 已启用"
+        return 0
+    fi
+    
+    echo "   当前拥塞控制: $CURRENT_CC"
+    echo "   📝 正在启用 BBR..."
+    
+    # 检查内核是否支持 BBR (Linux 4.9+)
+    if ! grep -q bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null; then
+        # 尝试加载 BBR 模块
+        sudo modprobe tcp_bbr 2>/dev/null || true
+    fi
+    
+    # 再次检查是否可用
+    if ! grep -q bbr /proc/sys/net/ipv4/tcp_available_congestion_control 2>/dev/null; then
+        echo "   ⚠️  内核不支持 BBR (需要 Linux 4.9+)"
+        echo "   当前内核: $(uname -r)"
+        return 0
+    fi
+    
+    # 配置 sysctl 参数
+    sudo tee /etc/sysctl.d/99-bbr.conf > /dev/null << 'EOF'
+# BBR congestion control
+net.core.default_qdisc = fq
+net.ipv4.tcp_congestion_control = bbr
+
+# 优化网络性能
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.tcp_mtu_probing = 1
+net.ipv4.tcp_fastopen = 3
+EOF
+    
+    # 应用配置
+    sudo sysctl -p /etc/sysctl.d/99-bbr.conf > /dev/null 2>&1 || sudo sysctl --system > /dev/null 2>&1
+    
+    # 验证
+    NEW_CC=$(sysctl net.ipv4.tcp_congestion_control 2>/dev/null | awk '{print $3}')
+    if [ "$NEW_CC" = "bbr" ]; then
+        echo "   ✅ BBR 启用成功"
+    else
+        echo "   ⚠️  BBR 启用失败，使用默认拥塞控制: $NEW_CC"
+    fi
+}
+
+# 启用 BBR
+enable_bbr
+echo ""
+
+# =============================================================================
+# 1. 检查并安装必要的工具
+# =============================================================================
+install_docker() {
+    echo "📦 安装 Docker..."
+    
+    # 检测操作系统
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+    else
+        echo "❌ 无法检测操作系统"
+        exit 1
+    fi
+    
+    case $OS in
+        ubuntu|debian)
+            echo "   检测到 $OS，使用 apt 安装..."
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ca-certificates curl gnupg
+            
+            # 添加 Docker 官方 GPG 密钥
+            sudo install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/$OS/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null || true
+            sudo chmod a+r /etc/apt/keyrings/docker.gpg
+            
+            # 添加 Docker 仓库
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$OS $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            
+            # 安装 Docker
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            ;;
+        centos|rhel|fedora|rocky|almalinux)
+            echo "   检测到 $OS，使用 yum/dnf 安装..."
+            sudo yum install -y -q yum-utils || sudo dnf install -y -q dnf-plugins-core
+            sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null || \
+                sudo dnf config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null
+            sudo yum install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin || \
+                sudo dnf install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+            ;;
+        *)
+            echo "   未知操作系统，尝试使用官方安装脚本..."
+            curl -fsSL https://get.docker.com | sudo sh
+            ;;
+    esac
+    
+    # 启动 Docker 服务
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    
+    # 将当前用户添加到 docker 组（下次登录生效）
+    sudo usermod -aG docker $USER 2>/dev/null || true
+    
+    echo "   ✅ Docker 安装完成"
+}
+
+install_openssl() {
+    echo "📦 安装 OpenSSL..."
+    
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+    fi
+    
+    case $OS in
+        ubuntu|debian)
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq openssl
+            ;;
+        centos|rhel|fedora|rocky|almalinux)
+            sudo yum install -y -q openssl || sudo dnf install -y -q openssl
+            ;;
+        *)
+            echo "❌ 无法自动安装 openssl，请手动安装"
+            exit 1
+            ;;
+    esac
+    
+    echo "   ✅ OpenSSL 安装完成"
+}
+
+echo "🔍 检查必要的工具..."
+
+# 检查 Docker
+if ! command -v docker &> /dev/null; then
+    echo "   ⚠️  Docker 未安装"
+    install_docker
+else
+    echo "   ✅ Docker 已安装: $(docker --version | head -1)"
+fi
+
+# 检查 Docker Compose (V2 plugin)
+if ! docker compose version &> /dev/null 2>&1; then
+    if ! sudo docker compose version &> /dev/null 2>&1; then
+        echo "   ⚠️  Docker Compose 未安装，重新安装 Docker..."
+        install_docker
+    fi
+fi
+echo "   ✅ Docker Compose 已安装"
+
+# 检查 OpenSSL
+if ! command -v openssl &> /dev/null; then
+    echo "   ⚠️  OpenSSL 未安装"
+    install_openssl
+else
+    echo "   ✅ OpenSSL 已安装"
+fi
+
+echo ""
+
+# =============================================================================
+# 2. 加载环境变量
+# =============================================================================
 if [ -f .env ]; then
     set -a
     source .env
@@ -11,9 +189,6 @@ else
     exit 1
 fi
 
-echo "🚀 开始部署简化代理服务..."
-echo ""
-
 # 检查必需的环境变量
 if [ -z "$VLESS_UUID" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT_ID" ] || [ -z "$H2_PASSWORD" ]; then
     echo "❌ 错误: 缺少必要的环境变量"
@@ -21,19 +196,24 @@ if [ -z "$VLESS_UUID" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHORT
     exit 1
 fi
 
-# 检查 Docker 权限
+# =============================================================================
+# 3. 检查 Docker 权限
+# =============================================================================
 DOCKER_CMD="docker"
 if ! docker info >/dev/null 2>&1; then
     if sudo docker info >/dev/null 2>&1; then
         echo "🔒 需要 sudo 权限来运行 Docker"
         DOCKER_CMD="sudo docker"
     else
-        echo "❌ 无法运行 Docker (即使使用 sudo)。请检查 Docker 是否安装及权限配置。"
+        echo "❌ 无法运行 Docker。请检查 Docker 服务是否启动。"
+        echo "   尝试: sudo systemctl start docker"
         exit 1
     fi
 fi
 
-# 检查并生成自签名证书
+# =============================================================================
+# 4. 检查并生成自签名证书
+# =============================================================================
 echo "🔐 检查 Hysteria2 自签名证书..."
 CERT_DIR="./sing-box/certs"
 mkdir -p "$CERT_DIR"
@@ -61,13 +241,6 @@ fi
 
 if [ "$NEED_GENERATE" = true ]; then
     echo "   📝 生成新的自签名证书..."
-    
-    # 检查 openssl 是否可用
-    if ! command -v openssl &> /dev/null; then
-        echo "   ❌ 错误: 未找到 openssl 命令"
-        echo "   请先安装 openssl: apt install openssl 或 yum install openssl"
-        exit 1
-    fi
     
     # 使用 OpenSSL 生成自签名证书 (使用 RSA 以确保兼容性)
     openssl req -x509 -nodes -newkey rsa:2048 \
@@ -104,7 +277,9 @@ if [ "$NEED_GENERATE" = true ]; then
     fi
 fi
 
-# 启动服务
+# =============================================================================
+# 5. 启动服务
+# =============================================================================
 echo ""
 echo "🚀 启动服务..."
 
@@ -116,7 +291,9 @@ $DOCKER_CMD compose pull
 echo "   🔥 启动 Sing-box..."
 $DOCKER_CMD compose up -d --remove-orphans
 
-# 健康检查
+# =============================================================================
+# 6. 健康检查
+# =============================================================================
 echo ""
 echo "⏳ 等待服务就绪..."
 sleep 5
@@ -124,18 +301,21 @@ sleep 5
 echo "📊 服务状态:"
 $DOCKER_CMD compose ps
 
+# 获取服务器 IP
+SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s ip.sb 2>/dev/null || echo "<SERVER_IP>")
+
 # 验证 Sing-box 是否运行
 if $DOCKER_CMD compose ps sing-box | grep -q "Up"; then
     echo ""
     echo "✅ 部署成功！"
     echo ""
     echo "📋 代理服务信息:"
-    echo "   VLESS Reality: <SERVER_IP>:8443"
-    echo "   Hysteria2:     <SERVER_IP>:9443 (自签名证书)"
+    echo "   VLESS Reality: $SERVER_IP:8443"
+    echo "   Hysteria2:     $SERVER_IP:9443 (自签名证书)"
     echo ""
     echo "📝 查看日志: docker logs -f sing-box"
     echo ""
-    echo "⚠️  注意: Hysteria2 使用自签名证书，客户端需要设置 insecure=true 或导入证书"
+    echo "⚠️  注意: Hysteria2 使用自签名证书，客户端需要设置 insecure=true"
 else
     echo ""
     echo "❌ Sing-box 启动失败，请检查日志:"
