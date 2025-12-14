@@ -28,29 +28,41 @@ jobs:
 
       - name: Configure SSH
         run: |
-          # Update SSH configuration to allow connectivity to the VM
-          gcloud compute config-ssh --project=${{ secrets.GCP_PROJECT_ID }}
+          # 1. Setup SSH keys and update config
+          # This command automatically generates keys and updates ~/.ssh/config
+          gcloud compute config-ssh --project=${{ secrets.GCP_PROJECT_ID }} --quiet
 
-          # Construct the hostname alias (format: name.zone.project)
+          # 2. Construct the hostname alias (format: name.zone.project)
           HOST="${{ secrets.GCP_VM_NAME }}.${{ secrets.GCP_VM_ZONE }}.${{ secrets.GCP_PROJECT_ID }}"
           echo "VM_HOST=$HOST" >> $GITHUB_ENV
 
+          # 3. Warm-up connection (Critical for new VMs)
+          # First connection triggers key propagation to the VM. We retry until successful.
+          echo "🔄 Warming up SSH connection..."
+          for i in {1..5}; do
+            if gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="echo SSH Ready" --quiet; then
+              echo "✅ SSH connection established"
+              break
+            fi
+            echo "⏳ Waiting for SSH keys to propagate... ($i/5)"
+            sleep 10
+          done
+
       - name: Prepare Remote Directory
         run: |
-          # Get the remote user's home directory dynamically
-          REMOTE_HOME=$(ssh -o StrictHostKeyChecking=no ${{ env.VM_HOST }} "pwd")
-          echo "Remote Home: $REMOTE_HOME"
+          # Use gcloud ssh directly for better reliability
+          gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="mkdir -p ~/app" --quiet
 
-          APP_DIR="$REMOTE_HOME/app"
-          echo "APP_DIR=$APP_DIR" >> $GITHUB_ENV
-
-          # Ensure the app directory exists
-          ssh ${{ env.VM_HOST }} "mkdir -p $APP_DIR"
+          # Get Remote Home (for rsync path)
+          REMOTE_HOME=$(gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="pwd" --quiet)
+          echo "APP_DIR=$REMOTE_HOME/app" >> $GITHUB_ENV
 
       - name: Sync files to server
         run: |
           # Sync files using the configured SSH alias
+          # We use "runner@" fallback protection by strictly using the alias options
           rsync -avz --delete \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
             --exclude ".env" \
             --exclude ".env.*" \
             --exclude ".git" \
@@ -62,16 +74,14 @@ jobs:
 
       - name: Create/Update .env file
         run: |
-          # Write the environment variables from GitHub Secrets to the remote .env file
-          ssh ${{ env.VM_HOST }} "cat > ${{ env.APP_DIR }}/.env << 'EOF'
-          ${{ secrets.ENV_FILE }}
-          EOF"
+          # Construct the .env file content locally first to handle newlines correctly
+          echo "${{ secrets.ENV_FILE }}" > .env.temp
+
+          # Copy .env file using gcloud scp (simpler than cat via ssh)
+          gcloud compute scp .env.temp ${{ secrets.GCP_VM_NAME }}:~/app/.env --zone=${{ secrets.GCP_VM_ZONE }} --quiet
+          rm .env.temp
 
       - name: Execute Deployment Script
         run: |
-          # Execute the deployment script on the remote server
-          ssh ${{ env.VM_HOST }} "
-            cd ${{ env.APP_DIR }} &&
-            chmod +x deploy.sh &&
-            ./deploy.sh
-          "
+          # Execute the deployment script using gcloud ssh
+          gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="cd ~/app && chmod +x deploy.sh && ./deploy.sh" --quiet
