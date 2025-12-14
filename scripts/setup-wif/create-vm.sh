@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 选择或创建 VM
+# 创建新 VM（包含服务账号和防火墙规则）
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
 # ==============================================================================
 
@@ -27,11 +27,58 @@ SPOT_DISK_SIZE="10"
 SPOT_DISK_TYPE="pd-standard"
 SPOT_NETWORK_TIER="STANDARD"
 
+# ------------------------------------------------------------------------------
+# 确保 SSH 防火墙规则存在（全项目共用）
+# ------------------------------------------------------------------------------
+ensure_ssh_firewall() {
+    local project="$1"
+    local rule_name="allow-ssh"
+    
+    # 检查规则是否已存在
+    if gcloud compute firewall-rules describe "$rule_name" --project="$project" &>/dev/null; then
+        log_substep "SSH 防火墙规则已存在: $rule_name"
+        return 0
+    fi
+    
+    log_substep "创建 SSH 防火墙规则: $rule_name"
+    
+    gcloud compute firewall-rules create "$rule_name" \
+        --project="$project" \
+        --direction=INGRESS \
+        --priority=1000 \
+        --network=default \
+        --action=ALLOW \
+        --allow=tcp:22 \
+        --source-ranges=0.0.0.0/0 \
+        --description="Allow SSH access to all instances"
+}
 
 # ------------------------------------------------------------------------------
-# 创建 VM
+# 创建 VM 专属服务账号
 # ------------------------------------------------------------------------------
-create_vm() {
+create_vm_service_account() {
+    local project="$1"
+    local sa_name="$2"
+    
+    local sa_email="${sa_name}@${project}.iam.gserviceaccount.com"
+    
+    # 检查服务账号是否已存在
+    if gcloud iam service-accounts describe "$sa_email" --project="$project" &>/dev/null; then
+        log_substep "服务账号已存在: $sa_name"
+        return 0
+    fi
+    
+    log_substep "创建服务账号: $sa_name"
+    
+    gcloud iam service-accounts create "$sa_name" \
+        --project="$project" \
+        --display-name="VM Service Account - $sa_name"
+}
+
+# ------------------------------------------------------------------------------
+# 创建 VM (核心函数)
+# ------------------------------------------------------------------------------
+create_vm_core() {
     local project="$1"
     local vm_name="$2"
     local zone="$3"
@@ -40,6 +87,7 @@ create_vm() {
     local disk_type="$6"
     local network_tier="$7"
     local is_spot="${8:-false}"
+    local sa_email="$9"
     
     local provisioning_model="STANDARD"
     local maintenance_policy="MIGRATE"
@@ -62,6 +110,8 @@ create_vm() {
         --maintenance-policy="$maintenance_policy" \
         --provisioning-model="$provisioning_model" \
         $extra_args \
+        --service-account="$sa_email" \
+        --scopes=https://www.googleapis.com/auth/cloud-platform \
         --create-disk=auto-delete=yes,boot=yes,device-name="$vm_name",image=projects/debian-cloud/global/images/debian-12-bookworm-v20241210,mode=rw,size="$disk_size",type="$disk_type" \
         --no-shielded-secure-boot \
         --shielded-vtpm \
@@ -71,142 +121,14 @@ create_vm() {
 }
 
 # ------------------------------------------------------------------------------
-# 显示现有 VM 列表
+# 创建 VM 交互流程
 # ------------------------------------------------------------------------------
-display_vm_list() {
-    local vm_list="$1"
-    
-    echo ""
-    echo "现有 VM 实例:"
-    
-    local i=0
-    while IFS=',' read -r name zone status; do
-        local status_icon="⚪"
-        [[ "$status" == "RUNNING" ]] && status_icon="🟢"
-        [[ "$status" == "TERMINATED" ]] && status_icon="🔴"
-        
-        echo "  $((i+1)). $name"
-        echo "      区域: $zone | 状态: $status_icon $status"
-        ((i++))
-    done <<< "$vm_list"
-    
-    echo "  0. 手动输入"
-    echo ""
-}
-
-# ------------------------------------------------------------------------------
-# 主函数
-# ------------------------------------------------------------------------------
-select_or_create_vm() {
+create_vm_interactive() {
     local project="${1:-$PROJECT_ID}"
-    local env_name="${2:-$ENV_NAME}"
     
     if [[ -z "$project" ]]; then
         die "PROJECT_ID 未设置"
     fi
-    
-    log_step "Step 9: 选择或创建 VM ('$env_name' 环境)"
-    echo ""
-    
-    log_substep "正在获取 VM 列表..."
-    local vm_list
-    vm_list=$(gcp_list_vms "$project")
-    
-    # 解析 VM 列表到数组
-    local vm_names=()
-    local vm_zones=()
-    local vm_statuses=()
-    local vm_count=0
-    
-    if [[ -n "$vm_list" ]]; then
-        while IFS=',' read -r name zone status; do
-            vm_names+=("$name")
-            vm_zones+=("$zone")
-            vm_statuses+=("$status")
-            ((vm_count++))
-        done <<< "$vm_list"
-    fi
-    
-    # 显示菜单：所有 VM + 创建新 VM + 退出
-    echo ""
-    local default_vm_index=""
-    if [[ $vm_count -eq 0 ]]; then
-        log_warn "项目中没有现有 VM 实例"
-    else
-        echo "现有 VM 实例:"
-        local i
-        for ((i=0; i<vm_count; i++)); do
-            local status_icon="⚪"
-            [[ "${vm_statuses[$i]}" == "RUNNING" ]] && status_icon="🟢"
-            [[ "${vm_statuses[$i]}" == "TERMINATED" ]] && status_icon="🔴"
-            
-            # 找第一个 RUNNING 的 VM 作为默认
-            if [[ -z "$default_vm_index" ]] && [[ "${vm_statuses[$i]}" == "RUNNING" ]]; then
-                default_vm_index=$((i+1))
-            fi
-            
-            echo "  $((i+1)). ${vm_names[$i]}"
-            echo "      区域: ${vm_zones[$i]} | 状态: $status_icon ${vm_statuses[$i]}"
-        done
-    fi
-    echo ""
-    echo "  $((vm_count+1)). 🆕 创建新 VM"
-    echo "  0. 退出"
-    echo ""
-    
-    local selection
-    while true; do
-        if [[ -n "$default_vm_index" ]]; then
-            read -p "选择 (0-$((vm_count+1))) [默认: $default_vm_index]: " selection
-            selection="${selection:-$default_vm_index}"
-        else
-            read -p "选择 (0-$((vm_count+1))): " selection
-        fi
-
-        
-        # 退出
-        if [[ "$selection" == "0" ]]; then
-            log_warn "已退出"
-            exit 0
-        fi
-        
-        # 创建新 VM
-        if [[ "$selection" == "$((vm_count+1))" ]]; then
-            create_new_vm_interactive "$project"
-            break
-        fi
-        
-        # 选择现有 VM
-        if [[ "$selection" =~ ^[0-9]+$ ]] && \
-           [[ "$selection" -ge 1 ]] && \
-           [[ "$selection" -le "$vm_count" ]]; then
-            VM_NAME="${vm_names[$((selection-1))]}"
-            VM_ZONE="${vm_zones[$((selection-1))]}"
-            local vm_status="${vm_statuses[$((selection-1))]}"
-            
-            if [[ "$vm_status" != "RUNNING" ]]; then
-                log_warn "VM '$VM_NAME' 未运行 (状态: $vm_status)"
-                if ! confirm "是否继续?"; then
-                    continue
-                fi
-            fi
-            break
-        fi
-        
-        echo "无效选择，请重试。"
-    done
-    
-    log_success "选择的 VM: $VM_NAME (区域: $VM_ZONE)"
-    echo ""
-    
-    export VM_NAME VM_ZONE
-}
-
-# ------------------------------------------------------------------------------
-# 创建新 VM 交互
-# ------------------------------------------------------------------------------
-create_new_vm_interactive() {
-    local project="$1"
     
     echo ""
     echo "🆕 创建新 VM"
@@ -233,9 +155,7 @@ create_new_vm_interactive() {
         
         case $preset_choice in
             0)
-                # 返回上级菜单，重新调用主函数
-                select_or_create_vm "$project" "$ENV_NAME"
-                return
+                return 1  # 返回上级
                 ;;
             1)
                 local default_name="instance-$(date +%Y%m%d)"
@@ -244,15 +164,10 @@ create_new_vm_interactive() {
                 VM_ZONE="$FREETIER_ZONE"
                 
                 echo ""
-                log_substep "创建 Free Tier VM..."
-                create_vm "$project" "$VM_NAME" "$VM_ZONE" \
-                    "$FREETIER_MACHINE" \
-                    "$FREETIER_DISK_SIZE" \
-                    "$FREETIER_DISK_TYPE" \
-                    "$FREETIER_NETWORK_TIER" \
-                    "false"
-                log_success "VM 创建成功: $VM_NAME (区域: $VM_ZONE)"
-                return
+                create_vm_with_sa "$project" "$VM_NAME" "$VM_ZONE" \
+                    "$FREETIER_MACHINE" "$FREETIER_DISK_SIZE" "$FREETIER_DISK_TYPE" \
+                    "$FREETIER_NETWORK_TIER" "false"
+                return 0
                 ;;
             2)
                 local default_name="spot-$(date +%Y%m%d)"
@@ -261,16 +176,11 @@ create_new_vm_interactive() {
                 VM_ZONE="$SPOT_ZONE"
                 
                 echo ""
-                log_substep "创建 Spot VM..."
-                create_vm "$project" "$VM_NAME" "$VM_ZONE" \
-                    "$SPOT_MACHINE" \
-                    "$SPOT_DISK_SIZE" \
-                    "$SPOT_DISK_TYPE" \
-                    "$SPOT_NETWORK_TIER" \
-                    "true"
+                create_vm_with_sa "$project" "$VM_NAME" "$VM_ZONE" \
+                    "$SPOT_MACHINE" "$SPOT_DISK_SIZE" "$SPOT_DISK_TYPE" \
+                    "$SPOT_NETWORK_TIER" "true"
                 log_warn "注意: Spot 实例可能随时被抢占"
-                log_success "VM 创建成功: $VM_NAME (区域: $VM_ZONE)"
-                return
+                return 0
                 ;;
             3)
                 local default_name="gcpvm-$(date +%Y%m%d)"
@@ -290,11 +200,9 @@ create_new_vm_interactive() {
                 local network_tier="$INPUT_VALUE"
                 
                 echo ""
-                log_substep "创建自定义 VM..."
-                create_vm "$project" "$VM_NAME" "$VM_ZONE" \
+                create_vm_with_sa "$project" "$VM_NAME" "$VM_ZONE" \
                     "$machine_type" "$disk_size" "pd-standard" "$network_tier" "false"
-                log_success "VM 创建成功: $VM_NAME (区域: $VM_ZONE)"
-                return
+                return 0
                 ;;
             *)
                 echo "无效选择，请重试。"
@@ -303,10 +211,45 @@ create_new_vm_interactive() {
     done
 }
 
+# ------------------------------------------------------------------------------
+# 创建 VM（包含服务账号和防火墙规则）
+# ------------------------------------------------------------------------------
+create_vm_with_sa() {
+    local project="$1"
+    local vm_name="$2"
+    local zone="$3"
+    local machine_type="$4"
+    local disk_size="$5"
+    local disk_type="$6"
+    local network_tier="$7"
+    local is_spot="$8"
+    
+    # 1. 确保 SSH 防火墙规则存在
+    ensure_ssh_firewall "$project"
+    
+    # 2. 创建服务账号（名称与 VM 相同）
+    create_vm_service_account "$project" "$vm_name"
+    local sa_email="${vm_name}@${project}.iam.gserviceaccount.com"
+    
+    # 3. 创建 VM
+    create_vm_core "$project" "$vm_name" "$zone" "$machine_type" "$disk_size" "$disk_type" "$network_tier" "$is_spot" "$sa_email"
+    
+    echo ""
+    log_success "VM 创建成功: $vm_name"
+    log_substep "区域: $zone"
+    log_substep "服务账号: $sa_email"
+    log_substep "SSH 防火墙: allow-ssh (端口 22)"
+    echo ""
+    echo "💡 提示: 其他端口（如 443）将在部署时根据配置自动开放"
+    echo ""
+    
+    export VM_NAME="$vm_name"
+    export VM_ZONE="$zone"
+}
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    select_or_create_vm "$PROJECT_ID" "$ENV_NAME"
+    create_vm_interactive "$PROJECT_ID"
     echo "VM_NAME=$VM_NAME"
     echo "VM_ZONE=$VM_ZONE"
 fi

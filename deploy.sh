@@ -22,6 +22,7 @@ source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
 source "${SCRIPTS_DIR}/deploy/parse-config.sh"
+source "${SCRIPTS_DIR}/deploy/configure-firewall.sh"
 source "${SCRIPTS_DIR}/deploy/generate-certs.sh"
 source "${SCRIPTS_DIR}/deploy/start-services.sh"
 source "${SCRIPTS_DIR}/deploy/health-check.sh"
@@ -46,17 +47,22 @@ main() {
     parse_config "vars.json"
     echo ""
     
-    # Step 4: 生成自签名证书
+    # Step 4: 配置防火墙规则（根据端口动态创建）
+    configure_firewall
+    echo ""
+    
+    # Step 5: 生成自签名证书
     generate_certs "./sing-box/certs"
     echo ""
     
-    # Step 5: 启动服务
+    # Step 6: 启动服务
     start_services "docker-compose.yml"
     echo ""
     
-    # Step 6: 健康检查
+    # Step 7: 健康检查
     health_check 5
 }
+
 
 # 运行主流程
 main "$@"

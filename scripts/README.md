@@ -20,20 +20,24 @@ scripts/
 │   ├── setup-service-account.sh  # Step 4-5: 创建 SA 并授权
 │   ├── setup-wif-pool.sh         # Step 6-7: 创建 WIF Pool/Provider
 │   ├── bind-repo-to-sa.sh        # Step 8: 绑定仓库到 SA
-│   ├── select-or-create-vm.sh    # Step 9: 选择或创建 VM
+│   ├── select-vm.sh              # Step 9: 选择 VM
+│   ├── create-vm.sh              # Step 9: 创建 VM（含防火墙规则）
 │   ├── ensure-oslogin.sh         # Step 10: 确保 OS Login 启用
 │   └── set-github-secrets.sh     # Step 11: 设置 GitHub Secrets
+
 │
 ├── deploy/                       # 部署子脚本
 │   ├── enable-bbr.sh             # 启用 BBR 拥塞控制
 │   ├── install-docker.sh         # 安装 Docker
 │   ├── install-dependencies.sh   # 安装依赖 (openssl, jq)
 │   ├── parse-config.sh           # 解析 vars.json 配置
+│   ├── configure-firewall.sh     # 配置防火墙规则（根据端口动态创建）
 │   ├── generate-certs.sh         # 生成自签名证书
 │   ├── start-services.sh         # 启动 Docker Compose 服务
 │   └── health-check.sh           # 健康检查
 │
 └── setup-wif.sh                  # WIF 配置主入口脚本
+
 ```
 
 根目录还有：

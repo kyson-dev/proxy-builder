@@ -23,7 +23,8 @@ source "${SCRIPT_DIR}/setup-wif/enable-apis.sh"
 source "${SCRIPT_DIR}/setup-wif/setup-service-account.sh"
 source "${SCRIPT_DIR}/setup-wif/setup-wif-pool.sh"
 source "${SCRIPT_DIR}/setup-wif/bind-repo-to-sa.sh"
-source "${SCRIPT_DIR}/setup-wif/select-or-create-vm.sh"
+source "${SCRIPT_DIR}/setup-wif/create-vm.sh"
+source "${SCRIPT_DIR}/setup-wif/select-vm.sh"
 source "${SCRIPT_DIR}/setup-wif/ensure-oslogin.sh"
 source "${SCRIPT_DIR}/setup-wif/set-github-secrets.sh"
 
@@ -84,7 +85,7 @@ main() {
     bind_repo_to_sa "$PROJECT_ID" "$SA_NAME" "$POOL_ID" "$REPO"
     
     # Step 9: 选择或创建 VM
-    select_or_create_vm "$PROJECT_ID" "$ENV_NAME"
+    select_vm "$PROJECT_ID" "$ENV_NAME"
     
     # Step 10: 确保 OS Login 启用
     ensure_oslogin "$PROJECT_ID" "$VM_NAME" "$VM_ZONE"
