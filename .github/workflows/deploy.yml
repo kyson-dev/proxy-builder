@@ -1,10 +1,6 @@
-name: Deploy to GCP VM (WIF + Zero Downtime)
+name: Deploy to GCP VM (WIF)
 
 on:
-  push:
-    branches:
-      - "main"
-      - "dev"
   workflow_dispatch: # Allow manual triggering from any branch
 
 permissions:
