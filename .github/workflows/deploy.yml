@@ -29,12 +29,14 @@ jobs:
           install_components: "beta"
 
       - name: Deploy
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
         run: |
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
           # 1. 打包文件（排除不需要的内容）
-          echo "� 打包文件..."
+          echo "📦 打包文件..."
           tar --exclude='.env*' \
               --exclude='.git' \
               --exclude='.github' \
@@ -43,8 +45,8 @@ jobs:
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
-          # 2. 创建 .env 文件
-          echo '${{ secrets.ENV_FILE }}' > /tmp/.env
+          # 2. 创建 .env 文件 (安全写入)
+          echo "$ENV_FILE_CONTENT" > /tmp/.env
 
           # 3. 上传文件到服务器
           echo "📤 上传文件..."
