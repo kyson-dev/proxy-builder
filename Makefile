@@ -10,6 +10,7 @@ help:
 	@echo "  make reality-key   - Generate Xray/Sing-box REALITY key pair (uses Docker)"
 	@echo "  make setup-wif     - Setup GCP Workload Identity Federation for GitHub Actions"
 	@echo "  make push-env      - Update GitHub repository secrets from .env file"
+	@echo "  make change-domain - Change domain name in .env file"
 
 uuid:
 	@uuidgen | tr '[:upper:]' '[:lower:]'
@@ -33,3 +34,7 @@ push-env:
 	@echo "Pushing secrets from .env to GitHub..."
 	@gh secret set -f .env
 	@echo "Done."
+
+change-domain:
+	@chmod +x scripts/change-domain.sh
+	@./scripts/change-domain.sh

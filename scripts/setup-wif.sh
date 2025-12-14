@@ -20,31 +20,6 @@ fi
 echo "🚀 Setting up Workload Identity Federation for GitHub Actions"
 echo ""
 
-# Helper function to display numbered list and get selection
-select_from_list() {
-    local prompt="$1"
-    shift
-    local options=("$@")
-    
-    if [ ${#options[@]} -eq 0 ]; then
-        return 1
-    fi
-    
-    echo "$prompt"
-    for i in "${!options[@]}"; do
-        echo "  $((i+1)). ${options[$i]}"
-    done
-    
-    while true; do
-        read -p "Enter number (1-${#options[@]}): " selection
-        if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#options[@]}" ]; then
-            echo "${options[$((selection-1))]}"
-            return 0
-        fi
-        echo "Invalid selection. Please try again."
-    done
-}
-
 # 1. Get Project ID
 echo "📋 Step 1: Select GCP Project"
 echo ""
