@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder
 # 支持多环境部署 (production / development)
 
-.PHONY: all uuid short-id password reality-key setup-wif push-config help
+.PHONY: all uuid short-id password reality-key setup-wif setup-firewall push-config help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -16,6 +16,7 @@ help:
 	@echo ""
 	@echo "🚀 Deployment Setup:"
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
+	@echo "  make setup-firewall    - Configure firewall rules for service ports"
 	@echo ""
 	@echo "📦 Configuration Push:"
 	@echo "  make push-config       - Push config vars to GitHub Environment (interactive)"
@@ -49,6 +50,10 @@ reality-key:
 setup-wif:
 	@chmod +x scripts/setup-wif.sh
 	@./scripts/setup-wif.sh
+
+setup-firewall:
+	@chmod +x scripts/setup-firewall.sh
+	@./scripts/setup-firewall.sh
 
 # ============================================================
 # Configuration Push (上传变量配置)
