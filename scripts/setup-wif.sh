@@ -20,23 +20,107 @@ fi
 echo "🚀 Setting up Workload Identity Federation for GitHub Actions"
 echo ""
 
+# Helper function to display numbered list and get selection
+select_from_list() {
+    local prompt="$1"
+    shift
+    local options=("$@")
+    
+    if [ ${#options[@]} -eq 0 ]; then
+        return 1
+    fi
+    
+    echo "$prompt"
+    for i in "${!options[@]}"; do
+        echo "  $((i+1)). ${options[$i]}"
+    done
+    
+    while true; do
+        read -p "Enter number (1-${#options[@]}): " selection
+        if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#options[@]}" ]; then
+            echo "${options[$((selection-1))]}"
+            return 0
+        fi
+        echo "Invalid selection. Please try again."
+    done
+}
+
 # 1. Get Project ID
-CURRENT_PROJECT=$(gcloud config get-value project)
-read -p "Enter GCP Project ID [$CURRENT_PROJECT]: " PROJECT_ID
-PROJECT_ID=${PROJECT_ID:-$CURRENT_PROJECT}
-echo "Using Project ID: $PROJECT_ID"
+echo "📋 Step 1: Select GCP Project"
+echo ""
+
+CURRENT_PROJECT=$(gcloud config get-value project 2>/dev/null || echo "")
+
+# Get list of all projects
+echo "Fetching your GCP projects..."
+PROJECTS=($(gcloud projects list --format="value(projectId)" 2>/dev/null))
+
+if [ ${#PROJECTS[@]} -eq 0 ]; then
+    echo "⚠️  No projects found or unable to list projects."
+    read -p "Enter GCP Project ID manually: " PROJECT_ID
+else
+    echo ""
+    echo "Available projects:"
+    for i in "${!PROJECTS[@]}"; do
+        project="${PROJECTS[$i]}"
+        if [ "$project" = "$CURRENT_PROJECT" ]; then
+            echo "  $((i+1)). $project (current)"
+        else
+            echo "  $((i+1)). $project"
+        fi
+    done
+    echo "  0. Enter manually"
+    echo ""
+    
+    while true; do
+        read -p "Select project (0-${#PROJECTS[@]}) [default: $CURRENT_PROJECT]: " selection
+        
+        # If empty, use current project
+        if [ -z "$selection" ] && [ -n "$CURRENT_PROJECT" ]; then
+            PROJECT_ID="$CURRENT_PROJECT"
+            break
+        fi
+        
+        # If 0, enter manually
+        if [ "$selection" = "0" ]; then
+            read -p "Enter GCP Project ID: " PROJECT_ID
+            break
+        fi
+        
+        # If valid number, use selected project
+        if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#PROJECTS[@]}" ]; then
+            PROJECT_ID="${PROJECTS[$((selection-1))]}"
+            break
+        fi
+        
+        echo "Invalid selection. Please try again."
+    done
+fi
+
+echo "✅ Using Project ID: $PROJECT_ID"
+echo ""
 
 # 2. Get GitHub Repository
+echo "📋 Step 2: Confirm GitHub Repository"
+echo ""
+
 # Try to detect from git remote
-DETECTED_REPO=$(git config --get remote.origin.url | sed 's/.*github.com\/\(.*\)\.git/\1/' || echo "")
-read -p "Enter GitHub Repository (owner/repo) [$DETECTED_REPO]: " REPO
-REPO=${REPO:-$DETECTED_REPO}
+DETECTED_REPO=$(git config --get remote.origin.url 2>/dev/null | sed 's/.*github.com\/\(.*\)\.git/\1/' || echo "")
+
+if [ -n "$DETECTED_REPO" ]; then
+    read -p "GitHub Repository [$DETECTED_REPO]: " REPO
+    REPO=${REPO:-$DETECTED_REPO}
+else
+    read -p "Enter GitHub Repository (owner/repo): " REPO
+fi
 
 if [ -z "$REPO" ]; then
     echo "❌ Repository is required."
     exit 1
 fi
-echo "Using Repository: $REPO"
+
+echo "✅ Using Repository: $REPO"
+echo ""
 
 # 3. Enable APIs
 echo "Enable necessary APIs..."
@@ -122,50 +206,88 @@ gcloud iam service-accounts add-iam-policy-binding "$SA_NAME@$PROJECT_ID.iam.gse
 
 # 9. Get VM Information (Required for deployment)
 echo ""
-echo "📍 VM Configuration (Required for SSH deployment)"
-echo "   You can find this in GCP Console → Compute Engine → VM instances"
+echo "� Step 3: Select VM Instance"
 echo ""
 
-# Get VM Name
-while true; do
-    read -p "Enter VM Name: " VM_NAME
-    if [ -n "$VM_NAME" ]; then
-        # Verify VM exists
-        if gcloud compute instances describe "$VM_NAME" --project "$PROJECT_ID" --format="value(name)" &>/dev/null; then
-            echo "✅ VM '$VM_NAME' found"
-            # Auto-detect zone
-            DETECTED_ZONE=$(gcloud compute instances list --project "$PROJECT_ID" --filter="name=$VM_NAME" --format="value(zone)")
-            break
-        else
-            echo "⚠️  VM '$VM_NAME' not found in project '$PROJECT_ID'"
-            read -p "   Continue anyway? (y/n): " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                DETECTED_ZONE=""
-                break
-            fi
-        fi
-    else
-        echo "❌ VM Name is required for deployment. Please enter a valid VM name."
-    fi
-done
+# Get list of VMs in the project
+echo "Fetching VM instances in project '$PROJECT_ID'..."
+VM_LIST=$(gcloud compute instances list --project "$PROJECT_ID" --format="csv[no-heading](name,zone,status)" 2>/dev/null)
 
-# Get VM Zone
-while true; do
-    if [ -n "$DETECTED_ZONE" ]; then
-        read -p "Enter VM Zone [$DETECTED_ZONE]: " VM_ZONE
-        VM_ZONE=${VM_ZONE:-$DETECTED_ZONE}
-    else
-        read -p "Enter VM Zone (e.g., us-central1-a): " VM_ZONE
-    fi
+if [ -z "$VM_LIST" ]; then
+    echo "⚠️  No VM instances found in project '$PROJECT_ID'"
+    echo ""
+    read -p "Enter VM Name manually: " VM_NAME
+    read -p "Enter VM Zone (e.g., us-central1-a): " VM_ZONE
     
-    if [ -n "$VM_ZONE" ]; then
-        echo "Using VM Zone: $VM_ZONE"
-        break
-    else
-        echo "❌ VM Zone is required for deployment. Please enter a valid zone."
+    if [ -z "$VM_NAME" ] || [ -z "$VM_ZONE" ]; then
+        echo "❌ VM Name and Zone are required."
+        exit 1
     fi
-done
+else
+    echo ""
+    echo "Available VM instances:"
+    
+    # Parse VM list into arrays
+    declare -a VM_NAMES
+    declare -a VM_ZONES
+    declare -a VM_STATUSES
+    
+    i=0
+    while IFS=',' read -r name zone status; do
+        VM_NAMES[$i]="$name"
+        VM_ZONES[$i]="$zone"
+        VM_STATUSES[$i]="$status"
+        
+        status_icon="⚪"
+        [ "$status" = "RUNNING" ] && status_icon="🟢"
+        [ "$status" = "TERMINATED" ] && status_icon="🔴"
+        
+        echo "  $((i+1)). $name"
+        echo "      Zone: $zone | Status: $status_icon $status"
+        i=$((i+1))
+    done <<< "$VM_LIST"
+    
+    echo "  0. Enter manually"
+    echo ""
+    
+    while true; do
+        read -p "Select VM (0-${#VM_NAMES[@]}): " selection
+        
+        # If 0, enter manually
+        if [ "$selection" = "0" ]; then
+            read -p "Enter VM Name: " VM_NAME
+            read -p "Enter VM Zone (e.g., us-central1-a): " VM_ZONE
+            
+            if [ -z "$VM_NAME" ] || [ -z "$VM_ZONE" ]; then
+                echo "❌ VM Name and Zone are required."
+                continue
+            fi
+            break
+        fi
+        
+        # If valid number, use selected VM
+        if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#VM_NAMES[@]}" ]; then
+            VM_NAME="${VM_NAMES[$((selection-1))]}"
+            VM_ZONE="${VM_ZONES[$((selection-1))]}"
+            VM_STATUS="${VM_STATUSES[$((selection-1))]}"
+            
+            if [ "$VM_STATUS" != "RUNNING" ]; then
+                echo "⚠️  Warning: VM '$VM_NAME' is not running (status: $VM_STATUS)"
+                read -p "   Continue anyway? (y/n): " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                    continue
+                fi
+            fi
+            break
+        fi
+        
+        echo "Invalid selection. Please try again."
+    done
+fi
+
+echo "✅ Selected VM: $VM_NAME (Zone: $VM_ZONE)"
+echo ""
 
 # 10. Ensure VM has OS Login enabled
 echo ""
