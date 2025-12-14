@@ -20,7 +20,6 @@ echo "Generating configuration from template..."
 cp /etc/sing-box/config.json.template /etc/sing-box/config.json
 
 # Replace variables using sed
-# Use | as delimiter to avoid conflicts with / in paths
 sed -i "s|\${DOMAIN}|$DOMAIN|g" /etc/sing-box/config.json
 sed -i "s|\${VLESS_UUID}|$VLESS_UUID|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json

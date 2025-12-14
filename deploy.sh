@@ -15,6 +15,12 @@ echo "🚀 开始部署代理服务..."
 echo "   域名: $DOMAIN"
 echo ""
 
+# 检查必需的环境变量
+if [ -z "$DOMAIN" ]; then
+    echo "❌ 错误: DOMAIN 未配置"
+    exit 1
+fi
+
 # 检查 Docker 权限
 DOCKER_CMD="docker"
 if ! docker info >/dev/null 2>&1; then
@@ -144,7 +150,7 @@ echo "   ⬇️  拉取最新镜像..."
 $DOCKER_CMD compose pull
 
 # 启动所有服务
-echo "   🔥 启动服务 (Zero Downtime)..."
+echo "   🔥 启动服务..."
 $DOCKER_CMD compose up -d --remove-orphans
 
 # -----------------------------------------------------------------------------
@@ -161,10 +167,16 @@ $DOCKER_CMD compose ps
 if $DOCKER_CMD compose ps sing-box | grep -q "Up"; then
     echo ""
     echo "✅ 部署成功！"
-    echo "📝 查看日志: $DOCKER_CMD compose logs -f"
+    echo ""
+    echo "📋 代理服务信息:"
+    echo "   VLESS Reality: $DOMAIN:8443"
+    echo "   Hysteria2:     $DOMAIN:9443"
+    echo "   TUIC:          $DOMAIN:5443"
+    echo ""
+    echo "📝 查看日志: docker logs -f sing-box"
 else
     echo ""
-    echo "❌ 部署可能存在问题，Sing-box 未正常运行"
-    $DOCKER_CMD compose logs sing-box
+    echo "❌ Sing-box 启动失败，请检查日志:"
+    echo "   docker logs sing-box"
     exit 1
 fi

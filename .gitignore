@@ -3,7 +3,12 @@ certs/
 *.log
 
 # 环境变量（包含敏感信息）
+# .env.*.example 文件保留在仓库中作为模板
 .env
+.env.production
+.env.development
+.env.local
+.env.backup
 
 # macOS
 .DS_Store
