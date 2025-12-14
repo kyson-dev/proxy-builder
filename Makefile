@@ -23,7 +23,8 @@ help:
 	@echo "  make push-env-dev      - Push .env.development to development environment"
 	@echo ""
 	@echo "🛠️  Utilities:"
-	@echo "  make change-domain     - Change domain name in config"
+	@echo "  make generate-cert     - Generate self-signed certificate for Hysteria2"
+	@echo "  make check-cert        - Check certificate validity and information"
 	@echo ""
 
 # ============================================================
@@ -58,12 +59,12 @@ setup-wif:
 # Legacy: Push to repository level (not recommended for multi-env)
 push-env:
 	@if [ ! -f .env ]; then echo "❌ .env file not found!"; exit 1; fi
-	@echo "⚠️  Warning: This pushes to repository-level secrets (not environment-specific)"
+	@echo "⚠️  Warning: This pushes to repository-level ENV_FILE secret (not environment-specific)"
 	@echo "   For multi-environment setup, use: make push-env-prod or make push-env-dev"
 	@echo ""
 	@read -p "Continue anyway? (y/n): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@echo "Pushing secrets from .env to GitHub..."
-	@gh secret set -f .env
+	@echo "Pushing .env as ENV_FILE to repository..."
+	@gh secret set ENV_FILE < .env
 	@echo "✅ Done."
 
 # Push to production environment
@@ -73,16 +74,14 @@ push-env-prod:
 		echo "   Please create .env.production with your production configuration."; \
 		exit 1; \
 	fi
-	@echo "📦 Pushing secrets from .env.production to 'production' environment..."
+	@echo "📦 Pushing .env.production as ENV_FILE to 'production' environment..."
 	@echo ""
-	@while IFS='=' read -r key value; do \
-		if [ -n "$$key" ] && [ "$${key:0:1}" != "#" ]; then \
-			echo "  Setting $$key..."; \
-			gh secret set "$$key" --env production --body "$$value"; \
-		fi; \
-	done < .env.production
+	@gh secret set ENV_FILE --env production < .env.production
 	@echo ""
-	@echo "✅ Production environment secrets updated!"
+	@echo "✅ Production environment ENV_FILE updated!"
+	@echo ""
+	@echo "📋 Content pushed:"
+	@cat .env.production | grep -v "^#" | grep -v "^$$"
 
 # Push to development environment
 push-env-dev:
@@ -91,21 +90,61 @@ push-env-dev:
 		echo "   Please create .env.development with your development configuration."; \
 		exit 1; \
 	fi
-	@echo "📦 Pushing secrets from .env.development to 'development' environment..."
+	@echo "📦 Pushing .env.development as ENV_FILE to 'development' environment..."
 	@echo ""
-	@while IFS='=' read -r key value; do \
-		if [ -n "$$key" ] && [ "$${key:0:1}" != "#" ]; then \
-			echo "  Setting $$key..."; \
-			gh secret set "$$key" --env development --body "$$value"; \
+	@gh secret set ENV_FILE --env development < .env.development
+	@echo ""
+	@echo "✅ Development environment ENV_FILE updated!"
+	@echo ""
+	@echo "📋 Content pushed:"
+	@cat .env.development | grep -v "^#" | grep -v "^$$"
+
+# ============================================================
+# Generate certificate for Hysteria2
+# ============================================================
+
+generate-cert:
+	@echo "🔐 生成 Hysteria2 自签名证书..."
+	@mkdir -p sing-box/certs
+	@if [ -f sing-box/certs/cert.pem ] || [ -f sing-box/certs/key.pem ]; then \
+		echo "⚠️  警告: 证书文件已存在"; \
+		read -p "是否覆盖? (y/N) " -n 1 -r; \
+		echo; \
+		if [[ ! $$REPLY =~ ^[Yy]$$ ]]; then \
+			echo "❌ 已取消"; \
+			exit 1; \
 		fi; \
-	done < .env.development
-	@echo ""
-	@echo "✅ Development environment secrets updated!"
+		rm -f sing-box/certs/cert.pem sing-box/certs/key.pem; \
+	fi
+	@openssl req -x509 -nodes -newkey rsa:2048 \
+		-keyout sing-box/certs/key.pem \
+		-out sing-box/certs/cert.pem \
+		-subj "/CN=bing.com" \
+		-days 36500 >/dev/null 2>&1 || \
+	(openssl ecparam -name prime256v1 -genkey -noout -out sing-box/certs/key.pem 2>/dev/null && \
+	openssl req -new -x509 -key sing-box/certs/key.pem \
+		-out sing-box/certs/cert.pem \
+		-subj "/CN=bing.com" \
+		-days 36500 >/dev/null 2>&1)
+	@if [ -f sing-box/certs/cert.pem ]; then \
+		chmod 644 sing-box/certs/cert.pem; \
+		chmod 600 sing-box/certs/key.pem; \
+		echo "✅ 证书生成成功"; \
+		echo "📋 CN: bing.com"; \
+		echo "📅 有效期: 100 年"; \
+	else \
+		echo "❌ 证书生成失败"; \
+		exit 1; \
+	fi
 
-# ============================================================
-# Utilities
-# ============================================================
-
-change-domain:
-	@chmod +x scripts/change-domain.sh
-	@./scripts/change-domain.sh
+check-cert:
+	@if [ ! -f sing-box/certs/cert.pem ]; then \
+		echo "❌ 证书不存在: sing-box/certs/cert.pem"; \
+		exit 1; \
+	fi
+	@echo "🔍 证书信息:"
+	@echo "📋 CN: $$(openssl x509 -in sing-box/certs/cert.pem -noout -subject 2>/dev/null | sed -n 's/.*CN=\([^,]*\).*/\1/p')"
+	@echo "📅 生效时间: $$(openssl x509 -in sing-box/certs/cert.pem -noout -startdate 2>/dev/null | cut -d= -f2)"
+	@echo "📅 过期时间: $$(openssl x509 -in sing-box/certs/cert.pem -noout -enddate 2>/dev/null | cut -d= -f2)"
+	@openssl x509 -in sing-box/certs/cert.pem -noout -checkend 86400 >/dev/null 2>&1 && \
+		echo "✅ 证书有效" || echo "⚠️  证书已过期或即将过期"

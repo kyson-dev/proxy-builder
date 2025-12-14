@@ -41,29 +41,8 @@
       ],
       "tls": {
         "enabled": true,
-        "certificate_path": "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem",
-        "key_path": "/etc/letsencrypt/live/${DOMAIN}/privkey.pem"
-      }
-    },
-    {
-      "type": "tuic",
-      "tag": "tuic",
-      "listen": "::",
-      "listen_port": 5443,
-      "users": [
-        {
-          "uuid": "${TUIC_UUID}",
-          "password": "${TUIC_PASSWORD}"
-        }
-      ],
-      "congestion_control": "bbr",
-      "tls": {
-        "enabled": true,
-        "certificate_path": "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem",
-        "key_path": "/etc/letsencrypt/live/${DOMAIN}/privkey.pem",
-        "alpn": [
-          "h3"
-        ]
+        "certificate_path": "/etc/sing-box/certs/cert.pem",
+        "key_path": "/etc/sing-box/certs/key.pem"
       }
     }
   ],

@@ -52,8 +52,12 @@ jobs:
           # Sync files using the configured SSH alias
           rsync -avz --delete \
             --exclude ".env" \
+            --exclude ".env.*" \
             --exclude ".git" \
-            --exclude "certs" \
+            --exclude ".github" \
+            --exclude "sing-box/certs" \
+            --exclude "*.md" \
+            --exclude "docs/" \
             ./ ${{ env.VM_HOST }}:${{ env.APP_DIR }}/
 
       - name: Create/Update .env file

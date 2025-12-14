@@ -1,165 +1,247 @@
-# 代理服务部署指南
+# 简化代理服务部署指南
 
-## 📁 项目结构
-```
-proxy-builder/
-├── .env                 # 环境变量（敏感信息）
-├── Makefile            # 便捷工具命令
-├── docker-compose.yml   # Docker 服务配置
-├── deploy.sh           # 一键部署脚本
-├── change-domain.sh    # 域名替换工具
-├── README.md           # 本文档
-├── .github/
-│   └── workflows/
-│       └── deploy.yml  # GitHub Actions WIF 自动部署
-├── docs/
-│   ├── WIF-SETUP-GUIDE.md    # WIF 完整配置指南
-│   └── WIF-CHECKLIST.md      # WIF 快速清单
-├── scripts/
-│   └── setup-wif.sh    # WIF 自动配置脚本
-├── nginx/
-│   └── nginx.conf      # Nginx 配置
-├── sing-box/
-│   ├── config.json.template # Sing-box 配置模板
-│   └── entrypoint.sh   # 容器启动脚本
-├── webroot/            # Certbot HTTP-01 验证目录
-└── certs/              # 证书存储目录（自动生成）
-```
+## 🎯 项目特点
 
-## 🚀 部署步骤
+这是一个**极简版本**的代理服务配置，具有以下特点：
 
-本项目支持两种部署方式：
+- ✅ **无需域名** - 不依赖任何域名和DNS配置
+- ✅ **无需Let's Encrypt** - 不需要申请和维护SSL证书
+- ✅ **自签名证书** - Hysteria2使用自动生成的自签名证书
+- ✅ **简单快速** - 一键部署，几分钟内完成
 
-### 方式 1: GitHub Actions 自动部署（推荐）
+## 📦 支持的协议
 
-通过 GitHub Actions + GCP Workload Identity Federation (WIF) 实现安全的自动化部署，支持零停机更新。
+1. **VLESS + Reality** (端口 8443)
+   - 无需任何证书
+   - 伪装成 Microsoft 官网
+   - 最安全的无证书方案
 
-#### 快速开始（3 步）：
+2. **Hysteria2** (端口 9443)
+   - 使用自签名证书
+   - 高性能UDP协议
+   - 客户端需要启用 `insecure` 选项
 
-1. **配置 WIF（一次性）**
-   ```bash
-   make setup-wif
-   ```
-   脚本会自动配置 GCP 和 GitHub Secrets。
-   
-   📋 **配置清单**：[docs/WIF-CHECKLIST.md](docs/WIF-CHECKLIST.md)
+## 🚀 快速开始
 
-2. **上传环境变量**
-   ```bash
-   make push-env
-   ```
+### 1. 生成密钥
 
-3. **推送代码触发部署**
-   ```bash
-   git add .
-   git commit -m "Update configuration"
-   git push origin main
-   ```
+使用项目提供的脚本生成所需的UUID和密钥：
 
-#### 查看部署进度
-- 在 GitHub 仓库的 **Actions** 标签页查看部署状态
-- 首次部署会自动运行 `deploy.sh` 申请证书
-- 后续更新会进行零停机重启
-
-📖 **详细指南**：
-- [WIF 配置指南](docs/WIF-SETUP-GUIDE.md)（完整说明）
-- [WIF 快速清单](docs/WIF-CHECKLIST.md)（快速参考）
-
----
-
-### 方式 2: 手动部署
-
-适合本地测试或不使用 GitHub Actions 的场景。
-
-### 1. 配置环境变量
-复制 `.env` 文件并修改其中的配置：
 ```bash
-# 域名
-DOMAIN=kyson.site
-EMAIL=admin@kyson.site
-
-# VLESS Reality
-VLESS_UUID=your-uuid-here
-REALITY_PRIVATE_KEY=your-private-key-here
-REALITY_SHORT_ID=your-short-id-here
-
-# Hysteria2 / TUIC
-PROXY_PASSWORD=your-secure-password-here
-```
-
-### 2. 生成新凭证（可选）
-如果需要生成新的 UUID 或 Reality 密钥：
-```bash
-# 生成 UUID
-make uuid
+# 生成 VLESS UUID
+uuidgen | tr '[:upper:]' '[:lower:]'
 
 # 生成 Reality 密钥对
-make reality-key
+docker run --rm ghcr.io/sagernet/sing-box sing-box generate reality-keypair
 
-# 生成随机密码
-make password
+# 生成 Reality Short ID
+openssl rand -hex 8
 
-# 生成 Short ID
-make short-id
+# 生成 Hysteria2 密码
+openssl rand -base64 32
 ```
 
-### 3. 一键部署
+### 2. 配置环境变量
+
+复制环境变量示例文件：
+
 ```bash
+cp .env.development.example .env.development
+# 或生产环境
+cp .env.production.example .env.production
+```
+
+然后编辑 `.env.development`，填入刚才生成的值：
+
+```bash
+# VLESS + Reality
+VLESS_UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+REALITY_PRIVATE_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+REALITY_PUBLIC_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+REALITY_SHORT_ID=xxxxxxxxxxxxxxxx
+
+# Hysteria2
+H2_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+### 3. 创建符号链接
+
+根据你的环境创建 `.env` 符号链接：
+
+```bash
+# 开发环境
+ln -sf .env.development .env
+
+# 或生产环境
+ln -sf .env.production .env
+```
+
+### 4. 部署服务
+
+运行部署脚本：
+
+```bash
+chmod +x deploy.sh
 ./deploy.sh
 ```
 
-## 📊 查看状态和日志
-
-### 查看服务状态
-```bash
-docker compose ps
-```
-
-### 查看所有日志
-```bash
-docker compose logs -f
-```
+脚本会自动：
+- ✅ 检查环境变量
+- ✅ 生成 Hysteria2 自签名证书
+- ✅ 启动 Sing-box 服务
 
 ## 📱 客户端配置
 
-### VLESS + Reality
-```
-协议:        VLESS
-地址:        ${DOMAIN}
-端口:        443
-UUID:        ${VLESS_UUID}
-Flow:        xtls-rprx-vision
-传输:        TCP
-TLS:         Reality
-SNI:         www.microsoft.com
-Public Key:  (使用生成的公钥)
-Short ID:    ${REALITY_SHORT_ID}
+### VLESS Reality 配置
+
+```json
+{
+  "protocol": "vless",
+  "settings": {
+    "vnext": [{
+      "address": "YOUR_SERVER_IP",
+      "port": 8443,
+      "users": [{
+        "id": "YOUR_VLESS_UUID",
+        "flow": "xtls-rprx-vision",
+        "encryption": "none"
+      }]
+    }]
+  },
+  "streamSettings": {
+    "network": "tcp",
+    "security": "reality",
+    "realitySettings": {
+      "serverName": "www.microsoft.com",
+      "publicKey": "YOUR_REALITY_PUBLIC_KEY",
+      "shortId": "YOUR_REALITY_SHORT_ID",
+      "fingerprint": "chrome"
+    }
+  }
+}
 ```
 
-### Hysteria2
-```
-协议:        Hysteria2
-地址:        ${DOMAIN}
-端口:        443
-密码:        ${PROXY_PASSWORD}
-TLS:         启用
-SNI:         ${DOMAIN}
+### Hysteria2 配置
+
+```yaml
+server: YOUR_SERVER_IP:9443
+auth: YOUR_H2_PASSWORD
+tls:
+  insecure: true  # ⚠️ 必须设置为 true（使用自签名证书）
+bandwidth:
+  up: 100 mbps
+  down: 500 mbps
 ```
 
-### TUIC
-```
-协议:        TUIC
-地址:        ${DOMAIN}
-端口:        5443
-UUID:        ${VLESS_UUID}
-密码:        ${PROXY_PASSWORD}
-拥塞控制:    BBR
-TLS:         启用
-SNI:         ${DOMAIN}
+**重要提示**：Hysteria2 使用自签名证书，必须在客户端设置 `insecure: true`。
+
+## 🔧 常用命令
+
+```bash
+# 查看服务状态
+docker compose ps
+
+# 查看 Sing-box 日志
+docker logs -f sing-box
+
+# 重启服务
+docker compose restart
+
+# 停止服务
+docker compose down
+
+# 更新并重启
+docker compose pull
+docker compose up -d
 ```
 
-## ⚠️ 注意事项
+## 📊 端口使用
 
-1. **安全性**: `.env` 文件包含敏感信息，请勿分享或提交到公共仓库。
-2. **DNS 配置**: 确保域名 A 记录指向服务器 IP。
-3. **防火墙**: 开放端口 80, 443, 5443。
+| 协议 | 端口 | 用途 |
+|------|------|------|
+| VLESS Reality | 8443 | TCP 代理（无需证书） |
+| Hysteria2 | 9443 | UDP 代理（自签名证书） |
+
+**防火墙设置**：确保开放以下端口
+
+```bash
+# Ubuntu/Debian
+sudo ufw allow 8443/tcp
+sudo ufw allow 9443/udp
+
+# CentOS/RHEL
+sudo firewall-cmd --permanent --add-port=8443/tcp
+sudo firewall-cmd --permanent --add-port=9443/udp
+sudo firewall-cmd --reload
+```
+
+## 🔐 安全建议
+
+1. **定期更换密码** - 建议每月更换一次密码和UUID
+2. **限制访问源** - 如果可能，限制特定IP访问
+3. **监控流量** - 定期检查异常流量
+4. **备份配置** - 保存好环境变量文件
+
+## ❓ 常见问题
+
+### Q: Hysteria2 连接失败？
+
+**A:** 检查以下几点：
+1. 客户端是否设置了 `insecure: true`
+2. 服务器防火墙是否开放 UDP 9443 端口
+3. 密码是否正确
+
+### Q: VLESS Reality 无法连接？
+
+**A:** 检查：
+1. Public Key 是否正确（注意不是 Private Key）
+2. Short ID 是否匹配
+3. 服务器防火墙是否开放 TCP 8443 端口
+
+### Q: 如何重新生成证书？
+
+**A:** 删除旧证书后重新部署：
+
+```bash
+rm -rf sing-box/certs/*
+./deploy.sh
+```
+
+## 📝 项目结构
+
+```
+.
+├── .env.development.example    # 开发环境变量示例
+├── .env.production.example     # 生产环境变量示例
+├── deploy.sh                   # 部署脚本
+├── docker-compose.yml          # Docker 编排文件
+├── sing-box/
+│   ├── config.json.template   # Sing-box 配置模板
+│   ├── entrypoint.sh          # 容器启动脚本
+│   └── certs/                 # 自签名证书目录（自动生成）
+└── README.md                   # 本文件
+```
+
+## 🆚 与完整版本的区别
+
+| 功能 | 简化版 | 完整版 |
+|------|--------|--------|
+| 域名要求 | ❌ 不需要 | ✅ 需要 |
+| Let's Encrypt | ❌ 不需要 | ✅ 需要 |
+| Nginx | ❌ 不需要 | ✅ 需要 |
+| VLESS Reality | ✅ 支持 | ✅ 支持 |
+| Hysteria2 | ✅ 自签名 | ✅ 正式证书 |
+| TUIC | ❌ 移除 | ✅ 支持 |
+| 部署时间 | < 2分钟 | > 5分钟 |
+
+## 📚 相关资源
+
+- [Sing-box 官方文档](https://sing-box.sagernet.org/)
+- [VLESS Protocol](https://github.com/XTLS/VLESS)
+- [Hysteria2 文档](https://v2.hysteria.network/)
+- [Reality 协议说明](https://github.com/XTLS/REALITY)
+
+---
+
+**License**: MIT  
+**维护者**: Kyson
