@@ -1,0 +1,18 @@
+{
+    "vless_users": [
+        {
+            "uuid": "dev-uuid-1",
+            "flow": "xtls-rprx-vision"
+        }
+    ],
+    "h2_users": [
+        {
+            "password": "dev-password-1"
+        }
+    ],
+    "reality": {
+        "private_key": "your-dev-private-key",
+        "public_key": "your-dev-public-key",
+        "short_id": "your-dev-short-id"
+    }
+}

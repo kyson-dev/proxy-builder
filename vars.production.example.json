@@ -1,0 +1,25 @@
+{
+    "vless_users": [
+        {
+            "uuid": "prod-uuid-1",
+            "flow": "xtls-rprx-vision"
+        },
+        {
+            "uuid": "prod-uuid-2",
+            "flow": "xtls-rprx-vision"
+        }
+    ],
+    "h2_users": [
+        {
+            "password": "prod-password-1"
+        },
+        {
+            "password": "prod-password-2"
+        }
+    ],
+    "reality": {
+        "private_key": "your-prod-private-key",
+        "public_key": "your-prod-public-key",
+        "short_id": "your-prod-short-id"
+    }
+}

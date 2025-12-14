@@ -30,35 +30,35 @@ jobs:
 
       - name: Deploy
         env:
-          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE }}
+          VARS_JSON: ${{ secrets.VARS_JSON }}
         run: |
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          # 1. 打包文件（排除不需要的内容）
+          # 1. 打包文件
           echo "📦 打包文件..."
-          tar --exclude='.env*' \
-              --exclude='.git' \
+          tar --exclude='.git' \
               --exclude='.github' \
+              --exclude='vars.*.json' \
               --exclude='sing-box/certs' \
               --exclude='*.md' \
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
-          # 2. 创建 .env 文件 (安全写入)
-          echo "$ENV_FILE_CONTENT" > /tmp/.env
+          # 2. 创建 vars.json (从 Secret)
+          echo "$VARS_JSON" > /tmp/vars.json
 
-          # 3. 上传文件到服务器
+          # 3. 上传
           echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz /tmp/.env ${VM}:~/ --zone=${ZONE} --quiet
+          gcloud beta compute scp /tmp/app.tar.gz /tmp/vars.json ${VM}:~/ --zone=${ZONE} --quiet
 
-          # 4. 在服务器上解压并部署
+          # 4. 部署
           echo "🚀 执行部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
             set -e
             mkdir -p ~/app
             tar -xzf ~/app.tar.gz -C ~/app
-            mv ~/.env ~/app/.env
+            mv ~/vars.json ~/app/vars.json
             rm ~/app.tar.gz
             cd ~/app
             chmod +x deploy.sh

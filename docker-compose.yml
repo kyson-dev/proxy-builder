@@ -1,6 +1,4 @@
 services:
-  # Sing-box - 代理服务（VLESS Reality + Hysteria2 with self-signed cert）
-  # docker logs -f sing-box 持续日志输出
   sing-box:
     image: ghcr.io/sagernet/sing-box:latest
     container_name: sing-box

@@ -17,10 +17,9 @@ help:
 	@echo "🚀 Deployment Setup:"
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
 	@echo ""
-	@echo "📦 Environment Variables:"
-	@echo "  make push-env          - Push .env to repository secrets (legacy)"
-	@echo "  make push-env-prod     - Push .env.production to production environment"
-	@echo "  make push-env-dev      - Push .env.development to development environment"
+	@echo "📦 Configuration Push:"
+	@echo "  make push-config-prod  - Convert singbox.config.json and push to production"
+	@echo "  make push-config-dev   - Convert singbox.config.json and push to development"
 	@echo ""
 	@echo "🛠️  Utilities:"
 	@echo "  make generate-cert     - Generate self-signed certificate for Hysteria2"
@@ -53,51 +52,32 @@ setup-wif:
 	@./scripts/setup-wif.sh
 
 # ============================================================
-# Environment Variables Push
+# Configuration Push (上传变量配置)
 # ============================================================
 
-# Legacy: Push to repository level (not recommended for multi-env)
-push-env:
-	@if [ ! -f .env ]; then echo "❌ .env file not found!"; exit 1; fi
-	@echo "⚠️  Warning: This pushes to repository-level ENV_FILE secret (not environment-specific)"
-	@echo "   For multi-environment setup, use: make push-env-prod or make push-env-dev"
-	@echo ""
-	@read -p "Continue anyway? (y/n): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@echo "Pushing .env as ENV_FILE to repository..."
-	@gh secret set ENV_FILE < .env
-	@echo "✅ Done."
-
-# Push to production environment
-push-env-prod:
-	@if [ ! -f .env.production ]; then \
-		echo "❌ .env.production file not found!"; \
-		echo "   Please create .env.production with your production configuration."; \
+# Push production config
+push-config-prod:
+	@if [ ! -f vars.production.json ]; then \
+		echo "❌ vars.production.json not found!"; \
+		echo "   Please copy vars.production.example.json to vars.production.json and fill in your values."; \
 		exit 1; \
 	fi
-	@echo "📦 Pushing .env.production as ENV_FILE to 'production' environment..."
+	@echo "📦 Pushing vars.production.json to 'production' environment..."
+	@gh secret set VARS_JSON --env production < vars.production.json
 	@echo ""
-	@gh secret set ENV_FILE --env production < .env.production
-	@echo ""
-	@echo "✅ Production environment ENV_FILE updated!"
-	@echo ""
-	@echo "📋 Content pushed:"
-	@cat .env.production | grep -v "^#" | grep -v "^$$"
+	@echo "✅ Production variables uploaded!"
 
-# Push to development environment
-push-env-dev:
-	@if [ ! -f .env.development ]; then \
-		echo "❌ .env.development file not found!"; \
-		echo "   Please create .env.development with your development configuration."; \
+# Push development config
+push-config-dev:
+	@if [ ! -f vars.development.json ]; then \
+		echo "❌ vars.development.json not found!"; \
+		echo "   Please copy vars.development.example.json to vars.development.json and fill in your values."; \
 		exit 1; \
 	fi
-	@echo "📦 Pushing .env.development as ENV_FILE to 'development' environment..."
+	@echo "📦 Pushing vars.development.json to 'development' environment..."
+	@gh secret set VARS_JSON --env development < vars.development.json
 	@echo ""
-	@gh secret set ENV_FILE --env development < .env.development
-	@echo ""
-	@echo "✅ Development environment ENV_FILE updated!"
-	@echo ""
-	@echo "📋 Content pushed:"
-	@cat .env.development | grep -v "^#" | grep -v "^$$"
+	@echo "✅ Development variables uploaded!"
 
 # ============================================================
 # Generate certificate for Hysteria2

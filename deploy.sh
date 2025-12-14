@@ -178,12 +178,49 @@ fi
 echo ""
 
 # =============================================================================
-# 2. 环境变量处理
+# 2. 解析变量配置文件 (vars.json)
 # =============================================================================
-# 注意：这里不再 source .env 文件，亦不检查变量。
-# 复杂的 JSON 环境变量由 Docker Compose 直接读取，避免 Shell 解析错误。
-# 具体的变量检查将在 Sing-box 容器内进行。
-echo "⏩ 跳过本地环境变量检查 (交由容器处理)"
+if [ ! -f vars.json ]; then
+    echo "❌ 未找到 vars.json 文件"
+    echo "   请确保部署时已创建此文件"
+    exit 1
+fi
+
+echo "📋 解析配置变量..."
+
+# 检查 jq 是否可用
+if ! command -v jq &> /dev/null; then
+    echo "   ⚠️  jq 未安装，正在安装..."
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case $ID in
+            ubuntu|debian)
+                sudo apt-get update -qq && sudo apt-get install -y -qq jq
+                ;;
+            centos|rhel|fedora|rocky|almalinux)
+                sudo yum install -y -q jq || sudo dnf install -y -q jq
+                ;;
+        esac
+    fi
+fi
+
+# 从 JSON 提取变量并导出
+export VLESS_USERS=$(jq -c '.vless_users' vars.json)
+export H2_USERS=$(jq -c '.h2_users' vars.json)
+export REALITY_PRIVATE_KEY=$(jq -r '.reality.private_key' vars.json)
+export REALITY_PUBLIC_KEY=$(jq -r '.reality.public_key' vars.json)
+export REALITY_SHORT_ID=$(jq -r '.reality.short_id' vars.json)
+
+# 验证必需变量
+if [ -z "$VLESS_USERS" ] || [ "$VLESS_USERS" = "null" ] || \
+   [ -z "$H2_USERS" ] || [ "$H2_USERS" = "null" ] || \
+   [ -z "$REALITY_PRIVATE_KEY" ] || [ "$REALITY_PRIVATE_KEY" = "null" ]; then
+    echo "❌ 配置文件中缺少必要的变量"
+    exit 1
+fi
+
+echo "   ✅ 配置解析完成"
+echo ""
 
 # =============================================================================
 # 3. 检查 Docker 权限
