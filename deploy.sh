@@ -205,6 +205,8 @@ if ! command -v jq &> /dev/null; then
 fi
 
 # 从 JSON 提取变量并导出
+export VLESS_PORT=$(jq -r '.ports.vless // 443' vars.json)
+export H2_PORT=$(jq -r '.ports.hysteria2 // 443' vars.json)
 export VLESS_USERS=$(jq -c '.vless_users' vars.json)
 export H2_USERS=$(jq -c '.h2_users' vars.json)
 export REALITY_PRIVATE_KEY=$(jq -r '.reality.private_key' vars.json)
@@ -219,7 +221,7 @@ if [ -z "$VLESS_USERS" ] || [ "$VLESS_USERS" = "null" ] || \
     exit 1
 fi
 
-echo "   ✅ 配置解析完成"
+echo "   ✅ 配置解析完成 (VLESS:$VLESS_PORT, Hysteria2:$H2_PORT)"
 echo ""
 
 # =============================================================================
@@ -342,8 +344,8 @@ if $DOCKER_CMD compose ps sing-box | grep -q "Up"; then
     echo "✅ 部署成功！"
     echo ""
     echo "📋 代理服务信息:"
-    echo "   VLESS Reality: $SERVER_IP:8443"
-    echo "   Hysteria2:     $SERVER_IP:9443 (自签名证书)"
+    echo "   VLESS Reality: $SERVER_IP:$VLESS_PORT"
+    echo "   Hysteria2:     $SERVER_IP:$H2_PORT (自签名证书)"
     echo ""
     echo "📝 查看日志: docker logs -f sing-box"
     echo ""

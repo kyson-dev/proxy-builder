@@ -13,6 +13,10 @@ if [ -z "$VLESS_USERS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHOR
   exit 1
 fi
 
+# Set default ports if not provided
+VLESS_PORT=${VLESS_PORT:-443}
+H2_PORT=${H2_PORT:-443}
+
 echo "Generating configuration from template..."
 
 # Copy template
@@ -23,6 +27,8 @@ cp /etc/sing-box/config.json.template /etc/sing-box/config.json
 VLESS_USERS_ESCAPED=$(echo "$VLESS_USERS" | tr '\n' ' ' | sed 's/  */ /g')
 H2_USERS_ESCAPED=$(echo "$H2_USERS" | tr '\n' ' ' | sed 's/  */ /g')
 
+sed -i "s|\${VLESS_PORT}|$VLESS_PORT|g" /etc/sing-box/config.json
+sed -i "s|\${H2_PORT}|$H2_PORT|g" /etc/sing-box/config.json
 sed -i "s|\${VLESS_USERS}|$VLESS_USERS_ESCAPED|g" /etc/sing-box/config.json
 sed -i "s|\${H2_USERS}|$H2_USERS_ESCAPED|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json

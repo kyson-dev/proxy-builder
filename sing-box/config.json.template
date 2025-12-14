@@ -8,7 +8,7 @@
       "type": "vless",
       "tag": "vless-reality",
       "listen": "::",
-      "listen_port": 8443,
+      "listen_port": ${VLESS_PORT},
       "users": ${VLESS_USERS},
       "tls": {
         "enabled": true,
@@ -28,7 +28,7 @@
       "type": "hysteria2",
       "tag": "hysteria2",
       "listen": "::",
-      "listen_port": 9443,
+      "listen_port": ${H2_PORT},
       "users": ${H2_USERS},
       "tls": {
         "enabled": true,

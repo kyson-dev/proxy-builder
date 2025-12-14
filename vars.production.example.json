@@ -1,4 +1,9 @@
 {
+    "ports": {
+        "vless": 443,
+        "hysteria2": 443
+    },
+    "_comment_ports": "VLESS使用TCP，Hysteria2使用UDP，可以共用同一端口",
     "vless_users": [
         {
             "uuid": "prod-uuid-1",
@@ -9,6 +14,7 @@
             "flow": "xtls-rprx-vision"
         }
     ],
+    "_comment_vless": "使用 'make uuid' 生成UUID",
     "h2_users": [
         {
             "password": "prod-password-1"
@@ -17,9 +23,11 @@
             "password": "prod-password-2"
         }
     ],
+    "_comment_h2": "使用 'make password' 生成密码",
     "reality": {
         "private_key": "your-prod-private-key",
         "public_key": "your-prod-public-key",
         "short_id": "your-prod-short-id"
-    }
+    },
+    "_comment_reality": "使用 'make reality-key' 生成密钥对，使用 'make short-id' 生成短ID"
 }

@@ -10,6 +10,8 @@ services:
       - ./sing-box/config.json.template:/etc/sing-box/config.json.template:ro
       - ./sing-box/certs:/etc/sing-box/certs:ro
     environment:
+      - VLESS_PORT=${VLESS_PORT:-443}
+      - H2_PORT=${H2_PORT:-443}
       - VLESS_USERS=${VLESS_USERS}
       - H2_USERS=${H2_USERS}
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
