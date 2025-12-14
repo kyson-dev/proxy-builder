@@ -40,27 +40,76 @@ create_firewall_rule() {
 }
 
 # ------------------------------------------------------------------------------
+# 选择项目
+# ------------------------------------------------------------------------------
+select_project() {
+    log_step "选择 GCP 项目"
+    
+    # 获取当前项目
+    local current_project
+    current_project=$(gcloud config get-value project 2>/dev/null || echo "")
+    
+    # 获取项目列表
+    log_substep "获取项目列表..."
+    local projects=()
+    local default_index=""
+    local i=1
+    
+    while IFS= read -r line; do
+        projects+=("$line")
+        if [[ "$line" == "$current_project" ]]; then
+            default_index=$i
+        fi
+        ((i++))
+    done < <(gcloud projects list --format="value(projectId)" 2>/dev/null)
+    
+    if [[ ${#projects[@]} -eq 0 ]]; then
+        die "没有找到任何 GCP 项目"
+    fi
+    
+    echo ""
+    echo "可用项目:"
+    for ((i=0; i<${#projects[@]}; i++)); do
+        local marker=""
+        if [[ "${projects[$i]}" == "$current_project" ]]; then
+            marker=" (当前)"
+        fi
+        echo "  $((i+1)). ${projects[$i]}${marker}"
+    done
+    echo ""
+    
+    local selection
+    while true; do
+        if [[ -n "$default_index" ]]; then
+            read -p "选择项目 (1-${#projects[@]}) [默认: $default_index]: " selection
+            selection="${selection:-$default_index}"
+        else
+            read -p "选择项目 (1-${#projects[@]}): " selection
+        fi
+        
+        if [[ "$selection" =~ ^[0-9]+$ ]] && \
+           [[ "$selection" -ge 1 ]] && \
+           [[ "$selection" -le "${#projects[@]}" ]]; then
+            PROJECT_ID="${projects[$((selection-1))]}"
+            break
+        fi
+        echo "无效选择，请重试。"
+    done
+    
+    log_success "选择的项目: $PROJECT_ID"
+    echo ""
+}
+
+# ------------------------------------------------------------------------------
 # 主函数
 # ------------------------------------------------------------------------------
 main() {
     print_header "配置服务端口防火墙规则"
     
-    # 获取当前项目
-    local project
-    project=$(gcloud config get-value project 2>/dev/null)
+    # 选择项目
+    select_project
     
-    if [[ -z "$project" ]]; then
-        prompt_required "请输入 GCP 项目 ID"
-        project="$INPUT_VALUE"
-    else
-        log_substep "当前项目: $project"
-        if ! confirm "使用此项目?" "y"; then
-            prompt_required "请输入 GCP 项目 ID"
-            project="$INPUT_VALUE"
-        fi
-    fi
-    
-    echo ""
+    # 询问端口配置
     echo "请输入服务端口配置:"
     echo ""
     
@@ -84,14 +133,14 @@ main() {
     echo ""
     
     # 创建 VLESS 规则 (TCP)
-    create_firewall_rule "$project" \
+    create_firewall_rule "$PROJECT_ID" \
         "allow-vless-${vless_port}" \
         "tcp" \
         "$vless_port" \
         "Allow VLESS Reality traffic"
     
     # 创建 Hysteria2 规则 (UDP)
-    create_firewall_rule "$project" \
+    create_firewall_rule "$PROJECT_ID" \
         "allow-hysteria2-${h2_port}" \
         "udp" \
         "$h2_port" \

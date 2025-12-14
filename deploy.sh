@@ -22,7 +22,6 @@ source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
 source "${SCRIPTS_DIR}/deploy/parse-config.sh"
-source "${SCRIPTS_DIR}/deploy/configure-firewall.sh"
 source "${SCRIPTS_DIR}/deploy/generate-certs.sh"
 source "${SCRIPTS_DIR}/deploy/start-services.sh"
 source "${SCRIPTS_DIR}/deploy/health-check.sh"
@@ -31,24 +30,20 @@ source "${SCRIPTS_DIR}/deploy/health-check.sh"
 # 主流程
 # ==============================================================================
 main() {
-    # Step 0: 启用 BBR
+    # Step 1: 启用 BBR
     enable_bbr
     echo ""
     
-    # Step 1: 检查并安装 Docker
+    # Step 2: 检查并安装 Docker
     check_docker
     echo ""
     
-    # Step 2: 检查并安装依赖
+    # Step 3: 检查并安装依赖
     check_dependencies
     echo ""
     
-    # Step 3: 解析配置文件
+    # Step 4: 解析配置文件
     parse_config "vars.json"
-    echo ""
-    
-    # Step 4: 配置防火墙规则（根据端口动态创建）
-    configure_firewall
     echo ""
     
     # Step 5: 生成自签名证书
@@ -62,7 +57,6 @@ main() {
     # Step 7: 健康检查
     health_check 5
 }
-
 
 # 运行主流程
 main "$@"
