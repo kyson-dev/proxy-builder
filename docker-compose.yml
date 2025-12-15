@@ -1,6 +1,4 @@
 services:
-  # Sing-box - 代理服务（VLESS Reality + Hysteria2 with self-signed cert）
-  # docker logs -f sing-box 持续日志输出
   sing-box:
     image: ghcr.io/sagernet/sing-box:latest
     container_name: sing-box
@@ -12,10 +10,13 @@ services:
       - ./sing-box/config.json.template:/etc/sing-box/config.json.template:ro
       - ./sing-box/certs:/etc/sing-box/certs:ro
     environment:
-      - VLESS_UUID=${VLESS_UUID}
+      - VLESS_PORT=${VLESS_PORT:-443}
+      - H2_PORT=${H2_PORT:-443}
+      - VLESS_USERS=${VLESS_USERS}
+      - H2_USERS=${H2_USERS}
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
-      - H2_PASSWORD=${H2_PASSWORD}
+      - REALITY_SERVER_NAME=${REALITY_SERVER_NAME:-www.microsoft.com}
     cap_add:
       - NET_ADMIN
     logging:

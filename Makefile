@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder
 # 支持多环境部署 (production / development)
 
-.PHONY: all uuid short-id password reality-key setup-wif push-env push-env-prod push-env-dev help
+.PHONY: all uuid short-id password reality-key setup-wif setup-firewall push-config help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -16,11 +16,10 @@ help:
 	@echo ""
 	@echo "🚀 Deployment Setup:"
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
+	@echo "  make setup-firewall    - Configure firewall rules for service ports"
 	@echo ""
-	@echo "📦 Environment Variables:"
-	@echo "  make push-env          - Push .env to repository secrets (legacy)"
-	@echo "  make push-env-prod     - Push .env.production to production environment"
-	@echo "  make push-env-dev      - Push .env.development to development environment"
+	@echo "📦 Configuration Push:"
+	@echo "  make push-config       - Push config vars to GitHub Environment (interactive)"
 	@echo ""
 	@echo "🛠️  Utilities:"
 	@echo "  make generate-cert     - Generate self-signed certificate for Hysteria2"
@@ -38,7 +37,7 @@ short-id:
 	@openssl rand -hex 4
 
 password:
-	@openssl rand -base64 16
+	@openssl rand -base64 32
 
 reality-key:
 	@echo "Generating REALITY key pair using sing-box docker image..."
@@ -52,52 +51,19 @@ setup-wif:
 	@chmod +x scripts/setup-wif.sh
 	@./scripts/setup-wif.sh
 
+setup-firewall:
+	@chmod +x scripts/setup-firewall.sh
+	@./scripts/setup-firewall.sh
+
 # ============================================================
-# Environment Variables Push
+# Configuration Push (上传变量配置)
 # ============================================================
 
-# Legacy: Push to repository level (not recommended for multi-env)
-push-env:
-	@if [ ! -f .env ]; then echo "❌ .env file not found!"; exit 1; fi
-	@echo "⚠️  Warning: This pushes to repository-level ENV_FILE secret (not environment-specific)"
-	@echo "   For multi-environment setup, use: make push-env-prod or make push-env-dev"
-	@echo ""
-	@read -p "Continue anyway? (y/n): " confirm && [ "$$confirm" = "y" ] || exit 1
-	@echo "Pushing .env as ENV_FILE to repository..."
-	@gh secret set ENV_FILE < .env
-	@echo "✅ Done."
+# Push config (auto-detect environment)
+push-config:
+	@chmod +x scripts/push-config.sh
+	@./scripts/push-config.sh
 
-# Push to production environment
-push-env-prod:
-	@if [ ! -f .env.production ]; then \
-		echo "❌ .env.production file not found!"; \
-		echo "   Please create .env.production with your production configuration."; \
-		exit 1; \
-	fi
-	@echo "📦 Pushing .env.production as ENV_FILE to 'production' environment..."
-	@echo ""
-	@gh secret set ENV_FILE --env production < .env.production
-	@echo ""
-	@echo "✅ Production environment ENV_FILE updated!"
-	@echo ""
-	@echo "📋 Content pushed:"
-	@cat .env.production | grep -v "^#" | grep -v "^$$"
-
-# Push to development environment
-push-env-dev:
-	@if [ ! -f .env.development ]; then \
-		echo "❌ .env.development file not found!"; \
-		echo "   Please create .env.development with your development configuration."; \
-		exit 1; \
-	fi
-	@echo "📦 Pushing .env.development as ENV_FILE to 'development' environment..."
-	@echo ""
-	@gh secret set ENV_FILE --env development < .env.development
-	@echo ""
-	@echo "✅ Development environment ENV_FILE updated!"
-	@echo ""
-	@echo "📋 Content pushed:"
-	@cat .env.development | grep -v "^#" | grep -v "^$$"
 
 # ============================================================
 # Generate certificate for Hysteria2

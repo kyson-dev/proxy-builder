@@ -1,7 +1,23 @@
-name: Deploy to GCP VM (WIF)
+name: Deploy to GCP VM
 
 on:
-  workflow_dispatch: # Allow manual triggering from any branch
+  # 手动触发
+  workflow_dispatch:
+  # 推送到 main 分支自动部署
+  push:
+    branches:
+      - main
+    # 排除这些文件的变更（文档、配置模板等不触发部署）
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "*.example.json"
+      - ".gitignore"
+      - "LICENSE"
+      - "Makefile"
+      - "scripts/setup-wif/**"
+      - "scripts/setup-firewall.sh"
+      - "scripts/push-config.sh"
 
 permissions:
   contents: read
@@ -10,78 +26,59 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Select environment based on branch
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Authenticate to Google Cloud
+      - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Cloud SDK
+      - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: "beta"
 
-      - name: Configure SSH
+      - name: Deploy
+        env:
+          VARS_JSON: ${{ secrets.VARS_JSON }}
         run: |
-          # 1. Setup SSH keys and update config
-          # This command automatically generates keys and updates ~/.ssh/config
-          gcloud compute config-ssh --project=${{ secrets.GCP_PROJECT_ID }} --quiet
+          VM="${{ secrets.GCP_VM_NAME }}"
+          ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          # 2. Construct the hostname alias (format: name.zone.project)
-          HOST="${{ secrets.GCP_VM_NAME }}.${{ secrets.GCP_VM_ZONE }}.${{ secrets.GCP_PROJECT_ID }}"
-          echo "VM_HOST=$HOST" >> $GITHUB_ENV
+          # 1. 打包文件
+          echo "📦 打包文件..."
+          tar --exclude='.git' \
+              --exclude='.github' \
+              --exclude='vars.*.json' \
+              --exclude='sing-box/certs' \
+              --exclude='*.md' \
+              --exclude='docs' \
+              -czf /tmp/app.tar.gz .
 
-          # 3. Warm-up connection (Critical for new VMs)
-          # First connection triggers key propagation to the VM. We retry until successful.
-          echo "🔄 Warming up SSH connection..."
-          for i in {1..5}; do
-            if gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="echo SSH Ready" --quiet; then
-              echo "✅ SSH connection established"
-              break
-            fi
-            echo "⏳ Waiting for SSH keys to propagate... ($i/5)"
-            sleep 10
-          done
+          # 2. 创建 vars.json (从 Secret)
+          echo "$VARS_JSON" > /tmp/vars.json
 
-      - name: Prepare Remote Directory
-        run: |
-          # Use gcloud ssh directly for better reliability
-          gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="mkdir -p ~/app" --quiet
+          # 3. 上传
+          echo "📤 上传文件..."
+          gcloud beta compute scp /tmp/app.tar.gz /tmp/vars.json ${VM}:~/ --zone=${ZONE} --quiet
 
-          # Get Remote Home (for rsync path)
-          REMOTE_HOME=$(gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="pwd" --quiet)
-          echo "APP_DIR=$REMOTE_HOME/app" >> $GITHUB_ENV
+          # 4. 部署
+          echo "🚀 执行部署..."
+          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
+            set -e
+            mkdir -p ~/app
+            tar -xzf ~/app.tar.gz -C ~/app
+            mv ~/vars.json ~/app/vars.json
+            rm ~/app.tar.gz
+            cd ~/app
+            chmod +x deploy.sh
+            ./deploy.sh
+          "
 
-      - name: Sync files to server
-        run: |
-          # Sync files using the configured SSH alias
-          # We use "runner@" fallback protection by strictly using the alias options
-          rsync -avz --delete \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-            --exclude ".env" \
-            --exclude ".env.*" \
-            --exclude ".git" \
-            --exclude ".github" \
-            --exclude "sing-box/certs" \
-            --exclude "*.md" \
-            --exclude "docs/" \
-            ./ ${{ env.VM_HOST }}:${{ env.APP_DIR }}/
-
-      - name: Create/Update .env file
-        run: |
-          # Construct the .env file content locally first to handle newlines correctly
-          echo "${{ secrets.ENV_FILE }}" > .env.temp
-
-          # Copy .env file using gcloud scp (simpler than cat via ssh)
-          gcloud compute scp .env.temp ${{ secrets.GCP_VM_NAME }}:~/app/.env --zone=${{ secrets.GCP_VM_ZONE }} --quiet
-          rm .env.temp
-
-      - name: Execute Deployment Script
-        run: |
-          # Execute the deployment script using gcloud ssh
-          gcloud compute ssh ${{ secrets.GCP_VM_NAME }} --zone=${{ secrets.GCP_VM_ZONE }} --command="cd ~/app && chmod +x deploy.sh && ./deploy.sh" --quiet
+          echo "✅ 部署完成"

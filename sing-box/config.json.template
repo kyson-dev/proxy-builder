@@ -8,20 +8,15 @@
       "type": "vless",
       "tag": "vless-reality",
       "listen": "::",
-      "listen_port": 8443,
-      "users": [
-        {
-          "uuid": "${VLESS_UUID}",
-          "flow": "xtls-rprx-vision"
-        }
-      ],
+      "listen_port": ${VLESS_PORT},
+      "users": ${VLESS_USERS},
       "tls": {
         "enabled": true,
-        "server_name": "www.microsoft.com",
+        "server_name": "${REALITY_SERVER_NAME}",
         "reality": {
           "enabled": true,
           "handshake": {
-            "server": "www.microsoft.com",
+            "server": "${REALITY_SERVER_NAME}",
             "server_port": 443
           },
           "private_key": "${REALITY_PRIVATE_KEY}",
@@ -33,12 +28,8 @@
       "type": "hysteria2",
       "tag": "hysteria2",
       "listen": "::",
-      "listen_port": 9443,
-      "users": [
-        {
-          "password": "${H2_PASSWORD}"
-        }
-      ],
+      "listen_port": ${H2_PORT},
+      "users": ${H2_USERS},
       "tls": {
         "enabled": true,
         "certificate_path": "/etc/sing-box/certs/cert.pem",
