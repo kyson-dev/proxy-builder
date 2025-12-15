@@ -16,6 +16,7 @@ services:
       - H2_USERS=${H2_USERS}
       - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
+      - REALITY_SERVER_NAME=${REALITY_SERVER_NAME:-www.microsoft.com}
     cap_add:
       - NET_ADMIN
     logging:

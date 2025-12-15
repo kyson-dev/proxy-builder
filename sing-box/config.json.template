@@ -12,11 +12,11 @@
       "users": ${VLESS_USERS},
       "tls": {
         "enabled": true,
-        "server_name": "www.microsoft.com",
+        "server_name": "${REALITY_SERVER_NAME}",
         "reality": {
           "enabled": true,
           "handshake": {
-            "server": "www.microsoft.com",
+            "server": "${REALITY_SERVER_NAME}",
             "server_port": 443
           },
           "private_key": "${REALITY_PRIVATE_KEY}",

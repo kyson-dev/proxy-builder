@@ -13,7 +13,7 @@ fi
 # 默认配置
 DEFAULT_CERT_DIR="./sing-box/certs"
 DEFAULT_CN="bing.com"
-DEFAULT_DAYS="36500"  # 100 年
+DEFAULT_DAYS="3650"  # 10 年
 
 # ------------------------------------------------------------------------------
 # 生成 RSA 自签名证书

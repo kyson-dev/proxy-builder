@@ -16,6 +16,7 @@ SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 # 加载通用库（所有库都在此加载，子模块不再重复加载）
 source "${SCRIPTS_DIR}/lib/common.sh"
 source "${SCRIPTS_DIR}/lib/os.sh"
+source "${SCRIPTS_DIR}/lib/docker.sh"
 
 # 加载子模块
 source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"

@@ -8,20 +8,8 @@
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     source "${_SELF_DIR}/../lib/common.sh"
+    source "${_SELF_DIR}/../lib/docker.sh"
 fi
-
-# ------------------------------------------------------------------------------
-# 获取 Docker 命令
-# ------------------------------------------------------------------------------
-get_docker_cmd() {
-    if docker info >/dev/null 2>&1; then
-        echo "docker"
-    elif sudo docker info >/dev/null 2>&1; then
-        echo "sudo docker"
-    else
-        die "无法运行 Docker"
-    fi
-}
 
 # ------------------------------------------------------------------------------
 # 获取服务器公网 IP
@@ -34,12 +22,27 @@ get_public_ip() {
 }
 
 # ------------------------------------------------------------------------------
+# 从 .env 文件读取端口配置
+# ------------------------------------------------------------------------------
+load_ports_from_env() {
+    if [[ -f .env ]]; then
+        # 读取 VLESS_PORT 和 H2_PORT
+        VLESS_PORT=$(grep "^VLESS_PORT=" .env 2>/dev/null | cut -d= -f2)
+        H2_PORT=$(grep "^H2_PORT=" .env 2>/dev/null | cut -d= -f2)
+    fi
+}
+
+# ------------------------------------------------------------------------------
 # 主函数
 # ------------------------------------------------------------------------------
 health_check() {
     local docker_cmd
     docker_cmd=$(get_docker_cmd)
     local wait_time="${1:-5}"
+    
+    if [[ -z "$docker_cmd" ]]; then
+        die "无法运行 Docker"
+    fi
     
     log_step "健康检查"
     
@@ -58,6 +61,9 @@ health_check() {
         
         local server_ip
         server_ip=$(get_public_ip)
+        
+        # 确保端口变量已加载
+        load_ports_from_env
         
         echo ""
         echo "📋 代理服务信息:"

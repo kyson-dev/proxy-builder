@@ -8,20 +8,8 @@
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     source "${_SELF_DIR}/../lib/common.sh"
+    source "${_SELF_DIR}/../lib/docker.sh"
 fi
-
-# ------------------------------------------------------------------------------
-# 获取 Docker 命令
-# ------------------------------------------------------------------------------
-get_docker_cmd() {
-    if docker info >/dev/null 2>&1; then
-        echo "docker"
-    elif sudo docker info >/dev/null 2>&1; then
-        echo "sudo docker"
-    else
-        die "无法运行 Docker"
-    fi
-}
 
 # ------------------------------------------------------------------------------
 # 主函数
@@ -31,13 +19,11 @@ start_services() {
     local docker_cmd
     docker_cmd=$(get_docker_cmd)
     
-    log_step "启动服务"
-    
-    # 清理旧的 .env 文件
-    if [[ -f .env ]]; then
-        log_substep "清理旧的 .env 文件..."
-        rm -f .env
+    if [[ -z "$docker_cmd" ]]; then
+        die "无法运行 Docker"
     fi
+    
+    log_step "启动服务"
     
     # 拉取最新镜像
     log_substep "拉取最新镜像..."

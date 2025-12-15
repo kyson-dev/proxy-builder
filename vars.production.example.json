@@ -27,7 +27,8 @@
     "reality": {
         "private_key": "your-prod-private-key",
         "public_key": "your-prod-public-key",
-        "short_id": "your-prod-short-id"
+        "short_id": "your-prod-short-id",
+        "server_name": "www.microsoft.com"
     },
-    "_comment_reality": "使用 'make reality-key' 生成密钥对，使用 'make short-id' 生成短ID"
+    "_comment_reality": "使用 'make reality-key' 生成密钥对，使用 'make short-id' 生成短ID，server_name 是伪装域名"
 }

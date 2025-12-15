@@ -13,9 +13,10 @@ if [ -z "$VLESS_USERS" ] || [ -z "$REALITY_PRIVATE_KEY" ] || [ -z "$REALITY_SHOR
   exit 1
 fi
 
-# Set default ports if not provided
+# Set default values if not provided
 VLESS_PORT=${VLESS_PORT:-443}
 H2_PORT=${H2_PORT:-443}
+REALITY_SERVER_NAME=${REALITY_SERVER_NAME:-www.microsoft.com}
 
 echo "Generating configuration from template..."
 
@@ -33,8 +34,10 @@ sed -i "s|\${VLESS_USERS}|$VLESS_USERS_ESCAPED|g" /etc/sing-box/config.json
 sed -i "s|\${H2_USERS}|$H2_USERS_ESCAPED|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_PRIVATE_KEY}|$REALITY_PRIVATE_KEY|g" /etc/sing-box/config.json
 sed -i "s|\${REALITY_SHORT_ID}|$REALITY_SHORT_ID|g" /etc/sing-box/config.json
+sed -i "s|\${REALITY_SERVER_NAME}|$REALITY_SERVER_NAME|g" /etc/sing-box/config.json
 
 echo "Configuration generated successfully."
+echo "  REALITY_SERVER_NAME: $REALITY_SERVER_NAME"
 
 # Validate configuration
 echo "Validating configuration..."
