@@ -1,7 +1,23 @@
 name: Deploy to GCP VM
 
 on:
+  # 手动触发
   workflow_dispatch:
+  # 推送到 main 分支自动部署
+  push:
+    branches:
+      - main
+    # 排除这些文件的变更（文档、配置模板等不触发部署）
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "*.example.json"
+      - ".gitignore"
+      - "LICENSE"
+      - "Makefile"
+      - "scripts/setup-wif/**"
+      - "scripts/setup-firewall.sh"
+      - "scripts/push-config.sh"
 
 permissions:
   contents: read

@@ -101,6 +101,31 @@ push_config() {
     if gh secret set VARS_JSON --env "$env_name" < "$vars_file"; then
         echo ""
         log_success "✅ 成功推送配置到 '$env_name' 环境!"
+        
+        # 提醒用户确保端口已开放
+        echo ""
+        print_separator
+        echo "⚠️  重要提醒: 请确保防火墙已开放以下端口"
+        print_separator
+        
+        # 尝试从配置文件读取端口
+        if command_exists jq; then
+            local vless_port=$(jq -r '.ports.vless // 443' "$vars_file")
+            local h2_port=$(jq -r '.ports.hysteria2 // 443' "$vars_file")
+            
+            echo ""
+            echo "   VLESS Reality: TCP 端口 $vless_port"
+            echo "   Hysteria2:     UDP 端口 $h2_port"
+            echo ""
+            echo "如果防火墙规则未配置，请运行:"
+            echo "   make setup-firewall"
+        else
+            echo ""
+            echo "   请检查 vars.json 中配置的端口并确保防火墙规则已创建"
+            echo "   运行 'make setup-firewall' 可快速创建规则"
+        fi
+        
+        echo ""
     else
         echo ""
         log_error "❌ 推送失败"

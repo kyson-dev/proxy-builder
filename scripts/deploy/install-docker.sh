@@ -9,6 +9,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     source "${_SELF_DIR}/../lib/common.sh"
     source "${_SELF_DIR}/../lib/os.sh"
+    source "${_SELF_DIR}/../lib/docker.sh"
 fi
 
 # ------------------------------------------------------------------------------
@@ -90,19 +91,7 @@ check_docker() {
     fi
 }
 
-# ------------------------------------------------------------------------------
-# 检查 Docker 权限
-# ------------------------------------------------------------------------------
-get_docker_cmd() {
-    if docker info >/dev/null 2>&1; then
-        echo "docker"
-    elif sudo docker info >/dev/null 2>&1; then
-        log_substep "需要 sudo 权限运行 Docker"
-        echo "sudo docker"
-    else
-        die "无法运行 Docker。请检查 Docker 服务是否启动: sudo systemctl start docker"
-    fi
-}
+
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
