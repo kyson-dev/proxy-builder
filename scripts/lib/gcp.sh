@@ -137,32 +137,80 @@ gcp_grant_role() {
 # Workload Identity Federation
 # ------------------------------------------------------------------------------
 
-# 检查 WIF Pool 是否存在
+# 检查 WIF Pool 是否存在且处于 ACTIVE 状态
 gcp_wif_pool_exists() {
     local pool_name="$1"
     local project="$2"
-    gcloud iam workload-identity-pools describe "$pool_name" \
+    local state
+    state=$(gcloud iam workload-identity-pools describe "$pool_name" \
         --project "$project" \
-        --location="global" &>/dev/null
+        --location="global" \
+        --format="value(state)" 2>/dev/null)
+    [[ "$state" == "ACTIVE" ]]
 }
 
-# 创建 WIF Pool
+# 检查 WIF Pool 是否处于软删除状态
+gcp_wif_pool_deleted() {
+    local pool_name="$1"
+    local project="$2"
+    local state
+    state=$(gcloud iam workload-identity-pools describe "$pool_name" \
+        --project "$project" \
+        --location="global" \
+        --format="value(state)" 2>/dev/null)
+    [[ "$state" == "DELETED" ]]
+}
+
+# 恢复软删除的 WIF Pool
+gcp_undelete_wif_pool() {
+    local pool_name="$1"
+    local project="$2"
+    
+    log_substep "恢复软删除的 Pool: $pool_name"
+    gcloud iam workload-identity-pools undelete "$pool_name" \
+        --project "$project" \
+        --location="global" >/dev/null
+    
+    # 等待恢复完成
+    sleep 3
+    log_success "Pool 已恢复: $pool_name"
+}
+
+# 创建 WIF Pool（支持自动恢复软删除状态）
+# 逻辑：1. ACTIVE → 跳过  2. DELETED → 恢复  3. 不存在 → 创建
 gcp_create_wif_pool() {
     local pool_name="$1"
     local project="$2"
     local display_name="${3:-$pool_name}"
     
-    if gcp_wif_pool_exists "$pool_name" "$project"; then
-        log_substep "Workload Identity Pool 已存在: $pool_name"
-        return 0
-    fi
-    
-    gcloud iam workload-identity-pools create "$pool_name" \
+    # 获取当前状态
+    local state
+    state=$(gcloud iam workload-identity-pools describe "$pool_name" \
         --project "$project" \
         --location="global" \
-        --display-name "$display_name"
+        --format="value(state)" 2>/dev/null || echo "NOT_FOUND")
     
-    log_success "Workload Identity Pool 已创建: $pool_name"
+    case "$state" in
+        ACTIVE)
+            log_substep "Workload Identity Pool 已存在: $pool_name"
+            return 0
+            ;;
+        DELETED)
+            log_warn "Pool 处于软删除状态，正在恢复..."
+            gcp_undelete_wif_pool "$pool_name" "$project"
+            return 0
+            ;;
+        *)
+            # 不存在，创建新的
+            log_substep "创建 Workload Identity Pool..."
+            gcloud iam workload-identity-pools create "$pool_name" \
+                --project "$project" \
+                --location="global" \
+                --display-name "$display_name"
+            log_success "Workload Identity Pool 已创建: $pool_name"
+            return 0
+            ;;
+    esac
 }
 
 # 获取 WIF Pool ID
