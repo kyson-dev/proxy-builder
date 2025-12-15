@@ -102,27 +102,67 @@ push_config() {
         echo ""
         log_success "✅ 成功推送配置到 '$env_name' 环境!"
         
-        # 提醒用户确保端口已开放
+        # 读取端口配置
+        local vless_port="443"
+        local h2_port="443"
+        
+        if command_exists jq; then
+            vless_port=$(jq -r '.ports.vless // 443' "$vars_file")
+            h2_port=$(jq -r '.ports.hysteria2 // 443' "$vars_file")
+        fi
+        
         echo ""
         print_separator
-        echo "⚠️  重要提醒: 请确保防火墙已开放以下端口"
+        echo "🔥 防火墙配置"
         print_separator
+        echo ""
+        echo "配置的端口:"
+        echo "   VLESS Reality: TCP 端口 $vless_port"
+        echo "   Hysteria2:     UDP 端口 $h2_port"
+        echo ""
         
-        # 尝试从配置文件读取端口
-        if command_exists jq; then
-            local vless_port=$(jq -r '.ports.vless // 443' "$vars_file")
-            local h2_port=$(jq -r '.ports.hysteria2 // 443' "$vars_file")
+        # 询问是否设置防火墙
+        if confirm "是否现在配置防火墙规则?" "y"; then
+            echo ""
+            # 加载防火墙设置脚本
+            source "${_SELF_DIR}/setup-firewall.sh"
             
+            # 选择项目
+            select_project
+            
+            # 直接使用配置文件中的端口创建规则
             echo ""
-            echo "   VLESS Reality: TCP 端口 $vless_port"
-            echo "   Hysteria2:     UDP 端口 $h2_port"
+            log_substep "将创建以下防火墙规则:"
+            echo "   - allow-vless-${vless_port} (tcp:${vless_port})"
+            echo "   - allow-hysteria2-${h2_port} (udp:${h2_port})"
             echo ""
-            echo "如果防火墙规则未配置，请运行:"
-            echo "   make setup-firewall"
+            
+            if confirm "确认创建?" "y"; then
+                echo ""
+                create_firewall_rule "$PROJECT_ID" \
+                    "allow-vless-${vless_port}" \
+                    "tcp" \
+                    "$vless_port" \
+                    "Allow VLESS Reality traffic"
+                
+                create_firewall_rule "$PROJECT_ID" \
+                    "allow-hysteria2-${h2_port}" \
+                    "udp" \
+                    "$h2_port" \
+                    "Allow Hysteria2 traffic"
+                
+                echo ""
+                log_success "防火墙规则配置完成"
+            else
+                log_warn "已跳过防火墙配置"
+            fi
         else
             echo ""
-            echo "   请检查 vars.json 中配置的端口并确保防火墙规则已创建"
-            echo "   运行 'make setup-firewall' 可快速创建规则"
+            log_warn "⚠️  请确保防火墙已开放以下端口:"
+            echo "   - TCP 端口 $vless_port (VLESS Reality)"
+            echo "   - UDP 端口 $h2_port (Hysteria2)"
+            echo ""
+            echo "稍后可运行 'make setup-firewall' 配置"
         fi
         
         echo ""

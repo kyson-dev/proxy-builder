@@ -2,6 +2,7 @@
 # ==============================================================================
 # 配置服务端口防火墙规则
 # 独立脚本，手动运行: make setup-firewall
+# 也可被其他脚本调用: setup_firewall_rules <project> <vless_port> <h2_port>
 # ==============================================================================
 set -e
 
@@ -101,7 +102,44 @@ select_project() {
 }
 
 # ------------------------------------------------------------------------------
-# 主函数
+# 创建防火墙规则（可被其他脚本调用）
+# 参数: <project_id> <vless_port> <h2_port>
+# ------------------------------------------------------------------------------
+setup_firewall_rules() {
+    local project="$1"
+    local vless_port="$2"
+    local h2_port="$3"
+    
+    if [[ -z "$project" ]] || [[ -z "$vless_port" ]] || [[ -z "$h2_port" ]]; then
+        die "用法: setup_firewall_rules <project_id> <vless_port> <h2_port>"
+    fi
+    
+    log_step "配置防火墙规则"
+    log_substep "项目: $project"
+    log_substep "VLESS 端口: $vless_port (TCP)"
+    log_substep "Hysteria2 端口: $h2_port (UDP)"
+    echo ""
+    
+    # 创建 VLESS 规则 (TCP)
+    create_firewall_rule "$project" \
+        "allow-vless-${vless_port}" \
+        "tcp" \
+        "$vless_port" \
+        "Allow VLESS Reality traffic"
+    
+    # 创建 Hysteria2 规则 (UDP)
+    create_firewall_rule "$project" \
+        "allow-hysteria2-${h2_port}" \
+        "udp" \
+        "$h2_port" \
+        "Allow Hysteria2 traffic"
+    
+    echo ""
+    log_success "防火墙规则配置完成"
+}
+
+# ------------------------------------------------------------------------------
+# 交互式主函数
 # ------------------------------------------------------------------------------
 main() {
     print_header "配置服务端口防火墙规则"
@@ -132,14 +170,13 @@ main() {
     
     echo ""
     
-    # 创建 VLESS 规则 (TCP)
+    # 创建规则
     create_firewall_rule "$PROJECT_ID" \
         "allow-vless-${vless_port}" \
         "tcp" \
         "$vless_port" \
         "Allow VLESS Reality traffic"
     
-    # 创建 Hysteria2 规则 (UDP)
     create_firewall_rule "$PROJECT_ID" \
         "allow-hysteria2-${h2_port}" \
         "udp" \
@@ -150,4 +187,7 @@ main() {
     log_success "防火墙规则配置完成"
 }
 
-main "$@"
+# 如果直接运行
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
