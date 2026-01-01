@@ -1,24 +1,14 @@
 services:
-  sing-box:
-    image: ghcr.io/sagernet/sing-box:latest
-    container_name: sing-box
+  s-ui:
+    image: alireza7/s-ui:latest
+    container_name: s-ui
+    hostname: s-ui
     restart: unless-stopped
+    tty: true
     network_mode: host
-    entrypoint: /entrypoint.sh
     volumes:
-      - ./sing-box/entrypoint.sh:/entrypoint.sh:ro
-      - ./sing-box/config.json.template:/etc/sing-box/config.json.template:ro
-      - ./sing-box/certs:/etc/sing-box/certs:ro
-    environment:
-      - VLESS_PORT=${VLESS_PORT:-443}
-      - H2_PORT=${H2_PORT:-443}
-      - VLESS_USERS=${VLESS_USERS}
-      - H2_USERS=${H2_USERS}
-      - REALITY_PRIVATE_KEY=${REALITY_PRIVATE_KEY}
-      - REALITY_SHORT_ID=${REALITY_SHORT_ID}
-      - REALITY_SERVER_NAME=${REALITY_SERVER_NAME:-www.microsoft.com}
-    cap_add:
-      - NET_ADMIN
+      - ./s-ui/db:/app/db
+      - ./s-ui/cert:/app/cert
     logging:
       driver: "json-file"
       options:

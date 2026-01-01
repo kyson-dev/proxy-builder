@@ -30,8 +30,6 @@ scripts/
 │   ├── enable-bbr.sh             # 启用 BBR 拥塞控制
 │   ├── install-docker.sh         # 安装 Docker
 │   ├── install-dependencies.sh   # 安装依赖 (openssl, jq)
-│   ├── parse-config.sh           # 解析 vars.json 配置
-│   ├── configure-firewall.sh     # 配置防火墙规则（根据端口动态创建）
 │   ├── generate-certs.sh         # 生成自签名证书
 │   ├── start-services.sh         # 启动 Docker Compose 服务
 │   └── health-check.sh           # 健康检查

@@ -11,7 +11,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 # 默认配置
-DEFAULT_CERT_DIR="./sing-box/certs"
+DEFAULT_CERT_DIR="./s-ui/cert"
 DEFAULT_CN="bing.com"
 DEFAULT_DAYS="3650"  # 10 年
 

@@ -1,12 +1,12 @@
 #!/bin/bash
 # ==============================================================================
-# 代理服务部署脚本
+# 代理服务部署脚本 (S-UI 版本)
 # 
 # 此脚本作为编排入口，调用各个子模块完成部署
 # ==============================================================================
 set -e
 
-echo "🚀 开始部署代理服务..."
+echo "🚀 开始部署 S-UI 代理服务..."
 echo ""
 
 # 获取脚本目录
@@ -22,7 +22,6 @@ source "${SCRIPTS_DIR}/lib/docker.sh"
 source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
-source "${SCRIPTS_DIR}/deploy/parse-config.sh"
 source "${SCRIPTS_DIR}/deploy/generate-certs.sh"
 source "${SCRIPTS_DIR}/deploy/start-services.sh"
 source "${SCRIPTS_DIR}/deploy/health-check.sh"
@@ -43,19 +42,15 @@ main() {
     check_dependencies
     echo ""
     
-    # Step 4: 解析配置文件
-    parse_config "vars.json"
+    # Step 4: 生成自签名证书 (用于 Hysteria2)
+    generate_certs "./s-ui/cert"
     echo ""
     
-    # Step 5: 生成自签名证书
-    generate_certs "./sing-box/certs"
-    echo ""
-    
-    # Step 6: 启动服务
+    # Step 5: 启动服务
     start_services "docker-compose.yml"
     echo ""
     
-    # Step 7: 健康检查
+    # Step 6: 健康检查
     health_check 5
 }
 

@@ -11,13 +11,11 @@ on:
     paths-ignore:
       - "**.md"
       - "docs/**"
-      - "*.example.json"
       - ".gitignore"
       - "LICENSE"
       - "Makefile"
       - "scripts/setup-wif/**"
       - "scripts/setup-firewall.sh"
-      - "scripts/push-config.sh"
 
 permissions:
   contents: read
@@ -45,8 +43,6 @@ jobs:
           install_components: "beta"
 
       - name: Deploy
-        env:
-          VARS_JSON: ${{ secrets.VARS_JSON }}
         run: |
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
@@ -56,25 +52,22 @@ jobs:
           tar --exclude='.git' \
               --exclude='.github' \
               --exclude='vars.*.json' \
-              --exclude='sing-box/certs' \
+              --exclude='s-ui/db' \
+              --exclude='s-ui/cert/*.pem' \
               --exclude='*.md' \
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
-          # 2. 创建 vars.json (从 Secret)
-          echo "$VARS_JSON" > /tmp/vars.json
-
-          # 3. 上传
+          # 2. 上传
           echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz /tmp/vars.json ${VM}:~/ --zone=${ZONE} --quiet
+          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/ --zone=${ZONE} --quiet
 
-          # 4. 部署
+          # 3. 部署
           echo "🚀 执行部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
             set -e
             mkdir -p ~/app
             tar -xzf ~/app.tar.gz -C ~/app
-            mv ~/vars.json ~/app/vars.json
             rm ~/app.tar.gz
             cd ~/app
             chmod +x deploy.sh

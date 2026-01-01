@@ -1,11 +1,11 @@
-# Makefile for Proxy Builder
-# 支持多环境部署 (production / development)
+# Makefile for Proxy Builder (S-UI)
+# S-UI Web Panel 管理代理服务
 
-.PHONY: all uuid short-id password reality-key setup-wif setup-firewall push-config help
+.PHONY: all uuid short-id password reality-key setup-wif setup-firewall help generate-cert check-cert
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-	@echo "Proxy Builder - Available Commands"
+	@echo "Proxy Builder (S-UI) - Available Commands"
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 	@echo ""
 	@echo "🔐 Credential Generation:"
@@ -18,10 +18,7 @@ help:
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
 	@echo "  make setup-firewall    - Configure firewall rules for service ports"
 	@echo ""
-	@echo "📦 Configuration Push:"
-	@echo "  make push-config       - Push config vars to GitHub Environment (interactive)"
-	@echo ""
-	@echo "🛠️  Utilities:"
+	@echo "️  Utilities:"
 	@echo "  make generate-cert     - Generate self-signed certificate for Hysteria2"
 	@echo "  make check-cert        - Check certificate validity and information"
 	@echo ""
@@ -56,23 +53,13 @@ setup-firewall:
 	@./scripts/setup-firewall.sh
 
 # ============================================================
-# Configuration Push (上传变量配置)
-# ============================================================
-
-# Push config (auto-detect environment)
-push-config:
-	@chmod +x scripts/push-config.sh
-	@./scripts/push-config.sh
-
-
-# ============================================================
 # Generate certificate for Hysteria2
 # ============================================================
 
 generate-cert:
 	@echo "🔐 生成 Hysteria2 自签名证书..."
-	@mkdir -p sing-box/certs
-	@if [ -f sing-box/certs/cert.pem ] || [ -f sing-box/certs/key.pem ]; then \
+	@mkdir -p s-ui/cert
+	@if [ -f s-ui/cert/cert.pem ] || [ -f s-ui/cert/key.pem ]; then \
 		echo "⚠️  警告: 证书文件已存在"; \
 		read -p "是否覆盖? (y/N) " -n 1 -r; \
 		echo; \
@@ -80,21 +67,21 @@ generate-cert:
 			echo "❌ 已取消"; \
 			exit 1; \
 		fi; \
-		rm -f sing-box/certs/cert.pem sing-box/certs/key.pem; \
+		rm -f s-ui/cert/cert.pem s-ui/cert/key.pem; \
 	fi
 	@openssl req -x509 -nodes -newkey rsa:2048 \
-		-keyout sing-box/certs/key.pem \
-		-out sing-box/certs/cert.pem \
+		-keyout s-ui/cert/key.pem \
+		-out s-ui/cert/cert.pem \
 		-subj "/CN=bing.com" \
 		-days 36500 >/dev/null 2>&1 || \
-	(openssl ecparam -name prime256v1 -genkey -noout -out sing-box/certs/key.pem 2>/dev/null && \
-	openssl req -new -x509 -key sing-box/certs/key.pem \
-		-out sing-box/certs/cert.pem \
+	(openssl ecparam -name prime256v1 -genkey -noout -out s-ui/cert/key.pem 2>/dev/null && \
+	openssl req -new -x509 -key s-ui/cert/key.pem \
+		-out s-ui/cert/cert.pem \
 		-subj "/CN=bing.com" \
 		-days 36500 >/dev/null 2>&1)
-	@if [ -f sing-box/certs/cert.pem ]; then \
-		chmod 644 sing-box/certs/cert.pem; \
-		chmod 600 sing-box/certs/key.pem; \
+	@if [ -f s-ui/cert/cert.pem ]; then \
+		chmod 644 s-ui/cert/cert.pem; \
+		chmod 600 s-ui/cert/key.pem; \
 		echo "✅ 证书生成成功"; \
 		echo "📋 CN: bing.com"; \
 		echo "📅 有效期: 100 年"; \
@@ -104,13 +91,13 @@ generate-cert:
 	fi
 
 check-cert:
-	@if [ ! -f sing-box/certs/cert.pem ]; then \
-		echo "❌ 证书不存在: sing-box/certs/cert.pem"; \
+	@if [ ! -f s-ui/cert/cert.pem ]; then \
+		echo "❌ 证书不存在: s-ui/cert/cert.pem"; \
 		exit 1; \
 	fi
 	@echo "🔍 证书信息:"
-	@echo "📋 CN: $$(openssl x509 -in sing-box/certs/cert.pem -noout -subject 2>/dev/null | sed -n 's/.*CN=\([^,]*\).*/\1/p')"
-	@echo "📅 生效时间: $$(openssl x509 -in sing-box/certs/cert.pem -noout -startdate 2>/dev/null | cut -d= -f2)"
-	@echo "📅 过期时间: $$(openssl x509 -in sing-box/certs/cert.pem -noout -enddate 2>/dev/null | cut -d= -f2)"
-	@openssl x509 -in sing-box/certs/cert.pem -noout -checkend 86400 >/dev/null 2>&1 && \
+	@echo "📋 CN: $$(openssl x509 -in s-ui/cert/cert.pem -noout -subject 2>/dev/null | sed -n 's/.*CN=\([^,]*\).*/\1/p')"
+	@echo "📅 生效时间: $$(openssl x509 -in s-ui/cert/cert.pem -noout -startdate 2>/dev/null | cut -d= -f2)"
+	@echo "📅 过期时间: $$(openssl x509 -in s-ui/cert/cert.pem -noout -enddate 2>/dev/null | cut -d= -f2)"
+	@openssl x509 -in s-ui/cert/cert.pem -noout -checkend 86400 >/dev/null 2>&1 && \
 		echo "✅ 证书有效" || echo "⚠️  证书已过期或即将过期"
