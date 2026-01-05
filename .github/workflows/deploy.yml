@@ -59,54 +59,65 @@ jobs:
           echo "📤 上传文件..."
           gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 3. 部署（版本管理逻辑在这里）
+          # 3. 部署
           echo "🚀 执行部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
             
-            # 解压到临时目录
-            echo "📦 解压到 ~/app.new..."
-            rm -rf ~/app.new
-            mkdir -p ~/app.new
-            tar -xzf ~/app.tar.gz -C ~/app.new
+            # 停止当前服务（如果存在）
+            if [ -d ~/app ] && [ -f ~/app/docker-compose.yml ]; then
+              echo "⏸️  停止当前服务..."
+              cd ~/app
+              docker compose down 2>/dev/null || true
+            fi
+            
+            # 备份当前版本
+            if [ -d ~/app ]; then
+              echo "💾 备份当前版本..."
+              rm -rf ~/app.backup
+              cp -r ~/app ~/app.backup
+            fi
+            
+            # 解压新版本到 app
+            echo "📦 解压新版本..."
+            rm -rf ~/app
+            mkdir -p ~/app
+            tar -xzf ~/app.tar.gz -C ~/app
             rm ~/app.tar.gz
             
-            # 运行临时目录的 deploy.sh
-            echo "🚀 运行新版本部署..."
-            cd ~/app.new
+            # 部署新版本
+            echo "🚀 部署新版本..."
+            cd ~/app
             chmod +x deploy.sh
             
             if ./deploy.sh; then
-              echo "✅ 新版本部署成功"
+              echo "✅ 部署成功"
               
-              # 备份旧版本
-              if [ -d ~/app ] && [ -f ~/app/deploy.sh ]; then
-                echo "💾 备份旧版本..."
+              # 删除备份
+              if [ -d ~/app.backup ]; then
+                echo "🧹 清理备份..."
                 rm -rf ~/app.backup
-                mv ~/app ~/app.backup
               fi
               
-              # 切换到新版本
-              echo "🔄 切换到新版本..."
-              mv ~/app.new ~/app
-              
-              echo "✅ 版本切换完成"
+              echo "✅ 部署完成"
             else
-              echo "❌ 新版本部署失败"
+              echo "❌ 部署失败"
               
-              # 停止新版本服务
-              cd ~/app.new
-              docker compose down 2>/dev/null || true
-              
-              # 重启旧版本（使用旧版本的 deploy.sh）
-              if [ -d ~/app ] && [ -f ~/app/deploy.sh ]; then
-                echo "🔄 重启旧版本..."
+              # 从备份恢复
+              if [ -d ~/app.backup ]; then
+                echo "🔄 从备份恢复..."
+                rm -rf ~/app
+                mv ~/app.backup ~/app
+                
+                # 重启旧版本
                 cd ~/app
-                ./deploy.sh || echo "⚠️ 旧版本重启失败，请手动检查"
+                docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
+                
+                echo "✅ 已恢复到旧版本"
+              else
+                echo "⚠️ 没有备份可恢复"
               fi
               
-              # 保留 app.new 用于调试
-              echo "📁 保留 ~/app.new 用于调试"
               exit 1
             fi
           '

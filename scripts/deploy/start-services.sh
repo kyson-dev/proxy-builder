@@ -25,6 +25,12 @@ start_services() {
     
     log_step "启动服务"
     
+    # 验证环境变量
+    if [[ -z "$S_UI_DATA_DIR" ]]; then
+        die "S_UI_DATA_DIR 环境变量未设置"
+    fi
+    log_substep "数据目录: $S_UI_DATA_DIR"
+    
     # 拉取最新镜像
     log_substep "拉取最新镜像..."
     $docker_cmd compose -f "$compose_file" pull
