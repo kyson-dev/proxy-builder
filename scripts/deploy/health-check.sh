@@ -66,8 +66,8 @@ health_check() {
         echo "📝 查看日志: docker logs -f s-ui"
         echo ""
         echo "💡 接下来请在 Web 面板中配置 Inbound:"
-        echo "   - VLESS Reality (端口 8443)"
-        echo "   - Hysteria2 (端口 9443)"
+        echo "   - VLESS Reality (端口 443)"
+        echo "   - Hysteria2 (端口 443)"
         
         return 0
     else

@@ -2,6 +2,13 @@
 certs/
 *.log
 
+# S-UI 数据（数据库、证书等）
+# 本地开发使用 ./data/s-ui，生产环境使用 ~/data/s-ui
+s-ui/db/
+s-ui/cert/
+s-ui/*.db
+data/
+
 # 配置文件（包含敏感信息）
 # *.example.json 保留在仓库中作为模板
 vars.production.json
@@ -15,3 +22,4 @@ vars.json
 # 临时文件
 *.tmp
 *.swp
+
