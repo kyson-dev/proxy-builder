@@ -5,7 +5,11 @@ services:
     hostname: s-ui
     restart: unless-stopped
     tty: true
-    network_mode: host
+    ports:
+      - "443:443/tcp"
+      - "443:443/udp"
+      - "2095:2095/tcp"
+      - "2096:2096/tcp"
     volumes:
       - ./s-ui/db:/app/db
       - ./s-ui/cert:/app/cert
@@ -13,4 +17,5 @@ services:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "3"
+        max-file: "1"
+
