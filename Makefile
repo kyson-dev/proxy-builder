@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (S-UI)
 # S-UI Web Panel 管理代理服务
 
-.PHONY: all uuid short-id password reality-key setup-wif setup-firewall help generate-cert check-cert
+.PHONY: all uuid short-id password reality-key setup-wif setup-firewall rollback check-scripts help generate-cert check-cert
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -17,6 +17,8 @@ help:
 	@echo "🚀 Deployment Setup:"
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
 	@echo "  make setup-firewall    - Configure firewall rules for service ports"
+	@echo "  make rollback          - Rollback to previous version (remote)"
+	@echo "  make check-scripts     - Check all shell scripts syntax"
 	@echo ""
 	@echo "️  Utilities:"
 	@echo "  make generate-cert     - Generate self-signed certificate for Hysteria2"

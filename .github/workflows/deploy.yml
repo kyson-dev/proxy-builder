@@ -1,13 +1,10 @@
 name: Deploy to GCP VM
 
 on:
-  # 手动触发
   workflow_dispatch:
-  # 推送到 main 分支自动部署
   push:
     branches:
       - main
-    # 排除这些文件的变更（文档、配置模板等不触发部署）
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -24,6 +21,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
@@ -43,35 +41,74 @@ jobs:
           install_components: "beta"
 
       - name: Deploy
+        timeout-minutes: 10
         run: |
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          # 1. 打包文件
+          # 1. 打包
           echo "📦 打包文件..."
           tar --exclude='.git' \
               --exclude='.github' \
               --exclude='vars.*.json' \
-              --exclude='s-ui/db' \
-              --exclude='s-ui/cert/*.pem' \
               --exclude='*.md' \
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
           # 2. 上传
           echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/ --zone=${ZONE} --quiet
+          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 3. 部署
+          # 3. 部署（版本管理逻辑在这里）
           echo "🚀 执行部署..."
-          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
+          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
-            mkdir -p ~/app
-            tar -xzf ~/app.tar.gz -C ~/app
+            
+            # 解压到临时目录
+            echo "📦 解压到 ~/app.new..."
+            rm -rf ~/app.new
+            mkdir -p ~/app.new
+            tar -xzf ~/app.tar.gz -C ~/app.new
             rm ~/app.tar.gz
-            cd ~/app
+            
+            # 运行临时目录的 deploy.sh
+            echo "🚀 运行新版本部署..."
+            cd ~/app.new
             chmod +x deploy.sh
-            ./deploy.sh
-          "
+            
+            if ./deploy.sh; then
+              echo "✅ 新版本部署成功"
+              
+              # 备份旧版本
+              if [ -d ~/app ] && [ -f ~/app/deploy.sh ]; then
+                echo "💾 备份旧版本..."
+                rm -rf ~/app.backup
+                mv ~/app ~/app.backup
+              fi
+              
+              # 切换到新版本
+              echo "🔄 切换到新版本..."
+              mv ~/app.new ~/app
+              
+              echo "✅ 版本切换完成"
+            else
+              echo "❌ 新版本部署失败"
+              
+              # 停止新版本服务
+              cd ~/app.new
+              docker compose down 2>/dev/null || true
+              
+              # 重启旧版本（使用旧版本的 deploy.sh）
+              if [ -d ~/app ] && [ -f ~/app/deploy.sh ]; then
+                echo "🔄 重启旧版本..."
+                cd ~/app
+                ./deploy.sh || echo "⚠️ 旧版本重启失败，请手动检查"
+              fi
+              
+              # 保留 app.new 用于调试
+              echo "📁 保留 ~/app.new 用于调试"
+              exit 1
+            fi
+          '
 
           echo "✅ 部署完成"
