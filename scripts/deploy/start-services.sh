@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 启动 Docker Compose 服务
+# 启动 Docker Compose 服务 (S-UI 版本)
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
 # ==============================================================================
 
@@ -25,12 +25,19 @@ start_services() {
     
     log_step "启动服务"
     
+    # 验证环境变量
+    if [[ -z "$S_UI_DATA_DIR" ]]; then
+        die "S_UI_DATA_DIR 环境变量未设置"
+    fi
+    log_substep "数据目录: $S_UI_DATA_DIR"
+    
     # 拉取最新镜像
     log_substep "拉取最新镜像..."
     $docker_cmd compose -f "$compose_file" pull
     
     # 启动服务
-    log_substep "启动 Sing-box..."
+    # --remove-orphans 会自动清理不在 compose 文件中定义的旧容器
+    log_substep "启动 S-UI..."
     $docker_cmd compose -f "$compose_file" up -d --remove-orphans
     
     log_success "服务已启动"

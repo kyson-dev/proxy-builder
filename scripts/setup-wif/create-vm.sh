@@ -105,7 +105,7 @@ create_vm_core() {
         --project="$project" \
         --zone="$zone" \
         --machine-type="$machine_type" \
-        --network-interface=network-tier="$network_tier",stack-type=IPV4_ONLY,subnet=default \
+        --network-interface=network-tier="$network_tier",stack-type=IPV4_ONLY,subnet=default,address= \
         --metadata=enable-oslogin=TRUE \
         --maintenance-policy="$maintenance_policy" \
         --provisioning-model="$provisioning_model" \

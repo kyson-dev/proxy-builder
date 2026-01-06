@@ -115,13 +115,14 @@ print_summary() {
     echo "  Provider: $provider_id"
     echo ""
     echo "📋 后续步骤:"
-    echo "   1. 创建环境配置文件: .env.$env_name"
-    echo "   2. 推送环境变量: make push-env ENV=$env_name"
+    echo "   1. 部署服务: ./deploy.sh"
+    echo "   2. 访问 S-UI 面板: http://<VM_IP>:2095/app/"
+    echo "   3. 在 Web UI 中配置代理入口"
     
     if [[ "$env_name" == "production" ]]; then
-        echo "   3. 推送到 main 分支部署: git push origin main"
+        echo "   4. 推送到 main 分支自动部署: git push origin main"
     else
-        echo "   3. 推送到 dev 分支部署: git push origin dev"
+        echo "   4. 推送到 dev 分支自动部署: git push origin dev"
     fi
     echo ""
 }

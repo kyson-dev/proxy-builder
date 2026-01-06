@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 健康检查
+# 健康检查 (S-UI 版本)
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
 # ==============================================================================
 
@@ -19,17 +19,6 @@ get_public_ip() {
     curl -s ip.sb 2>/dev/null || \
     curl -s ipinfo.io/ip 2>/dev/null || \
     echo "<SERVER_IP>"
-}
-
-# ------------------------------------------------------------------------------
-# 从 .env 文件读取端口配置
-# ------------------------------------------------------------------------------
-load_ports_from_env() {
-    if [[ -f .env ]]; then
-        # 读取 VLESS_PORT 和 H2_PORT
-        VLESS_PORT=$(grep "^VLESS_PORT=" .env 2>/dev/null | cut -d= -f2)
-        H2_PORT=$(grep "^H2_PORT=" .env 2>/dev/null | cut -d= -f2)
-    fi
 }
 
 # ------------------------------------------------------------------------------
@@ -52,8 +41,8 @@ health_check() {
     log_substep "服务状态:"
     $docker_cmd compose ps
     
-    # 验证 Sing-box 是否运行
-    if $docker_cmd compose ps sing-box 2>/dev/null | grep -q "Up"; then
+    # 验证 S-UI 是否运行
+    if $docker_cmd compose ps s-ui 2>/dev/null | grep -q "Up"; then
         echo ""
         print_separator
         log_success "部署成功！"
@@ -62,38 +51,36 @@ health_check() {
         local server_ip
         server_ip=$(get_public_ip)
         
-        # 确保端口变量已加载
-        load_ports_from_env
-        
         echo ""
-        echo "📋 代理服务信息:"
+        echo "📋 S-UI 管理面板信息:"
         echo "   服务器 IP: $server_ip"
-        
-        if [[ -n "$VLESS_PORT" ]]; then
-            echo "   VLESS Reality: $server_ip:$VLESS_PORT"
-        fi
-        
-        if [[ -n "$H2_PORT" ]]; then
-            echo "   Hysteria2: $server_ip:$H2_PORT (自签名证书)"
-        fi
-        
+        echo "   Web 面板: http://$server_ip:2095/app/"
+        echo "   订阅服务: http://$server_ip:2096/sub/"
         echo ""
-        echo "📝 查看日志: docker logs -f sing-box"
+        echo "🔐 默认登录信息:"
+        echo "   用户名: admin"
+        echo "   密码: admin"
         echo ""
-        echo "⚠️  注意: Hysteria2 使用自签名证书，客户端需要设置 insecure=true"
+        echo "⚠️  安全提示: 首次登录后请立即修改默认密码！"
+        echo ""
+        echo "📝 查看日志: docker logs -f s-ui"
+        echo ""
+        echo "💡 接下来请在 Web 面板中配置 Inbound:"
+        echo "   - VLESS Reality (端口 443)"
+        echo "   - Hysteria2 (端口 443)"
         
         return 0
     else
         echo ""
-        log_error "Sing-box 启动失败"
+        log_error "S-UI 启动失败"
         echo ""
         echo "请检查日志:"
-        echo "   docker logs sing-box"
+        echo "   docker logs s-ui"
         echo ""
         
         # 显示最后几行日志
         log_substep "最近日志:"
-        $docker_cmd logs sing-box --tail 20 2>&1 || true
+        $docker_cmd logs s-ui --tail 20 2>&1 || true
         
         return 1
     fi

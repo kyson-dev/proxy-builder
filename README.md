@@ -1,84 +1,36 @@
-# 简化代理服务部署指南
+# S-UI 代理服务部署指南
+
+http://localhost:2095/app/
 
 ## 🎯 项目特点
 
-这是一个**极简版本**的代理服务配置，具有以下特点：
+这是一个基于 **S-UI** 的代理服务部署方案，具有以下特点：
 
-- ✅ **无需域名** - 不依赖任何域名和DNS配置
-- ✅ **无需Let's Encrypt** - 不需要申请和维护SSL证书
-- ✅ **自签名证书** - Hysteria2使用自动生成的自签名证书
-- ✅ **简单快速** - 一键部署，几分钟内完成
+- ✅ **Web 管理面板** - 通过浏览器管理所有配置
+- ✅ **无需域名** - 不依赖任何域名和 DNS 配置
+- ✅ **订阅服务** - 内置用户订阅功能
+- ✅ **多协议支持** - VLESS、Hysteria2、Trojan、Shadowsocks 等
+- ✅ **流量统计** - 用户流量监控和限额管理
+- ✅ **一键部署** - Docker Compose 快速启动
 
 ## 📦 支持的协议
 
-1. **VLESS + Reality** (端口 8443)
-   - 无需任何证书
-   - 伪装成 Microsoft 官网
-   - 最安全的无证书方案
+S-UI 基于 Sing-Box，支持所有主流协议：
 
-2. **Hysteria2** (端口 9443)
-   - 使用自签名证书
-   - 高性能UDP协议
-   - 客户端需要启用 `insecure` 选项
+- **V2Ray 系**: VLESS, VMess, Trojan, Shadowsocks
+- **高性能协议**: Hysteria, Hysteria2, TUIC
+- **特殊协议**: ShadowTLS, Naive
+- **Reality 支持**: VLESS + Reality 无需证书
 
 ## 🚀 快速开始
 
-### 1. 生成密钥
+### 1. 服务器准备
 
-使用项目提供的脚本生成所需的UUID和密钥：
+确保服务器满足以下条件：
+- Linux 系统 (Ubuntu/Debian/CentOS)
+- 开放必要端口 (2095, 2096, 8443, 9443)
 
-```bash
-# 生成 VLESS UUID
-uuidgen | tr '[:upper:]' '[:lower:]'
-
-# 生成 Reality 密钥对
-docker run --rm ghcr.io/sagernet/sing-box sing-box generate reality-keypair
-
-# 生成 Reality Short ID
-openssl rand -hex 8
-
-# 生成 Hysteria2 密码
-openssl rand -base64 32
-```
-
-### 2. 配置环境变量
-
-复制环境变量示例文件：
-
-```bash
-cp .env.development.example .env.development
-# 或生产环境
-cp .env.production.example .env.production
-```
-
-然后编辑 `.env.development`，填入刚才生成的值：
-
-```bash
-# VLESS + Reality
-VLESS_UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-REALITY_PRIVATE_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-REALITY_PUBLIC_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-REALITY_SHORT_ID=xxxxxxxxxxxxxxxx
-
-# Hysteria2
-H2_PASSWORD=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-### 3. 创建符号链接
-
-根据你的环境创建 `.env` 符号链接：
-
-```bash
-# 开发环境
-ln -sf .env.development .env
-
-# 或生产环境
-ln -sf .env.production .env
-```
-
-### 4. 部署服务
-
-运行部署脚本：
+### 2. 一键部署
 
 ```bash
 chmod +x deploy.sh
@@ -86,54 +38,62 @@ chmod +x deploy.sh
 ```
 
 脚本会自动：
-- ✅ 检查环境变量
+- ✅ 启用 BBR 加速
+- ✅ 安装 Docker
 - ✅ 生成 Hysteria2 自签名证书
-- ✅ 启动 Sing-box 服务
+- ✅ 启动 S-UI 服务
 
-## 📱 客户端配置
+### 3. 访问管理面板
 
-### VLESS Reality 配置
+部署完成后，访问：
 
-```json
-{
-  "protocol": "vless",
-  "settings": {
-    "vnext": [{
-      "address": "YOUR_SERVER_IP",
-      "port": 8443,
-      "users": [{
-        "id": "YOUR_VLESS_UUID",
-        "flow": "xtls-rprx-vision",
-        "encryption": "none"
-      }]
-    }]
-  },
-  "streamSettings": {
-    "network": "tcp",
-    "security": "reality",
-    "realitySettings": {
-      "serverName": "www.microsoft.com",
-      "publicKey": "YOUR_REALITY_PUBLIC_KEY",
-      "shortId": "YOUR_REALITY_SHORT_ID",
-      "fingerprint": "chrome"
-    }
-  }
-}
+```
+http://<服务器IP>:2095/app/
 ```
 
-### Hysteria2 配置
+**默认登录信息**：
+- 用户名: `admin`
+- 密码: `admin`
 
-```yaml
-server: YOUR_SERVER_IP:9443
-auth: YOUR_H2_PASSWORD
-tls:
-  insecure: true  # ⚠️ 必须设置为 true（使用自签名证书）
-bandwidth:
-  up: 100 mbps
-  down: 500 mbps
+> ⚠️ **安全警告**: 首次登录后请立即修改默认密码！
+
+### 4. 配置代理入口
+
+在 S-UI 面板中配置 Inbound：
+
+1. **VLESS Reality** (推荐端口: 8443)
+   - 无需证书，最安全的方案
+   - 使用 `make reality-key` 生成密钥对
+
+2. **Hysteria2** (推荐端口: 9443)
+   - 高性能 UDP 协议
+   - 使用预生成的自签名证书 (`s-ui/cert/`)
+
+## 📊 端口说明
+
+| 端口 | 协议 | 用途 |
+|------|------|------|
+| 2095 | TCP | S-UI Web 管理面板 |
+| 2096 | TCP | 订阅服务 |
+| 8443 | TCP | VLESS Reality (需在 UI 配置) |
+| 9443 | UDP | Hysteria2 (需在 UI 配置) |
+
+**防火墙设置**：
+
+```bash
+# Ubuntu/Debian
+sudo ufw allow 2095/tcp
+sudo ufw allow 2096/tcp
+sudo ufw allow 8443/tcp
+sudo ufw allow 9443/udp
+
+# CentOS/RHEL
+sudo firewall-cmd --permanent --add-port=2095/tcp
+sudo firewall-cmd --permanent --add-port=2096/tcp
+sudo firewall-cmd --permanent --add-port=8443/tcp
+sudo firewall-cmd --permanent --add-port=9443/udp
+sudo firewall-cmd --reload
 ```
-
-**重要提示**：Hysteria2 使用自签名证书，必须在客户端设置 `insecure: true`。
 
 ## 🔧 常用命令
 
@@ -141,8 +101,8 @@ bandwidth:
 # 查看服务状态
 docker compose ps
 
-# 查看 Sing-box 日志
-docker logs -f sing-box
+# 查看 S-UI 日志
+docker logs -f s-ui
 
 # 重启服务
 docker compose restart
@@ -150,96 +110,77 @@ docker compose restart
 # 停止服务
 docker compose down
 
-# 更新并重启
+# 更新 S-UI
 docker compose pull
 docker compose up -d
 ```
 
-## 📊 端口使用
-
-| 协议 | 端口 | 用途 |
-|------|------|------|
-| VLESS Reality | 8443 | TCP 代理（无需证书） |
-| Hysteria2 | 9443 | UDP 代理（自签名证书） |
-
-**防火墙设置**：确保开放以下端口
+## 🛠️ Makefile 工具
 
 ```bash
-# Ubuntu/Debian
-sudo ufw allow 8443/tcp
-sudo ufw allow 9443/udp
+# 生成 VLESS UUID
+make uuid
 
-# CentOS/RHEL
-sudo firewall-cmd --permanent --add-port=8443/tcp
-sudo firewall-cmd --permanent --add-port=9443/udp
-sudo firewall-cmd --reload
+# 生成 Reality 密钥对
+make reality-key
+
+# 生成随机密码
+make password
+
+# 生成自签名证书
+make generate-cert
+
+# 检查证书有效期
+make check-cert
+```
+
+## 📁 项目结构
+
+```
+proxy-builder/
+├── docker-compose.yml    # S-UI 服务定义
+├── deploy.sh             # 一键部署脚本
+├── Makefile              # 工具命令
+├── s-ui/
+│   ├── db/               # S-UI 数据库 (运行时生成)
+│   └── cert/             # 自签名证书目录
+└── scripts/
+    ├── deploy/           # 部署子模块
+    └── lib/              # 通用函数库
 ```
 
 ## 🔐 安全建议
 
-1. **定期更换密码** - 建议每月更换一次密码和UUID
-2. **限制访问源** - 如果可能，限制特定IP访问
-3. **监控流量** - 定期检查异常流量
-4. **备份配置** - 保存好环境变量文件
+1. **修改默认密码** - 首次登录后立即修改
+2. **启用 HTTPS** - 在面板设置中配置 SSL
+3. **定期更新** - 保持 S-UI 版本最新
+4. **监控流量** - 定期检查异常流量
 
 ## ❓ 常见问题
 
-### Q: Hysteria2 连接失败？
+### Q: 无法访问管理面板？
 
-**A:** 检查以下几点：
-1. 客户端是否设置了 `insecure: true`
-2. 服务器防火墙是否开放 UDP 9443 端口
-3. 密码是否正确
+检查：
+1. 防火墙是否开放 2095 端口
+2. Docker 服务是否正常运行 (`docker compose ps`)
+3. 查看日志 (`docker logs s-ui`)
 
-### Q: VLESS Reality 无法连接？
+### Q: Hysteria2 使用自签名证书？
 
-**A:** 检查：
-1. Public Key 是否正确（注意不是 Private Key）
-2. Short ID 是否匹配
-3. 服务器防火墙是否开放 TCP 8443 端口
+在 S-UI 中配置 Hysteria2 时：
+1. 证书路径: `/app/cert/cert.pem`
+2. 密钥路径: `/app/cert/key.pem`
+3. 客户端需设置 `insecure: true`
 
-### Q: 如何重新生成证书？
+### Q: 如何备份数据？
 
-**A:** 删除旧证书后重新部署：
-
-```bash
-rm -rf sing-box/certs/*
-./deploy.sh
-```
-
-## 📝 项目结构
-
-```
-.
-├── .env.development.example    # 开发环境变量示例
-├── .env.production.example     # 生产环境变量示例
-├── deploy.sh                   # 部署脚本
-├── docker-compose.yml          # Docker 编排文件
-├── sing-box/
-│   ├── config.json.template   # Sing-box 配置模板
-│   ├── entrypoint.sh          # 容器启动脚本
-│   └── certs/                 # 自签名证书目录（自动生成）
-└── README.md                   # 本文件
-```
-
-## 🆚 与完整版本的区别
-
-| 功能 | 简化版 | 完整版 |
-|------|--------|--------|
-| 域名要求 | ❌ 不需要 | ✅ 需要 |
-| Let's Encrypt | ❌ 不需要 | ✅ 需要 |
-| Nginx | ❌ 不需要 | ✅ 需要 |
-| VLESS Reality | ✅ 支持 | ✅ 支持 |
-| Hysteria2 | ✅ 自签名 | ✅ 正式证书 |
-| TUIC | ❌ 移除 | ✅ 支持 |
-| 部署时间 | < 2分钟 | > 5分钟 |
+S-UI 数据存储在 `s-ui/db/` 目录，备份此目录即可。
 
 ## 📚 相关资源
 
+- [S-UI 官方仓库](https://github.com/alireza0/s-ui)
+- [S-UI API 文档](https://github.com/alireza0/s-ui/wiki/API-Documentation)
 - [Sing-box 官方文档](https://sing-box.sagernet.org/)
-- [VLESS Protocol](https://github.com/XTLS/VLESS)
-- [Hysteria2 文档](https://v2.hysteria.network/)
-- [Reality 协议说明](https://github.com/XTLS/REALITY)
 
 ---
 

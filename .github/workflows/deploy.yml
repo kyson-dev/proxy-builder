@@ -1,23 +1,18 @@
 name: Deploy to GCP VM
 
 on:
-  # 手动触发
   workflow_dispatch:
-  # 推送到 main 分支自动部署
   push:
     branches:
       - main
-    # 排除这些文件的变更（文档、配置模板等不触发部署）
     paths-ignore:
       - "**.md"
       - "docs/**"
-      - "*.example.json"
       - ".gitignore"
       - "LICENSE"
       - "Makefile"
       - "scripts/setup-wif/**"
       - "scripts/setup-firewall.sh"
-      - "scripts/push-config.sh"
 
 permissions:
   contents: read
@@ -26,6 +21,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
@@ -45,40 +41,85 @@ jobs:
           install_components: "beta"
 
       - name: Deploy
-        env:
-          VARS_JSON: ${{ secrets.VARS_JSON }}
+        timeout-minutes: 10
         run: |
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          # 1. 打包文件
+          # 1. 打包
           echo "📦 打包文件..."
           tar --exclude='.git' \
               --exclude='.github' \
               --exclude='vars.*.json' \
-              --exclude='sing-box/certs' \
               --exclude='*.md' \
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
-          # 2. 创建 vars.json (从 Secret)
-          echo "$VARS_JSON" > /tmp/vars.json
-
-          # 3. 上传
+          # 2. 上传
           echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz /tmp/vars.json ${VM}:~/ --zone=${ZONE} --quiet
+          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 4. 部署
+          # 3. 部署
           echo "🚀 执行部署..."
-          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
+          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
+            
+            # 停止当前服务（如果存在）
+            if [ -d ~/app ] && [ -f ~/app/docker-compose.yml ]; then
+              echo "⏸️  停止当前服务..."
+              cd ~/app
+              docker compose down 2>/dev/null || true
+            fi
+            
+            # 备份当前版本
+            if [ -d ~/app ]; then
+              echo "💾 备份当前版本..."
+              rm -rf ~/app.backup
+              cp -r ~/app ~/app.backup
+            fi
+            
+            # 解压新版本到 app
+            echo "📦 解压新版本..."
+            rm -rf ~/app
             mkdir -p ~/app
             tar -xzf ~/app.tar.gz -C ~/app
-            mv ~/vars.json ~/app/vars.json
             rm ~/app.tar.gz
+            
+            # 部署新版本
+            echo "🚀 部署新版本..."
             cd ~/app
             chmod +x deploy.sh
-            ./deploy.sh
-          "
+            
+            if ./deploy.sh; then
+              echo "✅ 部署成功"
+              
+              # 删除备份
+              if [ -d ~/app.backup ]; then
+                echo "🧹 清理备份..."
+                rm -rf ~/app.backup
+              fi
+              
+              echo "✅ 部署完成"
+            else
+              echo "❌ 部署失败"
+              
+              # 从备份恢复
+              if [ -d ~/app.backup ]; then
+                echo "🔄 从备份恢复..."
+                rm -rf ~/app
+                mv ~/app.backup ~/app
+                
+                # 重启旧版本
+                cd ~/app
+                docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
+                
+                echo "✅ 已恢复到旧版本"
+              else
+                echo "⚠️ 没有备份可恢复"
+              fi
+              
+              exit 1
+            fi
+          '
 
           echo "✅ 部署完成"
