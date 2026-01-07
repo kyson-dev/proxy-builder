@@ -49,10 +49,10 @@ jobs:
           # 1. 创建 .env 文件
           echo "📝 创建环境配置..."
           cat > .env << EOF
-          PANEL_DOMAIN=${{ secrets.PANEL_DOMAIN }} \
-          DATA_ROOT=${{ secrets.DATA_ROOT }} \
-          S_UI_DATA_DIR=${{ secrets.S_UI_DATA_DIR }} \
-          CADDY_DATA_DIR=${{ secrets.CADDY_DATA_DIR }} \
+          PANEL_DOMAIN=${{ secrets.PANEL_DOMAIN }}
+          DATA_ROOT=\${HOME}/data
+          S_UI_DATA_DIR=\${HOME}/data/s-ui
+          CADDY_DATA_DIR=\${HOME}/data/caddy
           EOF
 
           # 2. 打包
