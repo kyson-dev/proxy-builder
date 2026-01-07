@@ -1,0 +1,8 @@
+
+{$PANEL_DOMAIN}:2095 {
+    reverse_proxy s-ui:2095
+}
+
+{$PANEL_DOMAIN}:2096 {
+    reverse_proxy s-ui:2096
+}

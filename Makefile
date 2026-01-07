@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (S-UI)
 # S-UI Web Panel 管理代理服务
 
-.PHONY: all uuid short-id password reality-key setup-wif setup-firewall check-scripts dev help generate-cert check-cert
+.PHONY: all uuid short-id password reality-key setup-wif setup-firewall check-scripts dev upload-env help generate-cert check-cert
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -16,6 +16,7 @@ help:
 	@echo ""
 	@echo "🚀 Deployment Setup:"
 	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
+	@echo "  make upload-env        - Upload .env to GitHub Environment Secrets"
 	@echo "  make setup-firewall    - Configure firewall rules for service ports"
 	@echo "  make check-scripts     - Check all shell scripts syntax"
 	@echo ""
@@ -51,6 +52,10 @@ reality-key:
 setup-wif:
 	@chmod +x scripts/setup-wif.sh
 	@./scripts/setup-wif.sh
+
+upload-env:
+	@chmod +x scripts/upload-env.sh
+	@./scripts/upload-env.sh
 
 setup-firewall:
 	@chmod +x scripts/setup-firewall.sh
