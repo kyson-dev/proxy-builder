@@ -17,6 +17,7 @@ source "${SCRIPTS_DIR}/lib/docker.sh"
 
 # 加载子模块
 source "${SCRIPTS_DIR}/deploy/validate-env.sh"
+source "${SCRIPTS_DIR}/deploy/init-env.sh"
 source "${SCRIPTS_DIR}/deploy/init-data-dir.sh"
 source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
@@ -34,8 +35,13 @@ main() {
     
     print_header "部署 S-UI 代理服务"
 
-    # Step 0: 验证环境
+    # 1. 初始化完整环境 (补充默认路径并写入 .env)
+    init_env "${SCRIPT_DIR}/.env"
+
+    # 2. 验证基础配置 (PANEL_DOMAIN)
     validate_env "${SCRIPT_DIR}/.env"
+    
+
     
     # Step 1: 初始化数据目录
     init_data_dir
