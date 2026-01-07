@@ -8,12 +8,31 @@ services:
     ports:
       - "443:443/tcp"
       - "443:443/udp"
-      - "2095:2095/tcp"
-      - "2096:2096/tcp"
     volumes:
       # S-UI 数据目录：必须设置 S_UI_DATA_DIR 环境变量
       - ${S_UI_DATA_DIR}/db:/app/db
       - ${S_UI_DATA_DIR}/cert:/app/cert
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "1"
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    hostname: caddy
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "80:80/tcp"
+      - "2095:2095/tcp"
+      - "2096:2096/tcp"
+    environment:
+      - PANEL_DOMAIN=${PANEL_DOMAIN}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ${CADDY_DATA_DIR}/data:/data
+      - ${CADDY_DATA_DIR}/config:/config
     logging:
       driver: "json-file"
       options:

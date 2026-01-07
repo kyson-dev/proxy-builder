@@ -10,9 +10,24 @@ set -e
 echo "🚀 启动本地 S-UI 测试环境..."
 echo ""
 
+# 获取脚本目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 加载环境变量文件（如果存在）
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    echo "📝 加载配置文件: .env"
+    set -a
+    source "${SCRIPT_DIR}/.env"
+    set +a
+fi
+
 # 数据根目录（本地开发使用项目目录下的 data）
 export DATA_ROOT="$(pwd)/data"
 export S_UI_DATA_DIR="${DATA_ROOT}/s-ui"
+export CADDY_DATA_DIR="${DATA_ROOT}/caddy"
+export PANEL_DOMAIN="${PANEL_DOMAIN:-localhost}"
+
+echo "   面板域名: $PANEL_DOMAIN"
 
 # 检查 Docker
 if ! command -v docker &>/dev/null; then
@@ -31,9 +46,12 @@ fi
 echo "📁 创建数据目录..."
 mkdir -p "${S_UI_DATA_DIR}/db"
 mkdir -p "${S_UI_DATA_DIR}/cert"
+mkdir -p "${CADDY_DATA_DIR}/data"
+mkdir -p "${CADDY_DATA_DIR}/config"
 
 echo "   数据根目录: $DATA_ROOT"
 echo "   S-UI 数据: $S_UI_DATA_DIR"
+echo "   Caddy 数据: $CADDY_DATA_DIR"
 
 # 生成自签名证书（如果不存在）
 if [ ! -f "${S_UI_DATA_DIR}/cert/cert.pem" ] || [ ! -f "${S_UI_DATA_DIR}/cert/key.pem" ]; then

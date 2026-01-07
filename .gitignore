@@ -10,11 +10,10 @@ s-ui/*.db
 data/
 
 # 配置文件（包含敏感信息）
-# *.example.json 保留在仓库中作为模板
-vars.production.json
-vars.development.json
-vars.json
+# *.example 保留在仓库中作为模板
 .env
+.env.production
+.env.development
 
 # macOS
 .DS_Store

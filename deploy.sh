@@ -10,8 +10,27 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 
+# 加载环境变量文件（如果存在）
+if [ -f "${SCRIPT_DIR}/.env" ]; then
+    echo "📝 加载配置文件: .env"
+    set -a  # 自动导出所有变量
+    source "${SCRIPT_DIR}/.env"
+    set +a
+else
+    echo "⚠️  未找到 .env 文件，使用默认配置"
+    echo "   提示: 复制 .env.example 为 .env 并填写配置"
+fi
+
 # 数据根目录
-export DATA_ROOT="${HOME}/data"
+export DATA_ROOT="${DATA_ROOT:-${HOME}/data}"
+
+# 检查必需的环境变量
+if [ -z "$PANEL_DOMAIN" ]; then
+    echo "❌ 错误: 未设置 PANEL_DOMAIN 环境变量"
+    echo "   请在 .env 文件中设置 PANEL_DOMAIN=your-domain.com"
+    echo "   或运行: export PANEL_DOMAIN=your-domain.com"
+    exit 1
+fi
 
 # 加载通用库
 source "${SCRIPTS_DIR}/lib/common.sh"
