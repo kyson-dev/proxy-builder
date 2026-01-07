@@ -9,6 +9,8 @@ services:
       # 443 端口用于代理流量（VLESS, Hysteria2 等）
       - "443:443/tcp"
       - "443:443/udp"
+      - "8443:8443/tcp"
+      - "8443:8443/udp"
       # 注意: 2095 和 2096 不暴露到主机，仅通过 Caddy 反向代理访问
     volumes:
       # S-UI 数据目录：必须设置 S_UI_DATA_DIR 环境变量
