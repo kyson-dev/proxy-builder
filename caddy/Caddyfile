@@ -4,9 +4,16 @@
 # 说明:
 # - Caddy 自动在 2095 和 2096 端口上启用 HTTPS
 # - 自动申请和续期 Let's Encrypt 证书
-# - 不监听 443 端口，避免与 S-UI 的代理流量冲突
+# - 明确禁用 443 端口，避免与 S-UI 的代理流量冲突
 # - 访问: https://your-domain.com:2095/app/
 # ==============================================================================
+
+# 全局选项：禁用自动 HTTPS 重定向到 443
+{
+    auto_https disable_redirects
+    # 不在 443 端口上监听
+    https_port 2095
+}
 
 # Web 管理面板 - HTTPS on port 2095
 {$PANEL_DOMAIN}:2095 {

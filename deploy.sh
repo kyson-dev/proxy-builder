@@ -39,7 +39,6 @@ source "${SCRIPTS_DIR}/lib/docker.sh"
 
 # 加载子模块
 source "${SCRIPTS_DIR}/deploy/init-data-dir.sh"
-source "${SCRIPTS_DIR}/deploy/migrate-data.sh"
 source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
@@ -57,10 +56,6 @@ main() {
     
     # Step 1: 初始化数据目录
     init_data_dir
-    echo ""
-    
-    # Step 2: 数据迁移
-    migrate_data "./s-ui" "${S_UI_DATA_DIR}"
     echo ""
     
     # Step 3: 启用 BBR
