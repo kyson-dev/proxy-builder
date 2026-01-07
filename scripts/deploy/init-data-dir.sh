@@ -15,13 +15,12 @@ fi
 # 使用 DATA_ROOT 环境变量作为基础目录
 # ------------------------------------------------------------------------------
 init_data_dir() {
-    local data_root="${DATA_ROOT:-${HOME}/data}"
-    
     log_step "初始化数据目录"
     
-    # 定义各服务的数据目录
-    export S_UI_DATA_DIR="${data_root}/s-ui"
-    export CADDY_DATA_DIR="${data_root}/caddy"
+    # 验证必要的变量（双重保险）
+    if [[ -z "$S_UI_DATA_DIR" ]] || [[ -z "$CADDY_DATA_DIR" ]]; then
+        die "数据目录环境变量未设置 (init_data_dir)"
+    fi
     
     # 创建 S-UI 数据目录结构
     ensure_dir "${S_UI_DATA_DIR}/db"
@@ -31,14 +30,13 @@ init_data_dir() {
     ensure_dir "${CADDY_DATA_DIR}/data"
     ensure_dir "${CADDY_DATA_DIR}/config"
     
-    log_substep "数据根目录: $data_root"
+    log_substep "数据根目录: $DATA_ROOT"
     log_substep "S-UI 数据目录: $S_UI_DATA_DIR"
     log_substep "  - db: ${S_UI_DATA_DIR}/db"
     log_substep "  - cert: ${S_UI_DATA_DIR}/cert"
     log_substep "Caddy 数据目录: $CADDY_DATA_DIR"
     log_substep "  - data: ${CADDY_DATA_DIR}/data"
     log_substep "  - config: ${CADDY_DATA_DIR}/config"
-    
     log_success "数据目录初始化完成"
 }
 

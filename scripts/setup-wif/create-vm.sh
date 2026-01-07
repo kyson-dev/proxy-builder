@@ -231,6 +231,10 @@ create_vm_with_sa() {
     create_vm_service_account "$project" "$vm_name"
     local sa_email="${vm_name}@${project}.iam.gserviceaccount.com"
     
+    # 等待服务账号在 IAM 系统中传播
+    log_substep "等待服务账号传播..."
+    sleep 5
+    
     # 3. 创建 VM
     create_vm_core "$project" "$vm_name" "$zone" "$machine_type" "$disk_size" "$disk_type" "$network_tier" "$is_spot" "$sa_email"
     

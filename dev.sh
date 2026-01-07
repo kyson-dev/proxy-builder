@@ -67,17 +67,29 @@ if [ ! -f "${S_UI_DATA_DIR}/cert/cert.pem" ] || [ ! -f "${S_UI_DATA_DIR}/cert/ke
     echo "✅ 证书已生成"
 fi
 
+# 创建临时 .env 文件供 docker compose 使用
+echo "📝 创建环境配置..."
+cat > .env.local << EOF
+S_UI_DATA_DIR=${S_UI_DATA_DIR}
+CADDY_DATA_DIR=${CADDY_DATA_DIR}
+PANEL_DOMAIN=${PANEL_DOMAIN}
+DATA_ROOT=${DATA_ROOT}
+EOF
+
 # 启动服务
 echo ""
 echo "🐳 启动 Docker Compose..."
-docker compose up -d
+docker compose -f docker-compose.dev.yml --env-file .env.local up -d
+
+# 清理临时文件
+rm -f .env.local
 
 # 等待服务就绪
 echo "⏳ 等待服务启动..."
 sleep 5
 
 # 检查服务状态
-if docker compose ps s-ui 2>/dev/null | grep -q "Up"; then
+if docker compose -f docker-compose.dev.yml ps s-ui 2>/dev/null | grep -q "Up"; then
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo "✅ S-UI 启动成功！"
@@ -96,16 +108,16 @@ if docker compose ps s-ui 2>/dev/null | grep -q "Up"; then
     echo "📂 数据目录: $S_UI_DATA_DIR"
     echo ""
     echo "📝 常用命令:"
-    echo "   查看日志: docker compose logs -f s-ui"
-    echo "   停止服务: docker compose down"
-    echo "   重启服务: docker compose restart"
+    echo "   查看日志: docker compose -f docker-compose.dev.yml logs -f s-ui"
+    echo "   停止服务: docker compose -f docker-compose.dev.yml down"
+    echo "   重启服务: docker compose -f docker-compose.dev.yml restart"
     echo ""
 else
     echo ""
     echo "❌ 服务启动失败"
     echo ""
     echo "查看日志:"
-    docker compose logs s-ui --tail 20
+    docker compose -f docker-compose.dev.yml logs s-ui --tail 20
     exit 1
 fi
 

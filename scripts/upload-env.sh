@@ -122,7 +122,8 @@ push_config() {
     local skipped_count=0
     local failed_count=0
     
-    while IFS='=' read -r key value; do
+    # 使用不同的方法读取文件，处理没有换行符的情况
+    while IFS='=' read -r key value || [ -n "$key" ]; do
         # 跳过空行和注释
         [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
         
