@@ -46,7 +46,13 @@ jobs:
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          # 1. 打包
+          # 1. 创建 .env 文件
+          echo "📝 创建环境配置..."
+          cat > .env << EOF
+          PANEL_DOMAIN=${{ secrets.PANEL_DOMAIN }}
+          EOF
+
+          # 2. 打包
           echo "📦 打包文件..."
           tar --exclude='.git' \
               --exclude='.github' \
@@ -55,11 +61,11 @@ jobs:
               --exclude='docs' \
               -czf /tmp/app.tar.gz .
 
-          # 2. 上传
+          # 3. 上传
           echo "📤 上传文件..."
           gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 3. 部署
+          # 4. 部署
           echo "🚀 执行部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
