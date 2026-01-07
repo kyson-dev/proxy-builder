@@ -1,22 +1,23 @@
 # ==============================================================================
-# Caddy 反向代理配置 - HTTPS
+# Caddy 反向代理配置 - HTTP (临时)
 # 
 # 说明:
-# - Caddy 自动在 2095 和 2096 端口上启用 HTTPS
-# - 自动申请和续期 Let's Encrypt 证书
-# - 明确禁用 443 端口，避免与 S-UI 的代理流量冲突
-# - 访问: https://your-domain.com:2095/app/
+# - 使用 HTTP 避免 Caddy 尝试监听 443 端口
+# - 2095 和 2096 端口使用 HTTP 协议
+# - S-UI 的 443 端口专门用于代理流量
+# - 访问: http://your-domain.com:2095/app/
+# 
+# TODO: 配置 HTTPS 需要使用自签名证书或其他方式，避免 Caddy 自动监听 443
 # ==============================================================================
 
-# 全局选项：禁用自动 HTTPS 重定向到 443
+# 全局选项
 {
-    auto_https disable_redirects
-    # 不在 443 端口上监听
-    https_port 2095
+    # 完全禁用自动 HTTPS
+    auto_https off
 }
 
-# Web 管理面板 - HTTPS on port 2095
-{$PANEL_DOMAIN}:2095 {
+# Web 管理面板 - HTTP on port 2095
+http://{$PANEL_DOMAIN}:2095 {
     reverse_proxy s-ui:2095
     
     # 访问日志
@@ -26,8 +27,8 @@
     }
 }
 
-# 订阅服务 - HTTPS on port 2096
-{$PANEL_DOMAIN}:2096 {
+# 订阅服务 - HTTP on port 2096
+http://{$PANEL_DOMAIN}:2096 {
     reverse_proxy s-ui:2096
     
     # 访问日志
