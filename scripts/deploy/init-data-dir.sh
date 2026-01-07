@@ -39,6 +39,16 @@ init_data_dir() {
     log_substep "  - data: ${CADDY_DATA_DIR}/data"
     log_substep "  - config: ${CADDY_DATA_DIR}/config"
     
+    # 将数据目录变量写入 .env 文件，供 docker compose 使用
+    log_substep "更新 .env 文件..."
+    cat >> .env << 'ENV_EOF'
+
+# 数据目录配置（由 deploy.sh 自动生成）
+ENV_EOF
+    echo "DATA_ROOT=${data_root}" >> .env
+    echo "S_UI_DATA_DIR=${S_UI_DATA_DIR}" >> .env
+    echo "CADDY_DATA_DIR=${CADDY_DATA_DIR}" >> .env
+    
     log_success "数据目录初始化完成"
 }
 
