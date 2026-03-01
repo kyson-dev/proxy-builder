@@ -125,13 +125,35 @@ func buildClashConfig(user User, cfg Config) string {
 	sb.WriteString("proxies:\n")
 
 	if user.VlessUUID != "" {
-		sb.WriteString(fmt.Sprintf("  - {name: \"%s-VLESS\", type: vless, server: %s, port: 443, uuid: %s, network: tcp, tls: true, udp: true, flow: xtls-rprx-vision, servername: %s, client-fingerprint: chrome, reality-opts: {public-key: %s, short-id: \"%s\"}}\n",
-			user.Name, cfg.ServerIP, user.VlessUUID, cfg.SNI, cfg.RealityPublicKey, cfg.RealityShortID))
+		// 必须使用 Block Style 并对所有值加引号
+		// 原因: Reality 公鑰是 Base64 字符串，包含 +/= 等字符
+		// 在 YAML Flow Style {} 中不加引号会导致解析失败/截断，Clash 内核拿到错误公鑰导致 Reality 扭手失败
+		sb.WriteString(fmt.Sprintf("  - name: \"%s-VLESS\"\n", user.Name))
+		sb.WriteString("    type: vless\n")
+		sb.WriteString(fmt.Sprintf("    server: \"%s\"\n", cfg.ServerIP))
+		sb.WriteString("    port: 443\n")
+		sb.WriteString(fmt.Sprintf("    uuid: \"%s\"\n", user.VlessUUID))
+		sb.WriteString("    network: tcp\n")
+		sb.WriteString("    tls: true\n")
+		sb.WriteString("    udp: true\n")
+		sb.WriteString("    flow: xtls-rprx-vision\n")
+		sb.WriteString(fmt.Sprintf("    servername: \"%s\"\n", cfg.SNI))
+		sb.WriteString("    client-fingerprint: chrome\n")
+		sb.WriteString("    reality-opts:\n")
+		sb.WriteString(fmt.Sprintf("      public-key: \"%s\"\n", cfg.RealityPublicKey)) // 公鑰必须加引号!
+		sb.WriteString(fmt.Sprintf("      short-id: \"%s\"\n", cfg.RealityShortID))
 	}
 
 	if user.Hy2Password != "" {
-		sb.WriteString(fmt.Sprintf("  - {name: \"%s-HY2\", type: hysteria2, server: %s, port: 443, password: %s, sni: %s, skip-cert-verify: true, up: 1000, down: 1000}\n",
-			user.Name, cfg.ServerIP, user.Hy2Password, cfg.SNI))
+		sb.WriteString(fmt.Sprintf("  - name: \"%s-HY2\"\n", user.Name))
+		sb.WriteString("    type: hysteria2\n")
+		sb.WriteString(fmt.Sprintf("    server: \"%s\"\n", cfg.ServerIP))
+		sb.WriteString("    port: 443\n")
+		sb.WriteString(fmt.Sprintf("    password: \"%s\"\n", user.Hy2Password))
+		sb.WriteString(fmt.Sprintf("    sni: \"%s\"\n", cfg.SNI))
+		sb.WriteString("    skip-cert-verify: true\n")
+		sb.WriteString("    up: 1000\n")
+		sb.WriteString("    down: 1000\n")
 	}
 
 	sb.WriteString("\nproxy-groups:\n")
