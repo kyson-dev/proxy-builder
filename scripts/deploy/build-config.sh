@@ -60,6 +60,7 @@ build_config() {
     docker_cmd=$(get_docker_cmd) || die "无法连接到 Docker，请确认 Docker 已安装并运行"
     if ! $docker_cmd run --rm \
         -v "$output_file":/etc/sing-box/config.json \
+        -v "${SING_BOX_DATA_DIR}/cert":/etc/sing-box/cert:ro \
         ghcr.io/sagernet/sing-box:latest \
         check -c /etc/sing-box/config.json; then
         die "Sing-box 配置文件格式验证失败，请检查 users.json 或 .env 参数是否有误。"
