@@ -37,8 +37,9 @@ start_services() {
     
     # 启动服务
     # --remove-orphans 会自动清理不在 compose 文件中定义的旧容器
+    # --build 确保本地构建的代码（如 sub 服务）得到更新
     log_substep "启动 Sing-box..."
-    $docker_cmd compose -f "$compose_file" up -d --remove-orphans
+    $docker_cmd compose -f "$compose_file" up -d --remove-orphans --build
     
     log_success "服务已启动"
 }

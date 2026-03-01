@@ -120,6 +120,54 @@ func buildLinks(user User, cfg Config) []string {
 	return links
 }
 
+func buildClashConfig(user User, cfg Config) string {
+	var sb strings.Builder
+	sb.WriteString("proxies:\n")
+
+	if user.VlessUUID != "" {
+		sb.WriteString(fmt.Sprintf("  - name: \"%s-VLESS\"\n", user.Name))
+		sb.WriteString("    type: vless\n")
+		sb.WriteString(fmt.Sprintf("    server: %s\n", cfg.ServerIP))
+		sb.WriteString("    port: 443\n")
+		sb.WriteString(fmt.Sprintf("    uuid: %s\n", user.VlessUUID))
+		sb.WriteString("    udp: true\n")
+		sb.WriteString("    tls: true\n")
+		sb.WriteString("    flow: xtls-rprx-vision\n")
+		sb.WriteString(fmt.Sprintf("    servername: %s\n", cfg.SNI))
+		sb.WriteString("    client-fingerprint: chrome\n")
+		sb.WriteString("    reality-opts:\n")
+		sb.WriteString(fmt.Sprintf("      public-key: %s\n", cfg.RealityPublicKey))
+		sb.WriteString(fmt.Sprintf("      short-id: %s\n", cfg.RealityShortID))
+	}
+
+	if user.Hy2Password != "" {
+		sb.WriteString(fmt.Sprintf("  - name: \"%s-HY2\"\n", user.Name))
+		sb.WriteString("    type: hysteria2\n")
+		sb.WriteString(fmt.Sprintf("    server: %s\n", cfg.ServerIP))
+		sb.WriteString("    port: 443\n")
+		sb.WriteString(fmt.Sprintf("    password: %s\n", user.Hy2Password))
+		sb.WriteString(fmt.Sprintf("    sni: %s\n", cfg.SNI))
+		sb.WriteString("    skip-cert-verify: true\n")
+	}
+
+	sb.WriteString("\nproxy-groups:\n")
+	sb.WriteString("  - name: \"Auto\"\n")
+	sb.WriteString("    type: select\n")
+	sb.WriteString("    proxies:\n")
+	if user.VlessUUID != "" {
+		sb.WriteString(fmt.Sprintf("      - \"%s-VLESS\"\n", user.Name))
+	}
+	if user.Hy2Password != "" {
+		sb.WriteString(fmt.Sprintf("      - \"%s-HY2\"\n", user.Name))
+	}
+	sb.WriteString("      - DIRECT\n")
+
+	sb.WriteString("\nrules:\n")
+	sb.WriteString("  - MATCH,Auto\n")
+
+	return sb.String()
+}
+
 // ==============================================================================
 // HTTP 处理器
 // ==============================================================================
@@ -169,6 +217,19 @@ func (s *SubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检查是否需要 Clash 格式
+	ua := r.Header.Get("User-Agent")
+	flag := r.URL.Query().Get("flag")
+	if strings.Contains(strings.ToLower(ua), "clash") || flag == "clash" {
+		log.Printf("Serving Clash YAML for %s", matched.Name)
+		content := buildClashConfig(*matched, s.cfg)
+		w.Header().Set("Content-Type", "text/yaml; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(content))
+		return
+	}
+
+	log.Printf("Serving URIs for %s", matched.Name)
 	links := buildLinks(*matched, s.cfg)
 	content := base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n")))
 
