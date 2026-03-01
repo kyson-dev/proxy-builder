@@ -102,7 +102,7 @@ func buildLinks(user User, cfg Config) []string {
 	if user.VlessUUID != "" {
 		link := fmt.Sprintf(
 			"vless://%s@%s:443?encryption=none&flow=xtls-rprx-vision&security=reality"+
-				"&sni=%s&fp=chrome&pbk=%s&sid=%s&type=tcp&headerType=none#%s-VLESS",
+				"&sni=%s&fp=chrome&pbk=%s&sid=%s&headerType=none#%s-VLESS",
 			user.VlessUUID, cfg.ServerIP,
 			cfg.SNI, cfg.RealityPublicKey, cfg.RealityShortID, user.Name,
 		)
@@ -130,7 +130,7 @@ func buildClashConfig(user User, cfg Config) string {
 	}
 
 	if user.Hy2Password != "" {
-		sb.WriteString(fmt.Sprintf("  - {name: \"%s-HY2\", type: hysteria2, server: %s, port: 443, password: %s, sni: %s, skip-cert-verify: true}\n",
+		sb.WriteString(fmt.Sprintf("  - {name: \"%s-HY2\", type: hysteria2, server: %s, port: 443, password: %s, sni: %s, skip-cert-verify: true, up: 1000, down: 1000}\n",
 			user.Name, cfg.ServerIP, user.Hy2Password, cfg.SNI))
 	}
 
