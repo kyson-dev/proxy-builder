@@ -60,6 +60,22 @@ health_check() {
         echo "   - VLESS-TCP-Reality"
         echo "   - Hysteria2-UDP"
         echo ""
+
+        # 从 users.json 读取各用户的专属订阅 URL
+        local users_file="${SCRIPT_DIR}/users.json"
+        if [[ -f "$users_file" ]] && command -v jq &>/dev/null; then
+            echo "📱 订阅链接 (复制给对应用户):"
+            local user_count
+            user_count=$(jq 'length' "$users_file")
+            for ((i=0; i<user_count; i++)); do
+                local name
+                name=$(jq -r ".[$i].name" "$users_file")
+                echo "   👤 ${name}: http://${server_ip}:8080/sub?token=${name}"
+            done
+        else
+            echo "📱 订阅服务: http://${server_ip}:8080/sub?token=<用户名>"
+        fi
+        echo ""
         echo "📝 查看日志以排错: docker logs -f sing-box"
         echo ""
         

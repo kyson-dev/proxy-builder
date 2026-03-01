@@ -18,3 +18,24 @@ services:
       options:
         max-size: "10m"
         max-file: "1"
+
+  sub:
+    build:
+      context: ./sing-box/sub
+      dockerfile: Dockerfile
+    container_name: sub
+    restart: unless-stopped
+    ports:
+      # 订阅服务端口（仅供拉取订阅使用，非代理流量）
+      - "8080:8080/tcp"
+    volumes:
+      - ${SING_BOX_DATA_DIR}/users.json:/etc/sing-box/users.json:ro
+    environment:
+      - REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
+      - REALITY_SHORT_ID=${REALITY_SHORT_ID}
+      - REALITY_DEST=${REALITY_DEST}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "1"

@@ -50,6 +50,7 @@ jobs:
           echo "📝 创建环境配置..."
           cat > .env << EOF
           REALITY_PRIVATE_KEY=${{ secrets.REALITY_PRIVATE_KEY }}
+          REALITY_PUBLIC_KEY=${{ secrets.REALITY_PUBLIC_KEY }}
           REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
           REALITY_DEST=${{ secrets.REALITY_DEST }}
           EOF
