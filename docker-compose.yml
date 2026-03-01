@@ -5,6 +5,7 @@ services:
     hostname: sing-box
     restart: unless-stopped
     tty: true
+    command: run -c /etc/sing-box/config.json
     ports:
       # 443 端口用于代理流量（VLESS 和 Hysteria2 同端口多路）
       - "443:443/tcp"
