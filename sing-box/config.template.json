@@ -26,10 +26,6 @@
                     "private_key": "",
                     "short_id": []
                 }
-            },
-            "multiplex": {
-                "enabled": true,
-                "padding": true
             }
         },
         {
