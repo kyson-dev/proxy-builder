@@ -56,8 +56,13 @@ build_config() {
        "$template_file" > "$output_file"
        
     log_substep "校验 Sing-box 配置文件..."
-    if ! docker run --rm -v "$output_file":/etc/sing-box/config.json ghcr.io/sagernet/sing-box:latest check -c /etc/sing-box/config.json; then
-        die "Sing-box 配置文件格式验证失败，请检查用户的 users.json 或 底层参数变量是否有误。"
+    local docker_cmd
+    docker_cmd=$(get_docker_cmd) || die "无法连接到 Docker，请确认 Docker 已安装并运行"
+    if ! $docker_cmd run --rm \
+        -v "$output_file":/etc/sing-box/config.json \
+        ghcr.io/sagernet/sing-box:latest \
+        check -c /etc/sing-box/config.json; then
+        die "Sing-box 配置文件格式验证失败，请检查 users.json 或 .env 参数是否有误。"
     fi
        
     log_success "配置文件生成且校验成功: $output_file"

@@ -234,7 +234,8 @@ gcp_wif_provider_exists() {
         --location="global" &>/dev/null
 }
 
-# 创建 GitHub OIDC Provider
+# 创建或更新 GitHub OIDC Provider
+# 若已存在，则同步更新 attribute-condition（防止 GitHub 账号改名后失效）
 gcp_create_github_provider() {
     local provider_name="$1"
     local pool_name="$2"
@@ -242,7 +243,13 @@ gcp_create_github_provider() {
     local repo_owner="$4"
     
     if gcp_wif_provider_exists "$provider_name" "$pool_name" "$project"; then
-        log_substep "Workload Identity Provider 已存在: $provider_name"
+        log_substep "Workload Identity Provider 已存在，同步更新 attribute-condition..."
+        gcloud iam workload-identity-pools providers update-oidc "$provider_name" \
+            --workload-identity-pool="$pool_name" \
+            --project "$project" \
+            --location="global" \
+            --attribute-condition="assertion.repository_owner == '$repo_owner'"
+        log_success "Workload Identity Provider 已更新: $provider_name (owner: $repo_owner)"
         return 0
     fi
     
