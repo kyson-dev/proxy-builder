@@ -75,6 +75,13 @@ build_config() {
 
     # 将 users.json 同步到数据目录，供订阅服务（sub）读取
     if [[ -f "$users_file" ]]; then
+        # 🚨 防御性处理：如果 docker up 之前 users.json 不存在，
+        # Docker volumes 会默认把它当作"目录"创建（并赋予 root 权限），导致之后 cp 报错
+        if [[ -d "${SING_BOX_DATA_DIR}/users.json" ]]; then
+            log_warn "检测到 users.json 是错误的目录结构，正在修复..."
+            sudo rm -rf "${SING_BOX_DATA_DIR}/users.json" || rm -rf "${SING_BOX_DATA_DIR}/users.json"
+        fi
+        
         cp "$users_file" "${SING_BOX_DATA_DIR}/users.json"
         log_substep "users.json 已同步到: ${SING_BOX_DATA_DIR}/users.json"
     fi
