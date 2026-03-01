@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 代理服务部署脚本 (S-UI 版本)
+# 代理服务部署脚本 (Sing-box 原生版本)
 # 
 # 此脚本只负责部署，版本管理由 CD 处理
 # ==============================================================================
@@ -23,9 +23,9 @@ source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
 source "${SCRIPTS_DIR}/deploy/generate-certs.sh"
+source "${SCRIPTS_DIR}/deploy/build-config.sh"
 source "${SCRIPTS_DIR}/deploy/start-services.sh"
 source "${SCRIPTS_DIR}/deploy/health-check.sh"
-
 
 # ==============================================================================
 # 主流程
@@ -33,12 +33,12 @@ source "${SCRIPTS_DIR}/deploy/health-check.sh"
 main() {
     local start_time=$(date +%s)
     
-    print_header "部署 S-UI 代理服务"
+    print_header "部署 Sing-box 代理服务"
 
     # 1. 初始化完整环境 (补充默认路径并写入 .env)
     init_env "${SCRIPT_DIR}/.env"
 
-    # 2. 验证基础配置 (PANEL_DOMAIN)
+    # 2. 验证基础配置 (REALITY_PRIVATE_KEY 等核心参数)
     validate_env "${SCRIPT_DIR}/.env"
     
 
@@ -47,20 +47,24 @@ main() {
     init_data_dir
     echo ""
     
-    # Step 2: 启用 BBR
-    enable_bbr
-    echo ""
-    
-    # Step 3: 检查并安装 Docker
-    check_docker
-    echo ""
-    
-    # Step 5: 检查并安装依赖
+    # Step 2: 检查并安装依赖 (jq, openssl 等，后续步骤需要)
     check_dependencies
     echo ""
     
-    # Step 6: 生成自签名证书
-    generate_certs "${S_UI_DATA_DIR}/cert"
+    # Step 3: 启用 BBR
+    enable_bbr
+    echo ""
+    
+    # Step 4: 检查并安装 Docker
+    check_docker
+    echo ""
+    
+    # Step 5: 生成自签名证书
+    generate_certs "${SING_BOX_DATA_DIR}/cert"
+    echo ""
+
+    # Step 6: 生成最终的 config.json
+    build_config
     echo ""
     
     # Step 7: 启动服务

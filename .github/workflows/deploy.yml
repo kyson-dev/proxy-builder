@@ -49,8 +49,16 @@ jobs:
           # 1. 创建 .env 文件
           echo "📝 创建环境配置..."
           cat > .env << EOF
-          PANEL_DOMAIN=${{ secrets.PANEL_DOMAIN }}
+          REALITY_PRIVATE_KEY=${{ secrets.REALITY_PRIVATE_KEY }}
+          REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
+          REALITY_DEST=${{ secrets.REALITY_DEST }}
           EOF
+
+          # 将 users secret 写为 json 文件
+          echo "📝 生成用户配置 users.json..."
+          cat > users.json << 'USERS_EOF'
+          ${{ secrets.USERS_JSON }}
+          USERS_EOF
 
           # 2. 打包
           echo "📦 打包文件..."
@@ -59,6 +67,7 @@ jobs:
               --exclude='vars.*.json' \
               --exclude='*.md' \
               --exclude='docs' \
+              --exclude='.env.*' \
               -czf /tmp/app.tar.gz .
 
           # 3. 上传
@@ -77,16 +86,15 @@ jobs:
               docker compose down 2>/dev/null || true
             fi
             
-            # 备份当前版本
+            # 备份当前版本并腾出空间
             if [ -d ~/app ]; then
               echo "💾 备份当前版本..."
               rm -rf ~/app.backup
-              cp -r ~/app ~/app.backup
+              mv ~/app ~/app.backup
             fi
             
             # 解压新版本到 app
             echo "📦 解压新版本..."
-            rm -rf ~/app
             mkdir -p ~/app
             tar -xzf ~/app.tar.gz -C ~/app
             rm ~/app.tar.gz

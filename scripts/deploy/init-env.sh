@@ -12,15 +12,12 @@ init_env() {
     
     log_step "初始化环境配置"
     
-    # 1. 设置默认值 (如果未设置)
     export DATA_ROOT="${DATA_ROOT:-${HOME}/data}"
-    export S_UI_DATA_DIR="${S_UI_DATA_DIR:-${DATA_ROOT}/s-ui}"
-    export CADDY_DATA_DIR="${CADDY_DATA_DIR:-${DATA_ROOT}/caddy}"
+    export SING_BOX_DATA_DIR="${SING_BOX_DATA_DIR:-${DATA_ROOT}/sing-box}"
     
     log_substep "配置路径:"
     log_substep "  DATA_ROOT: $DATA_ROOT"
-    log_substep "  S_UI_DATA_DIR: $S_UI_DATA_DIR"
-    log_substep "  CADDY_DATA_DIR: $CADDY_DATA_DIR"
+    log_substep "  SING_BOX_DATA_DIR: $SING_BOX_DATA_DIR"
 
     # 2. 确保 .env 文件存在
     touch "$env_file"
@@ -41,10 +38,8 @@ init_env() {
             # log_substep "  + 追加: $key"
         fi
     }
-    
     append_if_missing "DATA_ROOT" "$DATA_ROOT"
-    append_if_missing "S_UI_DATA_DIR" "$S_UI_DATA_DIR"
-    append_if_missing "CADDY_DATA_DIR" "$CADDY_DATA_DIR"
+    append_if_missing "SING_BOX_DATA_DIR" "$SING_BOX_DATA_DIR"
     
     # 确保文件结尾有换行符（可选，为了美观）
     if [ -n "$(tail -c1 "$env_file")" ]; then
