@@ -87,12 +87,15 @@ jobs:
               docker compose down 2>/dev/null || true
             fi
             
-            # 备份当前版本并腾出空间
-            if [ -d ~/app ]; then
-              echo "💾 备份当前版本..."
-              rm -rf ~/app.backup
-              mv ~/app ~/app.backup
-            fi
+            # ==================================================================
+            # 备份：代码目录 + 数据目录 同时快照
+            # 确保回滚时两者能完整还原到同一版本
+            # ==================================================================
+            echo "💾 备份当前版本..."
+            rm -rf ~/app.backup ~/data/sing-box.backup
+            
+            [ -d ~/app ] && mv ~/app ~/app.backup
+            [ -d ~/data/sing-box ] && cp -r ~/data/sing-box ~/data/sing-box.backup
             
             # 解压新版本到 app
             echo "📦 解压新版本..."
@@ -108,29 +111,33 @@ jobs:
             if ./deploy.sh; then
               echo "✅ 部署成功"
               
-              # 删除备份
-              if [ -d ~/app.backup ]; then
-                echo "🧹 清理备份..."
-                rm -rf ~/app.backup
-              fi
+              # 清理备份（代码 + 数据）
+              echo "🧹 清理备份..."
+              rm -rf ~/app.backup ~/data/sing-box.backup
               
               echo "✅ 部署完成"
             else
-              echo "❌ 部署失败"
+              echo "❌ 部署失败，开始回滚..."
               
-              # 从备份恢复
-              if [ -d ~/app.backup ]; then
-                echo "🔄 从备份恢复..."
-                rm -rf ~/app
-                mv ~/app.backup ~/app
-                
-                # 重启旧版本
+              # ==============================================================
+              # 回滚：代码目录 + 数据目录 一起还原
+              # ==============================================================
+              rm -rf ~/app
+              [ -d ~/app.backup ] && mv ~/app.backup ~/app || echo "⚠️ 无代码备份"
+              
+              rm -rf ~/data/sing-box
+              if [ -d ~/data/sing-box.backup ]; then
+                mv ~/data/sing-box.backup ~/data/sing-box
+                echo "✅ 数据目录已回滚"
+              else
+                echo "⚠️ 无数据备份，跳过数据回滚"
+              fi
+              
+              # 用旧代码 + 旧数据重启服务
+              if [ -d ~/app ]; then
                 cd ~/app
                 docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
-                
                 echo "✅ 已恢复到旧版本"
-              else
-                echo "⚠️ 没有备份可恢复"
               fi
               
               exit 1

@@ -39,7 +39,9 @@ build_config() {
          log_warn "未找到 users.json，将创建空用户"
     fi
     
-    # 使用 jq 替换配置
+    # 先写入临时文件，校验通过后再原子性替换，防止校验失败时损坏正在运行的配置
+    local tmp_file="${output_file}.tmp"
+
     jq --argjson vless "$vless_users" \
        --argjson hy2 "$hy2_users" \
        --arg dest_name "$dest_name" \
@@ -53,20 +55,29 @@ build_config() {
         (.inbounds[] | select(.type=="vless")).tls.reality.private_key = $private_key |
         (.inbounds[] | select(.type=="vless")).tls.reality.short_id = ($short_id | split(",")) |
         (.inbounds[] | select(.type=="hysteria2")).users = $hy2' \
-       "$template_file" > "$output_file"
-       
+       "$template_file" > "$tmp_file"
+
     log_substep "校验 Sing-box 配置文件..."
     local docker_cmd
     docker_cmd=$(get_docker_cmd) || die "无法连接到 Docker，请确认 Docker 已安装并运行"
     if ! $docker_cmd run --rm \
-        -v "$output_file":/etc/sing-box/config.json \
+        -v "$tmp_file":/etc/sing-box/config.json \
         -v "${SING_BOX_DATA_DIR}/cert":/etc/sing-box/cert:ro \
         ghcr.io/sagernet/sing-box:latest \
         check -c /etc/sing-box/config.json; then
-        die "Sing-box 配置文件格式验证失败，请检查 users.json 或 .env 参数是否有误。"
+        rm -f "$tmp_file"
+        die "Sing-box 配置文件格式验证失败，请检查 users.json 或 .env 参数是否有误。原配置文件未被修改。"
     fi
-       
+
+    # 校验通过 → 原子性替换（不会中断正在运行的服务读取）
+    mv "$tmp_file" "$output_file"
     log_success "配置文件生成且校验成功: $output_file"
+
+    # 将 users.json 同步到数据目录，供订阅服务（sub）读取
+    if [[ -f "$users_file" ]]; then
+        cp "$users_file" "${SING_BOX_DATA_DIR}/users.json"
+        log_substep "users.json 已同步到: ${SING_BOX_DATA_DIR}/users.json"
+    fi
 }
 
 # 如果直接运行此脚本
