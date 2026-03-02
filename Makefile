@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (Sing-box)
 # Sing-box 原生模式代理服务管理
 
-.PHONY: all uuid short-id password reality-key setup-wif setup-firewall check-scripts upload-env share help
+.PHONY: all uuid short-id password reality-key setup-wif setup-firewall check-scripts upload-env help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -19,10 +19,7 @@ help:
 	@echo "  make upload-env        - Upload .env to GitHub Environment Secrets"
 	@echo "  make setup-firewall    - Configure firewall rules for service ports"
 	@echo "  make check-scripts     - Check all shell scripts syntax"
-	@echo ""
-	@echo "📱 Client:"
-	@echo "  make share             - Generate share links & QR codes for all users"
-	@echo ""
+
 
 # ============================================================
 # Credential Generation
