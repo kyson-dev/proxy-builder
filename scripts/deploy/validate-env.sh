@@ -22,10 +22,11 @@ validate_env() {
 
     # 2. 定义必填变量列表
     local required_vars=(
-        "PANEL_DOMAIN"
         "DATA_ROOT"
-        "S_UI_DATA_DIR"
-        "CADDY_DATA_DIR"
+        "SING_BOX_DATA_DIR"
+        "REALITY_PRIVATE_KEY"
+        "REALITY_SHORT_ID"
+        "REALITY_DEST"
     )
 
     # 3. 检查必填变量
@@ -50,7 +51,6 @@ validate_env() {
 
     # 5. 输出当前配置（可选，用于调试）
     # echo "✅ 环境配置已加载"
-    # echo "   域名: $PANEL_DOMAIN"
     # echo "   数据根目录: $DATA_ROOT"
 }
 

@@ -150,6 +150,33 @@ push_config() {
         fi
     done < "${PROJECT_ROOT}/$env_file"
     
+    # NEW: 推送结构化的用户列表文件
+    local users_file="users.json"
+    if [[ -f "${PROJECT_ROOT}/$users_file" ]]; then
+        echo ""
+        log_step "发现 ${users_file}，正在推送到 GitHub Secrets..."
+        # 使用 jq 压缩所有的空白符和换行
+        if ! command_exists jq; then
+             log_warn "未找到 jq 工具，将尝试直接上传"
+             users_json_content=$(cat "${PROJECT_ROOT}/$users_file")
+        else
+             users_json_content=$(jq -c . "${PROJECT_ROOT}/$users_file")
+        fi
+        
+        if gh secret set "USERS_JSON" \
+            --env "$env_name" \
+            --body "$users_json_content" 2>/dev/null; then
+            echo "   ✓ USERS_JSON"
+            ((uploaded_count++))
+        else
+            log_error "上传失败: USERS_JSON"
+            ((failed_count++))
+        fi
+    else
+        echo ""
+        log_substep "未发现 ${users_file}，跳过用户列表上传"
+    fi
+    
     echo ""
     print_separator
     

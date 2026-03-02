@@ -1,50 +1,41 @@
 services:
-  s-ui:
-    image: alireza7/s-ui:latest
-    container_name: s-ui
-    hostname: s-ui
+  sing-box:
+    image: ghcr.io/sagernet/sing-box:latest
+    container_name: sing-box
+    hostname: sing-box
     restart: unless-stopped
     tty: true
+    command: run -c /etc/sing-box/config.json
     ports:
-      # 443 端口用于代理流量（VLESS, Hysteria2 等）
+      # 443 端口用于代理流量（VLESS 和 Hysteria2 同端口多路）
       - "443:443/tcp"
       - "443:443/udp"
-      - "8443:8443/tcp"
-      - "8443:8443/udp"
-      # 注意: 2095 和 2096 不暴露到主机，仅通过 Caddy 反向代理访问
     volumes:
-      # S-UI 数据目录：必须设置 S_UI_DATA_DIR 环境变量
-      - ${S_UI_DATA_DIR}/db:/app/db
-      - ${S_UI_DATA_DIR}/cert:/app/cert
+      - ${SING_BOX_DATA_DIR}/config.json:/etc/sing-box/config.json
+      - ${SING_BOX_DATA_DIR}/cert:/etc/sing-box/cert
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "1"
-  caddy:
-    image: caddy:latest
-    container_name: caddy
-    hostname: caddy
+
+  sub:
+    build:
+      context: ./sing-box/sub
+      dockerfile: Dockerfile
+    container_name: sub
     restart: unless-stopped
-    tty: true
     ports:
-      # HTTP 端口（用于自动 HTTPS 重定向）
-      - "80:80/tcp"
-      # Web 面板端口（反向代理到 s-ui:2095）
-      - "2095:2095/tcp"
-      # 订阅服务端口（反向代理到 s-ui:2096）
-      - "2096:2096/tcp"
-      # 注意: Caddy 不监听 443，避免与 S-UI 的代理流量冲突
-    environment:
-      - PANEL_DOMAIN=${PANEL_DOMAIN}
+      # 订阅服务端口（仅供拉取订阅使用，非代理流量）
+      - "8080:8080/tcp"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      - ${CADDY_DATA_DIR}/data:/data
-      - ${CADDY_DATA_DIR}/config:/config
-    depends_on:
-      - s-ui
+      - ${SING_BOX_DATA_DIR}/users.json:/etc/sing-box/users.json:ro
+    environment:
+      - REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
+      - REALITY_SHORT_ID=${REALITY_SHORT_ID}
+      - REALITY_DEST=${REALITY_DEST}
     logging:
       driver: "json-file"
       options:
-        max-size: "10m"
+        max-size: "5m"
         max-file: "1"

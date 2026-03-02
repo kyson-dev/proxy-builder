@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 健康检查 (S-UI 版本)
+# 健康检查 (Sing-box 原生版本)
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
 # ==============================================================================
 
@@ -41,8 +41,8 @@ health_check() {
     log_substep "服务状态:"
     $docker_cmd compose ps
     
-    # 验证 S-UI 是否运行
-    if $docker_cmd compose ps s-ui 2>/dev/null | grep -q "Up"; then
+    # 验证 Sing-box 是否运行
+    if $docker_cmd compose ps sing-box 2>/dev/null | grep -q "Up"; then
         echo ""
         print_separator
         log_success "部署成功！"
@@ -52,36 +52,45 @@ health_check() {
         server_ip=$(get_public_ip)
         
         echo ""
-        echo "📋 S-UI 管理面板信息:"
-        echo "   服务器 IP: $server_ip"
-        echo "   服务器域名: $PANEL_DOMAIN"
-        echo "   Web 面板: https://$PANEL_DOMAIN:2095/app/"
-        echo "   订阅服务: https://$PANEL_DOMAIN:2096/sub/"
+        echo "🎉 Sing-box 核心代理已启动"
+        echo "   🌍 服务器 IP: $server_ip"
+        echo "   🌍 伪装域名: $REALITY_DEST"
         echo ""
-        echo "🔐 默认登录信息:"
-        echo "   用户名: admin"
-        echo "   密码: admin"
+        echo "✅ 支持的协议配置 (默认 443 端口多路复用):"
+        echo "   - VLESS-TCP-Reality"
+        echo "   - Hysteria2-UDP"
         echo ""
-        echo "⚠️  安全提示: 首次登录后请立即修改默认密码！"
+
+        # 从 users.json 读取各用户的专属订阅 URL
+        local users_file="${SCRIPT_DIR}/users.json"
+        if [[ -f "$users_file" ]] && command -v jq &>/dev/null; then
+            echo "📱 订阅链接 (复制给对应用户):"
+            local user_count
+            user_count=$(jq 'length' "$users_file")
+            for ((i=0; i<user_count; i++)); do
+                local name
+                name=$(jq -r ".[$i].name" "$users_file")
+                echo "   👤 ${name}: http://${server_ip}:8080/sub?token=${name}"
+            done
+        else
+            echo "📱 订阅服务: http://${server_ip}:8080/sub?token=<用户名>"
+        fi
         echo ""
-        echo "📝 查看日志: docker logs -f s-ui"
+        echo "📝 查看日志以排错: docker logs -f sing-box"
         echo ""
-        echo "💡 接下来请在 Web 面板中配置 Inbound:"
-        echo "   - VLESS Reality (端口 443)"
-        echo "   - Hysteria2 (端口 443)"
         
         return 0
     else
         echo ""
-        log_error "S-UI 启动失败"
+        log_error "Sing-box 启动失败"
         echo ""
         echo "请检查日志:"
-        echo "   docker logs s-ui"
+        echo "   docker logs sing-box"
         echo ""
         
         # 显示最后几行日志
         log_substep "最近日志:"
-        $docker_cmd logs s-ui --tail 20 2>&1 || true
+        $docker_cmd logs sing-box --tail 20 2>&1 || true
         
         return 1
     fi

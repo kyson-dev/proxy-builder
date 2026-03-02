@@ -1,13 +1,13 @@
-# Proxy Builder (S-UI)
+# Proxy Builder (Sing-box Native)
 
 <div align="center">
 
 ![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
 ![Google Cloud](https://img.shields.io/badge/GoogleCloud-%234285F4.svg?style=for-the-badge&logo=google-cloud&logoColor=white)
-![Caddy](https://img.shields.io/badge/caddy-%2300add8.svg?style=for-the-badge&logo=caddy&logoColor=white)
+![Sing-box](https://img.shields.io/badge/sing--box-%2300add8.svg?style=for-the-badge&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)
 
-**An enterprise-grade, automated deployment solution for high-performance proxy services.**
+**An enterprise-grade, automated GitOps deployment solution for high-performance proxy services.**
 
 [Architecture](#-architecture) • [Features](#-features) • [Quick Start](#-quick-start) • [Cloud Infrastructure](#-cloud-and-security)
 
@@ -15,9 +15,9 @@
 
 ## 📖 Introduction
 
-**Proxy Builder** is not just a docker-compose file; it is a **complete infrastructure-as-code solution**. It is designed to deploy a secure, resilient, and high-performance proxy server on Google Cloud Platform (GCP) (or any Linux server) using modern DevOps practices.
+**Proxy Builder** is a **complete infrastructure-as-code solution**. It is designed to deploy a secure, resilient, and high-performance proxy server on Google Cloud Platform (GCP) using modern DevOps practices.
 
-It leverages **S-UI** for web-based management and **Caddy** for automatic HTTPS, all orchestrated via **GitHub Actions** and secured by **Workload Identity Federation** (WIF).
+It leverages the powerful **Sing-box Core** running in native mode, with user configuration managed seamlessly via structured JSON secrets. The whole pipeline is orchestrated via **GitHub Actions** and secured by **Workload Identity Federation** (WIF).
 
 ## 🏗 Architecture
 
@@ -28,24 +28,22 @@ graph TD
     subgraph Local[💻 Local Developer Environment]
         Dev[Developer] --> |Push Code| GH[GitHub Repository]
         Dev --> |"Make upload-env"| Secrets[GitHub Secrets]
-        note1[".env Configuration\n(Never Committed)"] -.-> |Secure Upload| Secrets
+        note1[".env / users.json\n(Never Committed)"] -.-> |Secure Upload| Secrets
     end
 
     subgraph CI[🤖 GitHub Actions CI/CD]
         GA[Workflow] --> |"1. Auth via OIDC"| GCP_IAM[GCP IAM]
-        GA --> |"2. SSH Deployment"| VM[GCP Compute Engine]
+        GA --> |"2. Deploy & Inject Keys"| VM[GCP Compute Engine]
     end
 
     subgraph Cloud[☁️ Google Cloud Platform]
         GCP_IAM -- "Workload Identity (WIF)" --> GA
         
         subgraph Instance[Proxy Server]
-            Caddy[🔒 Caddy Reverse Proxy]
-            S_UI[🎛️ S-UI Panel]
+            Core[⚡ Sing-Box Core]
             
-            Caddy -- "HTTPS (443)" --> User((The Internet))
-            Caddy -- "Proxy (2095)" --> S_UI
-            S_UI -- "Mange Config" --> Core[Sing-Box Core]
+            Core -- "VLESS-Reality (443 TCP)" --> User((The Internet))
+            Core -- "Hysteria2 (443 UDP)" --> User
         end
     end
     
@@ -53,14 +51,13 @@ graph TD
 ```
 
 ### Key Concepts
-- **Automatic HTTPS**: Caddy automatically manages certificates for your panel (`panel.example.com`).
+- **Native Efficiency**: Pure `sing-box` runs without the overhead of panels or reverse proxies.
 - **Keyless Deployment**: GitHub Actions authenticates with Google Cloud using OIDC. **No long-lived JSON service account keys are stored.**
-- **Environment Isolation**: Separate configurations for `Production` (release) and `Development` (testing).
+- **GitOps User Mgmt**: Manage proxy users through a local `users.json` template injected securely as a GitHub Secret.
 
 ## ✨ Features
 
-- **Web Management Panel**: Manage users and protocols via S-UI.
-- **Protocol Support**: VLESS (Reality), Hysteria2, Trojan, Shadowsocks.
+- **Protocol Support**: VLESS-TCP-Reality and Hysteria2 multiplexed beautifully on port 443.
 - **Zero-Trust Security**: WIF authentication eliminates credential leaks.
 - **One-Click Cloud Setup**: Scripts to automate VM creation, Firewall rules, and IAM binding.
 - **Infrastructure as Code**: Everything is defined in scripts and `docker-compose.yml`.
@@ -82,25 +79,26 @@ We provide automated scripts to set up the secure infrastructure on GCP.
 make setup-wif
 
 # 2. Configure Firewall Rules
-# Opens ports 80, 443, 2095, 2096, etc.
+# Dynamically opens port 443 TCP/UDP based on config.
 make setup-firewall
 ```
 
 ### 2. Configuration Strategy
-We use secure `.env` files that are **never committed**.
+We use secure `.env` files and `users.json` that are **never committed**.
 
-**Production Environment:**
+**Base Environment:**
 ```bash
 cp .env.production.example .env.production
 nano .env.production
-# Set: PANEL_DOMAIN=panel.example.com
+# Generate keys via: make reality-key
+# Set REALITY_PRIVATE_KEY, REALITY_SHORT_ID, and REALITY_DEST
 ```
 
-**Development Environment:**
+**User Management:**
 ```bash
-cp .env.development.example .env.development
-nano .env.development
-# Set: PANEL_DOMAIN=dev.example.com
+cp users.example.json users.json
+nano users.json
+# Define proxy users, uuids, and passwords here.
 ```
 
 ### 3. Sync Configuration
@@ -108,7 +106,7 @@ Securely upload your local configuration to GitHub Secrets.
 
 ```bash
 make upload-env
-# Follow the prompts to select the environment (e.g., Production)
+# Follow the prompts. It will compress users.json and upload it as USERS_JSON.
 ```
 
 ### 4. Deploy
@@ -146,32 +144,13 @@ The proxy requires specific ports. We use `gcloud` to strictly allow only necess
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
-| `2095` | TCP | S-UI Web Panel (HTTPS) |
-| `2096` | TCP | Subscription Links (HTTPS) |
-| `80` | TCP | HTTP / ACME Challenges |
-| `443` | TCP/UDP | HTTPS / Proxy Traffic |
+| `443` | TCP/UDP | Reality (TCP) & Hysteria2 (UDP) Proxy Traffic |
 
 **Setup Command:**
 ```bash
 make setup-firewall
 ```
-*This will create the necessary VPC firewall rules in your GCP project.*
-
-## 🛠️ Local Development
-
-You can run the full stack locally (on your Mac/Linux machine) to test configuration changes.
-
-1. **Setup Env**:
-   ```bash
-   cp .env.development.example .env
-   # Set PANEL_DOMAIN=localhost
-   ```
-2. **Start Services**:
-   ```bash
-   make dev
-   ```
-3. **Access**:
-   Open `https://localhost:2095` (Accept self-signed cert).
+*This will dynamically read the `docker-compose.yml` and create the necessary VPC firewall rules in your GCP project (only 443).*
 
 ## 📄 License
 MIT License.
