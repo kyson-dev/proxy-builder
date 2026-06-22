@@ -31,8 +31,8 @@
             "tag": "hy2-in",
             "listen": "::",
             "listen_port": 443,
-            "up_mbps": 1000,
-            "down_mbps": 1000,
+            "up_mbps": 200,
+            "down_mbps": 200,
             "users": [],
             "tls": {
                 "enabled": true,
