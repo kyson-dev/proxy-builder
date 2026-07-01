@@ -75,7 +75,7 @@ install_ops_agent() {
     
     # 下载官方安装脚本并运行
     if curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh; then
-        sudo bash add-google-cloud-ops-agent-repo.sh --also-install --quiet
+        sudo bash add-google-cloud-ops-agent-repo.sh --also-install
         rm -f add-google-cloud-ops-agent-repo.sh
         log_success "Google Cloud Ops Agent 安装成功"
     else
