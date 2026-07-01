@@ -115,7 +115,12 @@ jobs:
             --metadata-from-file startup-script=scripts/gcp/bootstrap-deploy.sh \
             --metadata proxy-deploy-bucket="${BUCKET}",proxy-deploy-object="${OBJECT}",proxy-deploy-run-id="${RUN_ID}"
 
-          gcloud compute instances reset "${VM}" \
+          gcloud compute instances stop "${VM}" \
+            --project="${PROJECT}" \
+            --zone="${ZONE}" \
+            --quiet
+
+          gcloud compute instances start "${VM}" \
             --project="${PROJECT}" \
             --zone="${ZONE}" \
             --quiet
