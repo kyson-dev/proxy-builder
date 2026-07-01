@@ -22,6 +22,7 @@ source "${SCRIPTS_DIR}/deploy/init-data-dir.sh"
 source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
+source "${SCRIPTS_DIR}/deploy/configure-logging.sh"
 source "${SCRIPTS_DIR}/deploy/generate-certs.sh"
 source "${SCRIPTS_DIR}/deploy/build-config.sh"
 source "${SCRIPTS_DIR}/deploy/start-services.sh"
@@ -41,13 +42,11 @@ main() {
     # 2. 验证基础配置 (REALITY_PRIVATE_KEY 等核心参数)
     validate_env "${SCRIPT_DIR}/.env"
     
-
-    
     # Step 1: 初始化数据目录
     init_data_dir
     echo ""
     
-    # Step 2: 检查并安装依赖 (jq, openssl 等，后续步骤需要)
+    # Step 2: 检查并安装依赖 (jq, openssl, Ops Agent 等)
     check_dependencies
     echo ""
     
@@ -58,16 +57,20 @@ main() {
     # Step 4: 检查并安装 Docker
     check_docker
     echo ""
+
+    # Step 5: 配置日志收集器 (GCP Ops Agent)
+    configure_ops_agent
+    echo ""
     
-    # Step 5: 生成自签名证书
+    # Step 6: 生成自签名证书
     generate_certs "${SING_BOX_DATA_DIR}/cert"
     echo ""
 
-    # Step 6: 生成最终的 config.json
+    # Step 7: 生成最终的 config.json
     build_config
     echo ""
     
-    # Step 7: 启动服务
+    # Step 8: 启动服务
     start_services "docker-compose.yml"
     echo ""
     

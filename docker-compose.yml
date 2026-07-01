@@ -17,7 +17,7 @@ services:
       driver: "json-file"
       options:
         max-size: "10m"
-        max-file: "1"
+        max-file: "3"
 
   sub:
     build:
@@ -38,4 +38,4 @@ services:
       driver: "json-file"
       options:
         max-size: "5m"
-        max-file: "1"
+        max-file: "3"
