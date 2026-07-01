@@ -20,6 +20,7 @@ type User struct {
 	Name        string `json:"name"`
 	VlessUUID   string `json:"vless_uuid"`
 	Hy2Password string `json:"hy2_password"`
+	SubToken    string `json:"sub_token"`
 }
 
 // ==============================================================================
@@ -208,10 +209,10 @@ func (s *SubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 按 name 查找用户
+	// 按 sub_token 查找用户
 	var matched *User
 	for i := range users {
-		if users[i].Name == token {
+		if users[i].SubToken == token {
 			matched = &users[i]
 			break
 		}

@@ -68,9 +68,10 @@ health_check() {
             local user_count
             user_count=$(jq 'length' "$users_file")
             for ((i=0; i<user_count; i++)); do
-                local name
+                local name sub_token
                 name=$(jq -r ".[$i].name" "$users_file")
-                echo "   👤 ${name}: http://${server_ip}:8080/sub?token=${name}"
+                sub_token=$(jq -r ".[$i].sub_token" "$users_file")
+                echo "   👤 ${name}: http://${server_ip}:8080/sub?token=${sub_token}"
             done
         else
             echo "📱 订阅服务: http://${server_ip}:8080/sub?token=<用户名>"
