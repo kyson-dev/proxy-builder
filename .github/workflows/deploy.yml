@@ -73,7 +73,7 @@ jobs:
             if [ -d ~/app ] && [ -f ~/app/docker-compose.yml ]; then
               echo "⏸️  停止当前服务..."
               cd ~/app
-              sudo docker compose down 2>/dev/null || true
+              docker compose down 2>/dev/null || true
             fi
             
             # ==================================================================
@@ -82,10 +82,10 @@ jobs:
             # ==================================================================
             echo "💾 备份当前版本..."
             rm -rf ~/app.backup
-            sudo rm -rf /opt/proxy/data/sing-box.backup
+            rm -rf /opt/proxy/data/sing-box.backup
             
             [ -d ~/app ] && mv ~/app ~/app.backup
-            [ -d /opt/proxy/data/sing-box ] && sudo cp -r /opt/proxy/data/sing-box /opt/proxy/data/sing-box.backup || true
+            [ -d /opt/proxy/data/sing-box ] && cp -r /opt/proxy/data/sing-box /opt/proxy/data/sing-box.backup || true
             
             # 解压新版本到 app
             echo "📦 解压新版本..."
@@ -100,6 +100,8 @@ jobs:
             elif [ ! -f /etc/docker/daemon.json ]; then
               NEED_PROVISION=true
             elif [ ! -f /etc/google-cloud-ops-agent/config.yaml ] || ! grep -q "systemd_journald" /etc/google-cloud-ops-agent/config.yaml; then
+              NEED_PROVISION=true
+            elif [ ! -d /opt/proxy/data ] || [ "$(stat -c '%G' /opt/proxy/data 2>/dev/null)" != "docker" ]; then
               NEED_PROVISION=true
             fi
 
@@ -116,13 +118,13 @@ jobs:
             cd ~/app
             chmod +x deploy.sh
             
-            if sudo ./deploy.sh; then
+            if ./deploy.sh; then
               echo "✅ 部署成功"
               
               # 清理备份（代码 + 数据）
               echo "🧹 清理备份..."
               rm -rf ~/app.backup
-              sudo rm -rf /opt/proxy/data/sing-box.backup || true
+              rm -rf /opt/proxy/data/sing-box.backup || true
               
               echo "✅ 部署完成"
             else
@@ -134,9 +136,9 @@ jobs:
               rm -rf ~/app
               [ -d ~/app.backup ] && mv ~/app.backup ~/app || echo "⚠️ 无代码备份"
               
-              sudo rm -rf /opt/proxy/data/sing-box || true
+              rm -rf /opt/proxy/data/sing-box || true
               if [ -d /opt/proxy/data/sing-box.backup ]; then
-                sudo mv /opt/proxy/data/sing-box.backup /opt/proxy/data/sing-box
+                mv /opt/proxy/data/sing-box.backup /opt/proxy/data/sing-box
                 echo "✅ 数据目录已回滚"
               else
                 echo "⚠️ 无数据备份，跳过数据回滚"
@@ -145,7 +147,7 @@ jobs:
               # 用旧代码 + 旧数据重启服务
               if [ -d ~/app ]; then
                 cd ~/app
-                sudo docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
+                docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
                 echo "✅ 已恢复到旧版本"
               fi
               

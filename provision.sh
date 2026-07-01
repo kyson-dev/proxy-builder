@@ -30,6 +30,30 @@ source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/configure-journald.sh"
 source "${SCRIPTS_DIR}/deploy/configure-ops-agent.sh"
 
+# ------------------------------------------------------------------------------
+# 配置数据目录权限（方案 A：授权给 docker 组，免 sudo）
+# ------------------------------------------------------------------------------
+setup_data_dir_permissions() {
+    log_step "配置数据目录所有权与权限"
+    
+    local data_dir="${DATA_ROOT:-/opt/proxy/data}"
+    local sing_box_dir="${SING_BOX_DATA_DIR:-${data_dir}/sing-box}"
+    
+    log_substep "确保数据目录存在: ${sing_box_dir}/cert"
+    mkdir -p "${sing_box_dir}/cert"
+    
+    log_substep "设置目录所属组为 docker: ${data_dir}"
+    chown -R root:docker "${data_dir}"
+    
+    log_substep "设置组写权限 (775): ${data_dir}"
+    chmod -R 775 "${data_dir}"
+    
+    log_substep "设置 SGID 保证后续新建文件自动继承 docker 组"
+    find "${data_dir}" -type d -exec chmod g+s {} +
+    
+    log_success "数据目录授权完成"
+}
+
 # ==============================================================================
 # 主流程
 # ==============================================================================
@@ -58,6 +82,10 @@ main() {
 
     # Step 5: 安装并配置 Google Cloud Ops Agent
     configure_ops_agent
+    echo ""
+
+    # Step 6: 初始化并授权数据目录
+    setup_data_dir_permissions
     echo ""
 
     local end_time duration
