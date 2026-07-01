@@ -13,11 +13,6 @@ services:
     volumes:
       - ${SING_BOX_DATA_DIR}/config.json:/etc/sing-box/config.json
       - ${SING_BOX_DATA_DIR}/cert:/etc/sing-box/cert
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   sub:
     build:
@@ -34,8 +29,3 @@ services:
       - REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
       - REALITY_DEST=${REALITY_DEST}
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "5m"
-        max-file: "3"

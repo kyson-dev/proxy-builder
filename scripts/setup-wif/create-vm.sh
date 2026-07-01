@@ -73,6 +73,18 @@ create_vm_service_account() {
     gcloud iam service-accounts create "$sa_name" \
         --project="$project" \
         --display-name="VM Service Account - $sa_name"
+
+    # 为服务账号授权 Ops Agent 所需的日志和监控指标写入权限
+    log_substep "为虚拟机服务账号授予日志与监控指标写入权限..."
+    gcloud projects add-iam-policy-binding "$project" \
+        --member="serviceAccount:${sa_email}" \
+        --role="roles/logging.logWriter" \
+        --quiet >/dev/null
+
+    gcloud projects add-iam-policy-binding "$project" \
+        --member="serviceAccount:${sa_email}" \
+        --role="roles/monitoring.metricWriter" \
+        --quiet >/dev/null
 }
 
 # ------------------------------------------------------------------------------

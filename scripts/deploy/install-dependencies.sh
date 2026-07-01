@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# 安装必要依赖 (OpenSSL, jq 等)
+# 安装必要依赖 (OpenSSL、jq)
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
 # ==============================================================================
 
@@ -66,29 +66,11 @@ install_jq() {
 }
 
 # ------------------------------------------------------------------------------
-# 安装 Google Cloud Ops Agent
-# ------------------------------------------------------------------------------
-install_ops_agent() {
-    log_substep "安装 Google Cloud Ops Agent..."
-    
-    detect_os
-    
-    # 下载官方安装脚本并运行
-    if curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh; then
-        sudo bash add-google-cloud-ops-agent-repo.sh --also-install
-        rm -f add-google-cloud-ops-agent-repo.sh
-        log_success "Google Cloud Ops Agent 安装成功"
-    else
-        log_error "下载 Ops Agent 安装脚本失败，跳过安装"
-    fi
-}
-
-# ------------------------------------------------------------------------------
 # 检查并安装依赖
 # ------------------------------------------------------------------------------
 check_dependencies() {
     log_step "检查必要依赖"
-    
+
     # 检查 OpenSSL
     if ! command_exists openssl; then
         log_warn "OpenSSL 未安装"
@@ -96,21 +78,13 @@ check_dependencies() {
     else
         log_success "OpenSSL 已安装"
     fi
-    
+
     # 检查 jq
     if ! command_exists jq; then
         log_warn "jq 未安装"
         install_jq
     else
         log_success "jq 已安装"
-    fi
-
-    # 检查 Google Cloud Ops Agent 服务是否在系统运行
-    if ! systemctl is-active --quiet google-cloud-ops-agent; then
-        log_warn "Google Cloud Ops Agent 未安装或未启动"
-        install_ops_agent
-    else
-        log_success "Google Cloud Ops Agent 已运行"
     fi
 }
 

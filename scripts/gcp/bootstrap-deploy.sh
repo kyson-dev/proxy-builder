@@ -100,6 +100,21 @@ deploy_package() {
     tar -xzf "$PACKAGE_FILE" -C "$APP_DIR"
     chmod +x "${APP_DIR}/deploy.sh"
 
+    # 首次部署时自动供给主机环境（后续部署因 Docker 已安装而跳过）
+    if ! command -v docker &>/dev/null; then
+        log "Docker not found, running provision.sh first"
+        chmod +x "${APP_DIR}/provision.sh"
+        (
+            cd "$APP_DIR"
+            export DATA_ROOT="$DATA_DIR"
+            export SING_BOX_DATA_DIR="${DATA_DIR}/sing-box"
+            ./provision.sh
+        )
+        log "Provisioning completed"
+    else
+        log "Host already provisioned (Docker present), skipping provision.sh"
+    fi
+
     log "Running deploy.sh"
     (
         cd "$APP_DIR"
