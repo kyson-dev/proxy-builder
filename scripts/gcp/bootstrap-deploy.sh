@@ -37,6 +37,26 @@ oauth_token() {
         sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
 }
 
+upload_log() {
+    local status="$1"
+    local bucket run_id token
+    bucket="$(metadata proxy-deploy-bucket || true)"
+    run_id="$(metadata proxy-deploy-run-id || true)"
+    token="$(oauth_token || true)"
+
+    if [[ -n "$bucket" && -n "$run_id" && -n "$token" ]]; then
+        log "Uploading deployment result log to GCS: gs://${bucket}/deploy-${run_id}-${status}.log"
+        # 使用 GCS 媒体上传 API 投递纯文本日志文件
+        curl -fsS -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: text/plain" \
+            --data-binary @"$LOG_FILE" \
+            "https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=deploy-${run_id}-${status}.log" || true
+    else
+        log "Missing metadata or token; unable to upload result to GCS"
+    fi
+}
+
 stop_existing_services() {
     # 使用 stop 而非 down：只停止进程，保留容器/网络/卷
     # 优势：减少服务中断时间（容器无需重建），down 会额外删除容器和网络
@@ -91,6 +111,7 @@ deploy_package() {
     log "Deployment succeeded"
     rm -rf "$BACKUP_DIR" "$DATA_BACKUP_DIR" "$PACKAGE_FILE"
     date -Is > "$READY_FILE"
+    upload_log success
 }
 
 rollback() {
@@ -115,6 +136,8 @@ rollback() {
         log "Restarting previous deployment"
         (cd "$APP_DIR" && docker compose up -d) || true
     fi
+
+    upload_log failed
 }
 
 main() {

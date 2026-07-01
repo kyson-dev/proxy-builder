@@ -98,10 +98,10 @@ jobs:
             exit 1
           fi
 
-          echo "🔐 授权 VM service account 读取部署包..."
+          echo "🔐 授权 VM service account 读写部署桶..."
           gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
             --member="serviceAccount:${VM_SERVICE_ACCOUNT}" \
-            --role="roles/storage.objectViewer" \
+            --role="roles/storage.objectAdmin" \
             --quiet >/dev/null
 
           echo "📤 上传部署包: gs://${BUCKET}/${OBJECT}"
@@ -125,77 +125,46 @@ jobs:
             --zone="${ZONE}" \
             --quiet
 
-          # 5. 轮询串口日志，确认 startup-script 部署结果
-          echo "⏳ 等待 VM 自举部署完成..."
+          # 5. 轮询 GCS，等待自举部署结果文件出现
+          echo "⏳ 等待 GCS 部署结果文件..."
           deadline=$((SECONDS + 600))
+          result_status=""
 
-          # 增量读取串口日志：记录上次读取位置，避免重复扫描历史日志
-          serial_offset=0
-          # 已积累的日志内容（用于在已启动标记出现后继续搜索结果）
-          accumulated=""
-          # 0=未出现本次运行标记 1=已出现
-          seen_run_marker=0
-
-          # 暂时关闭 set -e 和 pipefail，允许轮询期间 gcloud 命令因虚拟机未完全开机而返回瞬态错误
+          # 暂时关闭 set -e，允许 gcloud 探针由于网络或暂时未开机而返回非零状态码
           set +e
-          set +o pipefail
-
           while [ "$SECONDS" -lt "$deadline" ]; do
-            # 增量读取，--start 使用字节偏移量
-            new_output="$(gcloud compute instances get-serial-port-output "${VM}" \
-              --project="${PROJECT}" \
-              --zone="${ZONE}" \
-              --start="${serial_offset}" \
-              --port=1 2>/dev/null)"
-
-            if [ -n "$new_output" ]; then
-              # 读取返回的 next 偏移量（最后一行为 next-start 注释）
-              next_offset="$(printf '%s\n' "$new_output" | grep '^\[' | tail -1 | sed -n 's/.*next-start: \([0-9]*\).*/\1/p')"
-              [ -n "$next_offset" ] && serial_offset="$next_offset"
-              accumulated="${accumulated}${new_output}"
+            # 1. 探测是否存在成功标记文件
+            if gcloud storage objects describe "gs://${BUCKET}/deploy-${RUN_ID}-success.log" &>/dev/null; then
+              result_status="success"
+              break
             fi
 
-            # 阶段1：等待本次运行的启动标记出现（排除历史残留日志干扰）
-            if [ "$seen_run_marker" -eq 0 ]; then
-              if [[ "$accumulated" == *"Deploy run: ${RUN_ID}"* ]]; then
-                seen_run_marker=1
-                echo "📍 正在运行的部署已确认启动"
-              fi
-            fi
-
-            # 阶段2：在已确认本次运行后，检查结果
-            if [ "$seen_run_marker" -eq 1 ]; then
-              # 截取当前运行标记之后的日志内容，防止历史残留日志干扰判定
-              current_run_log="${accumulated#*Deploy run: ${RUN_ID}}"
-
-              if [[ "$current_run_log" == *"Proxy bootstrap finished"* ]]; then
-                echo "✅ VM 自举部署成功"
-                echo "📝 部署执行日志与订阅链接："
-                printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}"
-                # 恢复严格模式并退出
-                set -e
-                set -o pipefail
-                break
-              fi
-              if [[ "$current_run_log" == *"Deployment failed"* ]]; then
-                echo "❌ VM 自举部署失败"
-                printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}" | tail -n 120
-                set -e
-                set -o pipefail
-                exit 1
-              fi
+            # 2. 探测是否存在失败标记文件
+            if gcloud storage objects describe "gs://${BUCKET}/deploy-${RUN_ID}-failed.log" &>/dev/null; then
+              result_status="failed"
+              break
             fi
 
             sleep 10
           done
-
-          # 确保如果因超时退出循环，恢复严格模式
           set -e
-          set -o pipefail
 
-          if [ "$SECONDS" -ge "$deadline" ]; then
-            echo "❌ 等待 VM 自举部署超时"
-            printf '%s\n' "$accumulated" | tail -n 160
+          # 6. 处理部署输出
+          if [ "$result_status" = "success" ]; then
+            echo "✅ VM 自举部署成功"
+            echo "📝 部署执行日志与订阅链接："
+            gcloud storage cat "gs://${BUCKET}/deploy-${RUN_ID}-success.log"
+            # 清理 GCS 上的临时状态日志文件
+            gcloud storage rm "gs://${BUCKET}/deploy-${RUN_ID}-success.log" --quiet &>/dev/null || true
+          elif [ "$result_status" = "failed" ]; then
+            echo "❌ VM 自举部署失败"
+            echo "📝 部署失败日志与回滚状态："
+            gcloud storage cat "gs://${BUCKET}/deploy-${RUN_ID}-failed.log" | tail -n 120
+            # 清理 GCS 上的临时状态日志文件
+            gcloud storage rm "gs://${BUCKET}/deploy-${RUN_ID}-failed.log" --quiet &>/dev/null || true
+            exit 1
+          else
+            echo "❌ 等待 VM 自举部署超时（10分钟）"
             exit 1
           fi
 
