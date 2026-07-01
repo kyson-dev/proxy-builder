@@ -32,6 +32,9 @@ jobs:
       - name: Deploy
         timeout-minutes: 10
         run: |
+          # 加载单一数据源全局路径定义
+          source scripts/lib/paths.sh
+
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
@@ -60,19 +63,24 @@ jobs:
               --exclude='.env.*' \
               -czf /tmp/app.tar.gz .
 
-          # 3. 上传
+          # 3. 上传到虚拟机临时目录
           echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
+          gcloud beta compute scp /tmp/app.tar.gz ${VM}:/tmp/app.tar.gz --zone=${ZONE} --quiet
 
           # 4. 部署
           echo "🚀 执行部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
             
+            # 从上传的压缩包中提取路径定义，以此作为虚拟机执行的唯一路径数据源
+            tar -xzf /tmp/app.tar.gz -C /tmp scripts/lib/paths.sh
+            source /tmp/scripts/lib/paths.sh
+            rm -rf /tmp/scripts
+            
             # 停止当前服务（如果存在）
-            if [ -d ~/app ] && [ -f ~/app/docker-compose.yml ]; then
+            if [ -d "$APP_DIR" ] && [ -f "$APP_DIR/docker-compose.yml" ]; then
               echo "⏸️  停止当前服务..."
-              cd ~/app
+              cd "$APP_DIR"
               docker compose down 2>/dev/null || true
             fi
             
@@ -81,17 +89,17 @@ jobs:
             # 确保回滚时两者能完整还原到同一版本
             # ==================================================================
             echo "💾 备份当前版本..."
-            rm -rf ~/app.backup
-            rm -rf /opt/proxy/data/sing-box.backup
+            rm -rf "${APP_DIR}.backup"
+            rm -rf "${SING_BOX_DATA_DIR}.backup"
             
-            [ -d ~/app ] && mv ~/app ~/app.backup
-            [ -d /opt/proxy/data/sing-box ] && cp -r /opt/proxy/data/sing-box /opt/proxy/data/sing-box.backup || true
+            [ -d "$APP_DIR" ] && mv "$APP_DIR" "${APP_DIR}.backup"
+            [ -d "${SING_BOX_DATA_DIR}" ] && cp -r "${SING_BOX_DATA_DIR}" "${SING_BOX_DATA_DIR}.backup" || true
             
-            # 解压新版本到 app
+            # 解压新版本到统一的应用目录
             echo "📦 解压新版本..."
-            mkdir -p ~/app
-            tar -xzf ~/app.tar.gz -C ~/app
-            rm ~/app.tar.gz
+            mkdir -p "$APP_DIR"
+            tar -xzf /tmp/app.tar.gz -C "$APP_DIR"
+            rm -f /tmp/app.tar.gz
             
             # 检测是否需要运行主机初始化 (provision)
             NEED_PROVISION=false
@@ -101,21 +109,21 @@ jobs:
               NEED_PROVISION=true
             elif [ ! -f /etc/google-cloud-ops-agent/config.yaml ] || ! grep -q "systemd_journald" /etc/google-cloud-ops-agent/config.yaml; then
               NEED_PROVISION=true
-            elif [ ! -d /opt/proxy/data ] || [ "$(stat -c '%G' /opt/proxy/data 2>/dev/null)" != "docker" ]; then
+            elif [ ! -d "$DATA_DIR" ] || [ "$(stat -c %G "$DATA_DIR" 2>/dev/null)" != "docker" ]; then
               NEED_PROVISION=true
             fi
 
             if [ "$NEED_PROVISION" = "true" ]; then
               echo "🔧 检测到主机环境不完整，正在自动执行主机供给 (provision.sh)..."
-              chmod +x ~/app/provision.sh
-              sudo ~/app/provision.sh
+              chmod +x "${APP_DIR}/provision.sh"
+              sudo "${APP_DIR}/provision.sh"
             else
               echo "✅ 检测到主机环境已就绪，跳过主机供给步骤"
             fi
             
             # 部署新版本
             echo "🚀 部署新版本..."
-            cd ~/app
+            cd "$APP_DIR"
             chmod +x deploy.sh
             
             if ./deploy.sh; then
@@ -123,8 +131,8 @@ jobs:
               
               # 清理备份（代码 + 数据）
               echo "🧹 清理备份..."
-              rm -rf ~/app.backup
-              rm -rf /opt/proxy/data/sing-box.backup || true
+              rm -rf "${APP_DIR}.backup"
+              rm -rf "${SING_BOX_DATA_DIR}.backup" || true
               
               echo "✅ 部署完成"
             else
@@ -133,20 +141,20 @@ jobs:
               # ==============================================================
               # 回滚：代码目录 + 数据目录 一起还原
               # ==============================================================
-              rm -rf ~/app
-              [ -d ~/app.backup ] && mv ~/app.backup ~/app || echo "⚠️ 无代码备份"
+              rm -rf "$APP_DIR"
+              [ -d "${APP_DIR}.backup" ] && mv "${APP_DIR}.backup" "$APP_DIR" || echo "⚠️ 无代码备份"
               
-              rm -rf /opt/proxy/data/sing-box || true
-              if [ -d /opt/proxy/data/sing-box.backup ]; then
-                mv /opt/proxy/data/sing-box.backup /opt/proxy/data/sing-box
+              rm -rf "${SING_BOX_DATA_DIR}" || true
+              if [ -d "${SING_BOX_DATA_DIR}.backup" ]; then
+                mv "${SING_BOX_DATA_DIR}.backup" "${SING_BOX_DATA_DIR}"
                 echo "✅ 数据目录已回滚"
               else
                 echo "⚠️ 无数据备份，跳过数据回滚"
               fi
               
               # 用旧代码 + 旧数据重启服务
-              if [ -d ~/app ]; then
-                cd ~/app
+              if [ -d "$APP_DIR" ]; then
+                cd "$APP_DIR"
                 docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
                 echo "✅ 已恢复到旧版本"
               fi
