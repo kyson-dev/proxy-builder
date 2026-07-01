@@ -12,7 +12,7 @@ init_env() {
     
     log_step "初始化环境配置"
     
-    export DATA_ROOT="${DATA_ROOT:-${HOME}/data}"
+    export DATA_ROOT="${DATA_ROOT:-/opt/proxy/data}"
     export SING_BOX_DATA_DIR="${SING_BOX_DATA_DIR:-${DATA_ROOT}/sing-box}"
     
     log_substep "配置路径:"

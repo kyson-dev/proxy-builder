@@ -2,17 +2,6 @@ name: Deploy to GCP VM
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "**.md"
-      - "docs/**"
-      - ".gitignore"
-      - "LICENSE"
-      - "Makefile"
-      - "scripts/setup-wif/**"
-      - "scripts/setup-firewall.sh"
 
 permissions:
   contents: read
@@ -41,10 +30,30 @@ jobs:
           install_components: "beta"
 
       - name: Deploy
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
+          set -euo pipefail
+
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
+          PROJECT="${{ secrets.GCP_PROJECT_ID }}"
+          if [ -z "$PROJECT" ]; then
+            PROJECT="$(gcloud config get-value project 2>/dev/null)"
+          fi
+          if [ -z "$PROJECT" ]; then
+            echo "❌ GCP_PROJECT_ID is not set and gcloud has no active project"
+            exit 1
+          fi
+
+          BUCKET="${PROJECT}-proxy-deploy"
+          OBJECT="deploy-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          RUN_ID="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          cleanup() {
+            echo "🧹 清理临时部署包..."
+            gcloud storage rm "gs://${BUCKET}/${OBJECT}" --quiet 2>/dev/null || true
+          }
+          trap cleanup EXIT
 
           # 1. 创建 .env 文件
           echo "📝 创建环境配置..."
@@ -71,77 +80,100 @@ jobs:
               --exclude='.env.*' \
               -czf /tmp/app.tar.gz .
 
-          # 3. 上传
-          echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
+          # 3. 上传到 GCS 临时部署包
+          echo "🪣 准备 GCS 部署桶..."
+          if ! gcloud storage buckets describe "gs://${BUCKET}" --project="${PROJECT}" >/dev/null 2>&1; then
+            gcloud storage buckets create "gs://${BUCKET}" \
+              --project="${PROJECT}" \
+              --location=US \
+              --uniform-bucket-level-access
+          fi
 
-          # 4. 部署
-          echo "🚀 执行部署..."
-          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
-            set -e
-            
-            # 停止当前服务（如果存在）
-            if [ -d ~/app ] && [ -f ~/app/docker-compose.yml ]; then
-              echo "⏸️  停止当前服务..."
-              cd ~/app
-              docker compose down 2>/dev/null || true
+          VM_SERVICE_ACCOUNT="$(gcloud compute instances describe "${VM}" \
+            --project="${PROJECT}" \
+            --zone="${ZONE}" \
+            --format='value(serviceAccounts[0].email)')"
+          if [ -z "$VM_SERVICE_ACCOUNT" ]; then
+            echo "❌ VM does not have a service account; cannot download deployment package without SSH"
+            exit 1
+          fi
+
+          echo "🔐 授权 VM service account 读取部署包..."
+          gcloud storage buckets add-iam-policy-binding "gs://${BUCKET}" \
+            --member="serviceAccount:${VM_SERVICE_ACCOUNT}" \
+            --role="roles/storage.objectViewer" \
+            --quiet >/dev/null
+
+          echo "📤 上传部署包: gs://${BUCKET}/${OBJECT}"
+          gcloud storage cp /tmp/app.tar.gz "gs://${BUCKET}/${OBJECT}" --quiet
+
+          # 4. 注入 startup-script 并重启 VM，让 VM 自己完成部署
+          echo "🚀 注入 startup-script 并重启 VM..."
+          gcloud compute instances add-metadata "${VM}" \
+            --project="${PROJECT}" \
+            --zone="${ZONE}" \
+            --metadata-from-file startup-script=scripts/gcp/bootstrap-deploy.sh \
+            --metadata proxy-deploy-bucket="${BUCKET}",proxy-deploy-object="${OBJECT}",proxy-deploy-run-id="${RUN_ID}"
+
+          gcloud compute instances reset "${VM}" \
+            --project="${PROJECT}" \
+            --zone="${ZONE}" \
+            --quiet
+
+          # 5. 轮询串口日志，确认 startup-script 部署结果
+          echo "⏳ 等待 VM 自举部署完成..."
+          deadline=$((SECONDS + 600))
+
+          # 增量读取串口日志：记录上次读取位置，避免重复扫描历史日志
+          serial_offset=0
+          # 已积累的日志内容（用于在已启动标记出现后继续搜索结果）
+          accumulated=""
+          # 0=未出现本次运行标记 1=已出现
+          seen_run_marker=0
+
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            # 增量读取，--start 使用字节偏移量
+            new_output="$(gcloud compute instances get-serial-port-output "${VM}" \
+              --project="${PROJECT}" \
+              --zone="${ZONE}" \
+              --start="${serial_offset}" \
+              --port=1 2>/dev/null || true)"
+
+            if [ -n "$new_output" ]; then
+              # 读取返回的 next 偏移量（最后一行为 next-start 注释）
+              next_offset="$(printf '%s\n' "$new_output" | grep '^\[' | tail -1 | sed -n 's/.*next-start: \([0-9]*\).*/\1/p')"
+              [ -n "$next_offset" ] && serial_offset="$next_offset"
+              accumulated="${accumulated}${new_output}"
             fi
-            
-            # ==================================================================
-            # 备份：代码目录 + 数据目录 同时快照
-            # 确保回滚时两者能完整还原到同一版本
-            # ==================================================================
-            echo "💾 备份当前版本..."
-            rm -rf ~/app.backup ~/data/sing-box.backup
-            
-            [ -d ~/app ] && mv ~/app ~/app.backup
-            [ -d ~/data/sing-box ] && cp -r ~/data/sing-box ~/data/sing-box.backup
-            
-            # 解压新版本到 app
-            echo "📦 解压新版本..."
-            mkdir -p ~/app
-            tar -xzf ~/app.tar.gz -C ~/app
-            rm ~/app.tar.gz
-            
-            # 部署新版本
-            echo "🚀 部署新版本..."
-            cd ~/app
-            chmod +x deploy.sh
-            
-            if ./deploy.sh; then
-              echo "✅ 部署成功"
-              
-              # 清理备份（代码 + 数据）
-              echo "🧹 清理备份..."
-              rm -rf ~/app.backup ~/data/sing-box.backup
-              
-              echo "✅ 部署完成"
-            else
-              echo "❌ 部署失败，开始回滚..."
-              
-              # ==============================================================
-              # 回滚：代码目录 + 数据目录 一起还原
-              # ==============================================================
-              rm -rf ~/app
-              [ -d ~/app.backup ] && mv ~/app.backup ~/app || echo "⚠️ 无代码备份"
-              
-              rm -rf ~/data/sing-box
-              if [ -d ~/data/sing-box.backup ]; then
-                mv ~/data/sing-box.backup ~/data/sing-box
-                echo "✅ 数据目录已回滚"
-              else
-                echo "⚠️ 无数据备份，跳过数据回滚"
+
+            # 阶段1：等待本次运行的启动标记出现（排除历史残留日志干扰）
+            if [ "$seen_run_marker" -eq 0 ]; then
+              if printf '%s\n' "$accumulated" | grep -qF "Deploy run: ${RUN_ID}"; then
+                seen_run_marker=1
+                echo "📍 正在运行的部署已确认启动"
               fi
-              
-              # 用旧代码 + 旧数据重启服务
-              if [ -d ~/app ]; then
-                cd ~/app
-                docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
-                echo "✅ 已恢复到旧版本"
-              fi
-              
-              exit 1
             fi
-          '
+
+            # 阶段2：在已确认本次运行后，检查结果
+            if [ "$seen_run_marker" -eq 1 ]; then
+              if printf '%s\n' "$accumulated" | grep -qF "Proxy bootstrap finished"; then
+                echo "✅ VM 自举部署成功"
+                break
+              fi
+              if printf '%s\n' "$accumulated" | grep -qF "Deployment failed"; then
+                echo "❌ VM 自举部署失败"
+                printf '%s\n' "$accumulated" | tail -n 120
+                exit 1
+              fi
+            fi
+
+            sleep 10
+          done
+
+          if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "❌ 等待 VM 自举部署超时"
+            printf '%s\n' "$accumulated" | tail -n 160
+            exit 1
+          fi
 
           echo "✅ 部署完成"
