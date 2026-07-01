@@ -32,7 +32,9 @@ validate_env() {
     # 3. 检查必填变量
     local missing_vars=()
     for var in "${required_vars[@]}"; do
-        if [ -z "${!var}" ]; then
+        # 在严格模式下，间接引用动态变量前先安全展开，防止 unbound variable 报错
+        local val="${!var:-}"
+        if [ -z "$val" ]; then
             missing_vars+=("$var")
         fi
     done

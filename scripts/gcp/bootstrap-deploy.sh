@@ -104,24 +104,31 @@ deploy_package() {
     if ! command -v docker &>/dev/null; then
         log "Docker not found, running provision.sh first"
         chmod +x "${APP_DIR}/provision.sh"
-        (
+        if ! (
             cd "$APP_DIR"
             export DATA_ROOT="$DATA_DIR"
             export SING_BOX_DATA_DIR="${DATA_DIR}/sing-box"
             ./provision.sh
-        )
+        ); then
+            log "Provisioning failed"
+            exit 1
+        fi
         log "Provisioning completed"
     else
         log "Host already provisioned (Docker present), skipping provision.sh"
     fi
 
     log "Running deploy.sh"
-    (
+    if ! (
         cd "$APP_DIR"
         export DATA_ROOT="$DATA_DIR"
         export SING_BOX_DATA_DIR="${DATA_DIR}/sing-box"
         ./deploy.sh
-    )
+    ); then
+        log "deploy.sh failed"
+        rollback
+        exit 1
+    fi
 
     log "Deployment succeeded"
     rm -rf "$BACKUP_DIR" "$DATA_BACKUP_DIR" "$PACKAGE_FILE"
