@@ -54,7 +54,7 @@ configure_ops_agent() {
 logging:
   receivers:
     systemd_journal:
-      type: systemd_journal
+      type: systemd_journald
   service:
     pipelines:
       default_pipeline:

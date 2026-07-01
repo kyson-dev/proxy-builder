@@ -100,9 +100,18 @@ deploy_package() {
     tar -xzf "$PACKAGE_FILE" -C "$APP_DIR"
     chmod +x "${APP_DIR}/deploy.sh"
 
-    # 首次部署时自动供给主机环境（后续部署因 Docker 已安装而跳过）
+    # 首次部署或检测到系统级日志配置缺失时，自动供给主机环境
+    local need_provision=false
     if ! command -v docker &>/dev/null; then
-        log "Docker not found, running provision.sh first"
+        need_provision=true
+    elif [[ ! -f "/etc/docker/daemon.json" ]]; then
+        need_provision=true
+    elif [[ ! -f "/etc/google-cloud-ops-agent/config.yaml" ]] || ! grep -q "systemd_journald" "/etc/google-cloud-ops-agent/config.yaml"; then
+        need_provision=true
+    fi
+
+    if [[ "$need_provision" == "true" ]]; then
+        log "Host configuration missing or incomplete, running provision.sh"
         chmod +x "${APP_DIR}/provision.sh"
         if ! (
             cd "$APP_DIR"
@@ -115,7 +124,7 @@ deploy_package() {
         fi
         log "Provisioning completed"
     else
-        log "Host already provisioned (Docker present), skipping provision.sh"
+        log "Host already provisioned and configured, skipping provision.sh"
     fi
 
     log "Running deploy.sh"
