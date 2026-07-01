@@ -158,6 +158,8 @@ jobs:
             if [ "$seen_run_marker" -eq 1 ]; then
               if printf '%s\n' "$accumulated" | grep -qF "Proxy bootstrap finished"; then
                 echo "✅ VM 自举部署成功"
+                echo "📝 部署执行日志与订阅链接："
+                printf '%s\n' "$accumulated" | awk -v marker="Deploy run: ${RUN_ID}" 'index($0, marker) { seen=1 } seen'
                 break
               fi
               if printf '%s\n' "$accumulated" | grep -qF "Deployment failed"; then

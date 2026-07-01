@@ -20,6 +20,7 @@ SA_ROLES=(
     "roles/compute.instanceAdmin.v1"
     "roles/compute.osAdminLogin"
     "roles/iam.serviceAccountUser"
+    "roles/storage.admin"
 )
 
 # ------------------------------------------------------------------------------
