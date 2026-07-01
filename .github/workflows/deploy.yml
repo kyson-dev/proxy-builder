@@ -136,8 +136,9 @@ jobs:
           # 0=未出现本次运行标记 1=已出现
           seen_run_marker=0
 
-          # 暂时关闭 set -e，允许轮询期间 gcloud 命令因虚拟机未完全开机而返回瞬态错误
+          # 暂时关闭 set -e 和 pipefail，允许轮询期间 gcloud 命令因虚拟机未完全开机而返回瞬态错误
           set +e
+          set +o pipefail
 
           while [ "$SECONDS" -lt "$deadline" ]; do
             # 增量读取，--start 使用字节偏移量
@@ -173,12 +174,14 @@ jobs:
                 printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}"
                 # 恢复严格模式并退出
                 set -e
+                set -o pipefail
                 break
               fi
               if [[ "$current_run_log" == *"Deployment failed"* ]]; then
                 echo "❌ VM 自举部署失败"
                 printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}" | tail -n 120
                 set -e
+                set -o pipefail
                 exit 1
               fi
             fi
@@ -188,6 +191,7 @@ jobs:
 
           # 确保如果因超时退出循环，恢复严格模式
           set -e
+          set -o pipefail
 
           if [ "$SECONDS" -ge "$deadline" ]; then
             echo "❌ 等待 VM 自举部署超时"
