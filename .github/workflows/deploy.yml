@@ -92,6 +92,24 @@ jobs:
             tar -xzf ~/app.tar.gz -C ~/app
             rm ~/app.tar.gz
             
+            # 检测是否需要运行主机初始化 (provision)
+            NEED_PROVISION=false
+            if ! command -v docker &>/dev/null; then
+              NEED_PROVISION=true
+            elif [ ! -f /etc/docker/daemon.json ]; then
+              NEED_PROVISION=true
+            elif [ ! -f /etc/google-cloud-ops-agent/config.yaml ] || ! grep -q "systemd_journald" /etc/google-cloud-ops-agent/config.yaml; then
+              NEED_PROVISION=true
+            fi
+
+            if [ "$NEED_PROVISION" = "true" ]; then
+              echo "🔧 检测到主机环境不完整，正在自动执行主机供给 (provision.sh)..."
+              chmod +x ~/app/provision.sh
+              sudo ~/app/provision.sh
+            else
+              echo "✅ 检测到主机环境已就绪，跳过主机供给步骤"
+            fi
+            
             # 部署新版本
             echo "🚀 部署新版本..."
             cd ~/app
