@@ -136,13 +136,16 @@ jobs:
           # 0=未出现本次运行标记 1=已出现
           seen_run_marker=0
 
+          # 暂时关闭 set -e，允许轮询期间 gcloud 命令因虚拟机未完全开机而返回瞬态错误
+          set +e
+
           while [ "$SECONDS" -lt "$deadline" ]; do
             # 增量读取，--start 使用字节偏移量
             new_output="$(gcloud compute instances get-serial-port-output "${VM}" \
               --project="${PROJECT}" \
               --zone="${ZONE}" \
               --start="${serial_offset}" \
-              --port=1 2>/dev/null || true)"
+              --port=1 2>/dev/null)"
 
             if [ -n "$new_output" ]; then
               # 读取返回的 next 偏移量（最后一行为 next-start 注释）
@@ -168,17 +171,23 @@ jobs:
                 echo "✅ VM 自举部署成功"
                 echo "📝 部署执行日志与订阅链接："
                 printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}"
+                # 恢复严格模式并退出
+                set -e
                 break
               fi
               if [[ "$current_run_log" == *"Deployment failed"* ]]; then
                 echo "❌ VM 自举部署失败"
                 printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}" | tail -n 120
+                set -e
                 exit 1
               fi
             fi
 
             sleep 10
           done
+
+          # 确保如果因超时退出循环，恢复严格模式
+          set -e
 
           if [ "$SECONDS" -ge "$deadline" ]; then
             echo "❌ 等待 VM 自举部署超时"
