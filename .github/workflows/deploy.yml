@@ -156,15 +156,18 @@ jobs:
 
             # 阶段2：在已确认本次运行后，检查结果
             if [ "$seen_run_marker" -eq 1 ]; then
-              if [[ "$accumulated" == *"Proxy bootstrap finished"* ]]; then
+              # 截取当前运行标记之后的日志内容，防止历史残留日志干扰判定
+              current_run_log="${accumulated#*Deploy run: ${RUN_ID}}"
+
+              if [[ "$current_run_log" == *"Proxy bootstrap finished"* ]]; then
                 echo "✅ VM 自举部署成功"
                 echo "📝 部署执行日志与订阅链接："
-                printf '%s\n' "$accumulated" | awk -v marker="Deploy run: ${RUN_ID}" 'index($0, marker) { seen=1 } seen'
+                printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}"
                 break
               fi
-              if [[ "$accumulated" == *"Deployment failed"* ]]; then
+              if [[ "$current_run_log" == *"Deployment failed"* ]]; then
                 echo "❌ VM 自举部署失败"
-                printf '%s\n' "$accumulated" | tail -n 120
+                printf '%s\n' "Deploy run: ${RUN_ID}${current_run_log}" | tail -n 120
                 exit 1
               fi
             fi
