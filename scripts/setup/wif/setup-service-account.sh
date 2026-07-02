@@ -28,7 +28,7 @@ SA_ROLES=(
 # 主函数
 # ------------------------------------------------------------------------------
 setup_service_account() {
-    local project="${1:-$PROJECT_ID}"
+    local project="${1:-${PROJECT_ID:-}}"
     
     if [[ -z "$project" ]]; then
         die "PROJECT_ID 未设置"
@@ -58,10 +58,10 @@ setup_service_account() {
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if [[ -z "$PROJECT_ID" ]]; then
+    if [[ -z "${PROJECT_ID:-}" ]]; then
         read -p "请输入 Project ID: " PROJECT_ID
     fi
-    setup_service_account "$PROJECT_ID"
-    echo "SA_NAME=$SA_NAME"
-    echo "SA_EMAIL=$SA_EMAIL"
+    setup_service_account "${PROJECT_ID:-}"
+    echo "SA_NAME=${SA_NAME:-}"
+    echo "SA_EMAIL=${SA_EMAIL:-}"
 fi

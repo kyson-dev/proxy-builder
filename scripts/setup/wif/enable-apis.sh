@@ -24,7 +24,7 @@ REQUIRED_APIS=(
 # 主函数
 # ------------------------------------------------------------------------------
 enable_required_apis() {
-    local project="${1:-$PROJECT_ID}"
+    local project="${1:-${PROJECT_ID:-}}"
     
     if [[ -z "$project" ]]; then
         die "PROJECT_ID 未设置"
@@ -41,8 +41,8 @@ enable_required_apis() {
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if [[ -z "$PROJECT_ID" ]]; then
+    if [[ -z "${PROJECT_ID:-}" ]]; then
         read -p "请输入 Project ID: " PROJECT_ID
     fi
-    enable_required_apis "$PROJECT_ID"
+    enable_required_apis "${PROJECT_ID:-}"
 fi

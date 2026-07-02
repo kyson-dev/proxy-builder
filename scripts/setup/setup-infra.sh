@@ -99,6 +99,7 @@ _collect_vm_params_interactive() {
     log_step "VM 参数配置"
 
     prompt_with_default "VM 实例名称" "$default_name"
+    
     VM_NAME="$INPUT_VALUE"
 
     echo ""

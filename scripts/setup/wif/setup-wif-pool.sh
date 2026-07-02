@@ -20,8 +20,8 @@ POOL_DESCRIPTION="${POOL_DESCRIPTION:-GitHub Actions Deployment}"
 # 主函数
 # ------------------------------------------------------------------------------
 setup_wif_pool() {
-    local project="${1:-$PROJECT_ID}"
-    local repo_owner="${2:-$REPO_OWNER}"
+    local project="${1:-${PROJECT_ID:-}}"
+    local repo_owner="${2:-${REPO_OWNER:-}}"
     
     if [[ -z "$project" ]]; then
         die "PROJECT_ID 未设置"
@@ -80,13 +80,13 @@ setup_wif_pool() {
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if [[ -z "$PROJECT_ID" ]]; then
+    if [[ -z "${PROJECT_ID:-}" ]]; then
         read -p "请输入 Project ID: " PROJECT_ID
     fi
-    if [[ -z "$REPO_OWNER" ]]; then
+    if [[ -z "${REPO_OWNER:-}" ]]; then
         read -p "请输入 Repo Owner: " REPO_OWNER
     fi
-    setup_wif_pool "$PROJECT_ID" "$REPO_OWNER"
-    echo "POOL_ID=$POOL_ID"
-    echo "PROVIDER_ID=$PROVIDER_ID"
+    setup_wif_pool "${PROJECT_ID:-}" "${REPO_OWNER:-}"
+    echo "POOL_ID=${POOL_ID:-}"
+    echo "PROVIDER_ID=${PROVIDER_ID:-}"
 fi

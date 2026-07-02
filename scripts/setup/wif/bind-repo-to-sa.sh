@@ -15,10 +15,10 @@ fi
 # 主函数
 # ------------------------------------------------------------------------------
 bind_repo_to_sa() {
-    local project="${1:-$PROJECT_ID}"
-    local sa_name="${2:-$SA_NAME}"
-    local pool_id="${3:-$POOL_ID}"
-    local repo="${4:-$REPO}"
+    local project="${1:-${PROJECT_ID:-}}"
+    local sa_name="${2:-${SA_NAME:-}}"
+    local pool_id="${3:-${POOL_ID:-}}"
+    local repo="${4:-${REPO:-}}"
     
     if [[ -z "$project" ]] || [[ -z "$sa_name" ]] || [[ -z "$pool_id" ]] || [[ -z "$repo" ]]; then
         die "缺少必要参数: PROJECT_ID, SA_NAME, POOL_ID, REPO"
@@ -45,5 +45,5 @@ bind_repo_to_sa() {
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    bind_repo_to_sa "$PROJECT_ID" "$SA_NAME" "$POOL_ID" "$REPO"
+    bind_repo_to_sa "${PROJECT_ID:-}" "${SA_NAME:-}" "${POOL_ID:-}" "${REPO:-}"
 fi

@@ -11,6 +11,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 # --- 加载公共库 ---
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
+source "${SCRIPT_DIR}/../lib/gcp.sh"
 
 # --- 加载上下文解析器 + 功能模块 ---
 source "${SCRIPT_DIR}/shared/resolve-context.sh"

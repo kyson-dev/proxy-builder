@@ -75,8 +75,8 @@ ar_create_repository() {
 # 供入口层（setup-ar.sh）使用
 # ------------------------------------------------------------------------------
 setup_artifact_registry() {
-    local project="${1:-$PROJECT_ID}"
-    local zone="${2:-$VM_ZONE}"
+    local project="${1:-${PROJECT_ID:-}}"
+    local zone="${2:-${VM_ZONE:-}}"
 
     if [[ -z "$project" ]]; then
         die "PROJECT_ID 未设置"
@@ -204,10 +204,10 @@ setup_artifact_registry() {
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    if [[ -z "$PROJECT_ID" ]]; then
+    if [[ -z "${PROJECT_ID:-}" ]]; then
         read -p "请输入 Project ID: " PROJECT_ID
     fi
-    if [[ -z "$VM_ZONE" ]]; then
+    if [[ -z "${VM_ZONE:-}" ]]; then
         read -p "请输入 VM Zone (如 us-west1-b): " VM_ZONE
     fi
     setup_artifact_registry "$PROJECT_ID" "$VM_ZONE"

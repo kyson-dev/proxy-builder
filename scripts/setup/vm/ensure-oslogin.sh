@@ -20,9 +20,9 @@ fi
 # 主函数
 # ------------------------------------------------------------------------------
 ensure_oslogin() {
-    local project="${1:-$PROJECT_ID}"
-    local vm_name="${2:-$VM_NAME}"
-    local vm_zone="${3:-$VM_ZONE}"
+    local project="${1:-${PROJECT_ID:-}}"
+    local vm_name="${2:-${VM_NAME:-}}"
+    local vm_zone="${3:-${VM_ZONE:-}}"
 
     if [[ -z "$project" ]] || [[ -z "$vm_name" ]] || [[ -z "$vm_zone" ]]; then
         die "缺少必要参数: PROJECT_ID, VM_NAME, VM_ZONE"
@@ -73,5 +73,5 @@ ensure_oslogin() {
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    ensure_oslogin "$PROJECT_ID" "$VM_NAME" "$VM_ZONE"
+    ensure_oslogin "${PROJECT_ID:-}" "${VM_NAME:-}" "${VM_ZONE:-}"
 fi
