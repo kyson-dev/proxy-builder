@@ -8,20 +8,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 
 # 加载通用库
-source "${SCRIPTS_DIR}/lib/common.sh"
-source "${SCRIPTS_DIR}/lib/docker.sh"
+source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../lib/docker.sh"
 
 # 加载部署所需模块
-source "${SCRIPTS_DIR}/deploy/validate-env.sh"
-source "${SCRIPTS_DIR}/deploy/init-env.sh"
-source "${SCRIPTS_DIR}/deploy/init-data-dir.sh"
-source "${SCRIPTS_DIR}/deploy/generate-certs.sh"
-source "${SCRIPTS_DIR}/deploy/build-config.sh"
-source "${SCRIPTS_DIR}/deploy/start-services.sh"
-source "${SCRIPTS_DIR}/deploy/health-check.sh"
+source "${SCRIPT_DIR}/validate-env.sh"
+source "${SCRIPT_DIR}/init-env.sh"
+source "${SCRIPT_DIR}/init-data-dir.sh"
+source "${SCRIPT_DIR}/generate-certs.sh"
+source "${SCRIPT_DIR}/build-config.sh"
+source "${SCRIPT_DIR}/start-services.sh"
+source "${SCRIPT_DIR}/health-check.sh"
 
 # ==============================================================================
 # 前置断言：检查主机环境是否已就绪
@@ -43,7 +42,7 @@ assert_provisioned() {
     fi
 
     if [[ "$failed" == "true" ]]; then
-        die "请先运行 ./provision.sh 完成主机初始化后再执行此脚本"
+        die "请先运行 scripts/provision/provision.sh 完成主机初始化后再执行此脚本"
     fi
 }
 

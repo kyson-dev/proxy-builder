@@ -41,11 +41,11 @@ _backup_current_version() {
 # 检查主机环境，若不满足则执行 provision 自举
 _ensure_host_provisioned() {
     log_step "诊断主机供给环境..."
-    chmod +x ~/app/scripts/deploy/check-host-env.sh
-    if ! ~/app/scripts/deploy/check-host-env.sh; then
+    chmod +x ~/app/scripts/provision/check-host-env.sh
+    if ! ~/app/scripts/provision/check-host-env.sh; then
         log_warn "主机环境不完整，开始自举 (provision.sh)..."
-        chmod +x ~/app/provision.sh
-        sudo ~/app/provision.sh
+        chmod +x ~/app/scripts/provision/provision.sh
+        sudo ~/app/scripts/provision/provision.sh
     fi
 }
 
@@ -115,9 +115,9 @@ main() {
     # Step 5: 执行应用层部署
     log_step "执行应用层部署..."
     cd "${APP_DIR}"
-    chmod +x deploy.sh
+    chmod +x scripts/deploy/deploy.sh
 
-    if ./deploy.sh; then
+    if ./scripts/deploy/deploy.sh; then
         log_success "部署成功"
         _cleanup_backup
     else

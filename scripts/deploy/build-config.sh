@@ -12,9 +12,13 @@ fi
 build_config() {
     log_step "构建 Sing-box 配置文件"
     
-    local template_file="${SCRIPT_DIR}/sing-box/config.template.json"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$(cd "${script_dir}/../.." && pwd)"
+    
+    local template_file="${project_root}/config/sing-box.template.json"
     local output_file="${DATA_ROOT}/config.json"
-    local users_file="${SCRIPT_DIR}/users.json"
+    local users_file="${project_root}/users.json"
     
     if [[ ! -f "$template_file" ]]; then
         die "找不到配置文件模板: $template_file"

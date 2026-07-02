@@ -43,8 +43,8 @@ jobs:
         run: |
           docker build \
             -t "${AR_IMAGE}:${{ env.IMAGE_TAG }}" \
-            -f sing-box/${{ env.IMAGE_NAME }}/Dockerfile \
-            sing-box/${{ env.IMAGE_NAME }}/
+            -f services/${{ env.IMAGE_NAME }}/Dockerfile \
+            services/${{ env.IMAGE_NAME }}/
 
           docker push "${AR_IMAGE}:${{ env.IMAGE_TAG }}"
 
@@ -109,10 +109,8 @@ jobs:
               .env \
               users.json \
               docker-compose.yml \
-              deploy.sh \
-              provision.sh \
               scripts/ \
-              sing-box/
+              config/
 
           # 3. 上传到虚拟机家目录暂存区
           echo "📤 上传文件..."

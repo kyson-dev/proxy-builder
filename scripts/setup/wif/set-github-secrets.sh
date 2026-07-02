@@ -5,9 +5,9 @@
 
 # 加载依赖库
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../lib/common.sh"
-source "${SCRIPT_DIR}/../lib/prompt.sh"
-source "${SCRIPT_DIR}/../lib/gcp.sh"
+source "${SCRIPT_DIR}/../../lib/common.sh"
+source "${SCRIPT_DIR}/../../lib/prompt.sh"
+source "${SCRIPT_DIR}/../../lib/gcp.sh"
 
 # ------------------------------------------------------------------------------
 # 主函数

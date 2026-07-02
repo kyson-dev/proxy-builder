@@ -19,6 +19,13 @@ help:
 	@echo "  make upload-env        - Upload .env to GitHub Environment Secrets"
 	@echo "  make setup-firewall    - Configure firewall rules for service ports"
 	@echo "  make check-scripts     - Check all shell scripts syntax"
+	@echo ""
+	@echo "📁 Script Entrypoints:"
+	@echo "  scripts/setup/setup-wif.sh       - Interactive WIF setup"
+	@echo "  scripts/setup/upload-env.sh      - Interactive env upload"
+	@echo "  scripts/setup/setup-firewall.sh  - Interactive firewall setup"
+	@echo "  scripts/provision/provision.sh   - Host provisioning (run on VM)"
+	@echo "  scripts/deploy/deploy.sh         - App deployment (run on VM)"
 
 
 # ============================================================
@@ -43,14 +50,14 @@ reality-key:
 # ============================================================
 
 setup-wif:
-	@chmod +x scripts/setup-wif.sh
-	@./scripts/setup-wif.sh
+	@chmod +x scripts/setup/setup-wif.sh
+	@./scripts/setup/setup-wif.sh
 
 upload-env:
-	@chmod +x scripts/upload-env.sh
-	@./scripts/upload-env.sh
+	@chmod +x scripts/setup/upload-env.sh
+	@./scripts/setup/upload-env.sh
 
 setup-firewall:
-	@chmod +x scripts/setup-firewall.sh
-	@./scripts/setup-firewall.sh
+	@chmod +x scripts/setup/setup-firewall.sh
+	@./scripts/setup/setup-firewall.sh
 

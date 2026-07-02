@@ -7,9 +7,9 @@
 # 如果直接运行，加载依赖
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     _SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    source "${_SELF_DIR}/../lib/common.sh"
-    source "${_SELF_DIR}/../lib/prompt.sh"
-    source "${_SELF_DIR}/../lib/gcp.sh"
+    source "${_SELF_DIR}/../../lib/common.sh"
+    source "${_SELF_DIR}/../../lib/prompt.sh"
+    source "${_SELF_DIR}/../../lib/gcp.sh"
 fi
 
 # VM 预设配置 (使用普通变量，兼容 bash 3.x)

@@ -8,11 +8,11 @@ set -e
 
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # 加载依赖库
-source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/prompt.sh"
+source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../lib/prompt.sh"
 
 # ------------------------------------------------------------------------------
 # 主函数
@@ -151,7 +151,11 @@ push_config() {
     done < "${PROJECT_ROOT}/$env_file"
     
     # NEW: 推送结构化的用户列表文件
-    local users_file="users.json"
+    local users_file="users.${env_name}.json"
+    if [[ ! -f "${PROJECT_ROOT}/$users_file" ]]; then
+        users_file="users.json"
+    fi
+    
     if [[ -f "${PROJECT_ROOT}/$users_file" ]]; then
         echo ""
         log_step "发现 ${users_file}，正在推送到 GitHub Secrets..."
@@ -174,7 +178,7 @@ push_config() {
         fi
     else
         echo ""
-        log_substep "未发现 ${users_file}，跳过用户列表上传"
+        log_substep "未发现 users.${env_name}.json 且未发现 users.json，跳过用户列表上传"
     fi
     
     echo ""

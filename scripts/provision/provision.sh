@@ -16,20 +16,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="${SCRIPT_DIR}/scripts"
 
 # 加载通用库
-source "${SCRIPTS_DIR}/lib/common.sh"
-source "${SCRIPTS_DIR}/lib/os.sh"
-source "${SCRIPTS_DIR}/lib/docker.sh"
+source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../lib/os.sh"
+source "${SCRIPT_DIR}/../lib/docker.sh"
 
 # 加载供给所需模块
-source "${SCRIPTS_DIR}/deploy/install-dependencies.sh"
-source "${SCRIPTS_DIR}/deploy/install-docker.sh"
-source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
-source "${SCRIPTS_DIR}/deploy/configure-journald.sh"
-source "${SCRIPTS_DIR}/deploy/configure-ops-agent.sh"
-source "${SCRIPTS_DIR}/deploy/configure-permission.sh"
+source "${SCRIPT_DIR}/install-dependencies.sh"
+source "${SCRIPT_DIR}/install-docker.sh"
+source "${SCRIPT_DIR}/enable-bbr.sh"
+source "${SCRIPT_DIR}/configure-journald.sh"
+source "${SCRIPT_DIR}/configure-ops-agent.sh"
+source "${SCRIPT_DIR}/configure-permission.sh"
 
 # ==============================================================================
 # 主流程
@@ -71,7 +70,7 @@ main() {
 
     print_separator
     log_success "主机供给完成！耗时: ${duration}s"
-    log_substep "现在可以运行 ./deploy.sh 部署应用"
+    log_substep "现在可以运行 scripts/deploy/deploy.sh 部署应用"
     print_separator
 }
 

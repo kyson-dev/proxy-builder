@@ -11,23 +11,23 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 加载通用库（所有库都在此加载，子模块不再重复加载）
-source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/prompt.sh"
-source "${SCRIPT_DIR}/lib/gcp.sh"
+source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../lib/prompt.sh"
+source "${SCRIPT_DIR}/../lib/gcp.sh"
 
 # 加载子模块
-source "${SCRIPT_DIR}/setup-wif/select-environment.sh"
-source "${SCRIPT_DIR}/setup-wif/select-project.sh"
-source "${SCRIPT_DIR}/setup-wif/confirm-repo.sh"
-source "${SCRIPT_DIR}/setup-wif/enable-apis.sh"
-source "${SCRIPT_DIR}/setup-wif/setup-service-account.sh"
-source "${SCRIPT_DIR}/setup-wif/setup-wif-pool.sh"
-source "${SCRIPT_DIR}/setup-wif/bind-repo-to-sa.sh"
-source "${SCRIPT_DIR}/setup-wif/create-vm.sh"
-source "${SCRIPT_DIR}/setup-wif/select-vm.sh"
-source "${SCRIPT_DIR}/setup-wif/setup-artifact-registry.sh"
-source "${SCRIPT_DIR}/setup-wif/ensure-oslogin.sh"
-source "${SCRIPT_DIR}/setup-wif/set-github-secrets.sh"
+source "${SCRIPT_DIR}/wif/select-environment.sh"
+source "${SCRIPT_DIR}/wif/select-project.sh"
+source "${SCRIPT_DIR}/wif/confirm-repo.sh"
+source "${SCRIPT_DIR}/wif/enable-apis.sh"
+source "${SCRIPT_DIR}/wif/setup-service-account.sh"
+source "${SCRIPT_DIR}/wif/setup-wif-pool.sh"
+source "${SCRIPT_DIR}/wif/bind-repo-to-sa.sh"
+source "${SCRIPT_DIR}/wif/create-vm.sh"
+source "${SCRIPT_DIR}/wif/select-vm.sh"
+source "${SCRIPT_DIR}/wif/setup-artifact-registry.sh"
+source "${SCRIPT_DIR}/wif/ensure-oslogin.sh"
+source "${SCRIPT_DIR}/wif/set-github-secrets.sh"
 
 # ==============================================================================
 # 配置
