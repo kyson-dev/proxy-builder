@@ -7,6 +7,10 @@ permissions:
   contents: read
   id-token: write
 
+env:
+  IMAGE_NAME: subscription
+  IMAGE_TAG: latest
+
 jobs:
   # ============================================================================
   # Job 1: 构建 sub 镜像并推送到 Artifact Registry
@@ -35,17 +39,17 @@ jobs:
       - name: Build and push subscription image
         id: meta
         env:
-          AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/subscription
+          AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}
         run: |
           docker build \
-            -t "${AR_IMAGE}:latest" \
-            -f sing-box/subscription/Dockerfile \
-            sing-box/subscription/
+            -t "${AR_IMAGE}:${{ env.IMAGE_TAG }}" \
+            -f sing-box/${{ env.IMAGE_NAME }}/Dockerfile \
+            sing-box/${{ env.IMAGE_NAME }}/
 
-          docker push "${AR_IMAGE}:latest"
+          docker push "${AR_IMAGE}:${{ env.IMAGE_TAG }}"
 
-          echo "image=${AR_IMAGE}:latest" >> "$GITHUB_OUTPUT"
-          echo "✅ 镜像已推送: ${AR_IMAGE}:latest"
+          echo "image=${AR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
+          echo "✅ 镜像已推送: ${AR_IMAGE}:${{ env.IMAGE_TAG }}"
 
   # ============================================================================
   # Job 2: 将精简包部署到 VM
@@ -75,7 +79,7 @@ jobs:
       - name: Deploy
         timeout-minutes: 10
         env:
-          SUBSCRIPTION_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/subscription:latest
+          SUBSCRIPTION_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
         run: |
           # 加载单一数据源全局路径定义
           source scripts/lib/paths.sh
