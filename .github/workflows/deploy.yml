@@ -9,7 +9,7 @@ permissions:
 
 env:
   IMAGE_NAME: subscription
-  IMAGE_TAG: latest
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   # ============================================================================
@@ -103,104 +103,36 @@ jobs:
           ${{ secrets.USERS_JSON }}
           USERS_EOF
 
-          # 2. 打包精简包（排除 sing-box/subscription 源码目录）
+          # 2. 打包精简包（白名单：仅包含运行所需文件，排除源码与开发产物）
           echo "📦 打包文件..."
-          tar --exclude='.git' \
-              --exclude='.github' \
-              --exclude='sing-box/subscription' \
-              --exclude='vars.*.json' \
-              --exclude='*.md' \
-              --exclude='docs' \
-              --exclude='.env.*' \
-              -czf /tmp/app.tar.gz .
+          tar -czf /tmp/app.tar.gz \
+              .env \
+              users.json \
+              docker-compose.yml \
+              deploy.sh \
+              provision.sh \
+              scripts/ \
+              sing-box/
 
           # 3. 上传到虚拟机家目录暂存区
           echo "📤 上传文件..."
           gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 4. 执行主机供给与应用部署
+          # 4. 在 VM 上解压暂存区并调用部署脚本
           echo "🚀 开始主机供给与应用部署..."
-          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
+          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
             set -e
-            
-            # 1. 解压新版本到虚拟机家目录暂存区
-            echo "📦 解压新版本到暂存区..."
+
+            # 解压新版本到虚拟机家目录暂存区
+            echo '📦 解压新版本到暂存区...'
             rm -rf ~/app
             mkdir -p ~/app
             tar -xzf ~/app.tar.gz -C ~/app
             rm -f ~/app.tar.gz
-            
-            # 加载单一路径配置
-            source ~/app/scripts/lib/paths.sh
-            
-            # 2. 停止当前服务（如果存在）
-            if [ -d "$APP_DIR" ] && [ -f "$APP_DIR/docker-compose.yml" ]; then
-              echo "⏸️  停止当前服务..."
-              cd "$APP_DIR"
-              docker compose down 2>/dev/null || true
-            fi
-            
-            # ==================================================================
-            # 备份：代码目录 + 数据目录 同时快照
-            # 确保回滚时两者能完整还原到同一版本
-            # ==================================================================
-            echo "💾 备份当前版本..."
-            rm -rf "${APP_DIR}.backup"
-            rm -rf "${DATA_DIR}.backup"
-            
-            [ -d "$APP_DIR" ] && mv "$APP_DIR" "${APP_DIR}.backup"
-            [ -d "${DATA_DIR}" ] && cp -r "${DATA_DIR}" "${DATA_DIR}.backup" || true
-            
-            # 3. 诊断主机环境并执行供给自举
-            chmod +x ~/app/scripts/deploy/check-host-env.sh
-            if ! ~/app/scripts/deploy/check-host-env.sh; then
-              chmod +x ~/app/provision.sh
-              sudo ~/app/provision.sh
-            fi
-            
-            # 4. 迁移新代码到最终的应用目录
-            echo "🚚 迁移新代码到应用目录..."
-            mkdir -p "$APP_DIR"
-            cp -r ~/app/. "$APP_DIR/"
-            rm -rf ~/app
-            
-            # 5. 部署新版本
-            echo "🚀 部署新版本..."
-            cd "$APP_DIR"
-            chmod +x deploy.sh
-            
-            if ./deploy.sh; then
-              echo "✅ 部署成功"
-              
-              # 清理备份（代码 + 数据）
-              echo "🧹 清理备份..."
-              rm -rf "${APP_DIR}.backup"
-              rm -rf "${DATA_DIR}.backup" || true
-            else
-              echo "❌ 部署失败，开始回滚..."
-              
-              # ==============================================================
-              # 回滚：代码目录 + 数据目录 一起还原
-              # ==============================================================
-              rm -rf "$APP_DIR"
-              [ -d "${APP_DIR}.backup" ] && mv "${APP_DIR}.backup" "$APP_DIR" || echo "⚠️ 无代码备份"
-              
-              rm -rf "${DATA_DIR}" || true
-              if [ -d "${DATA_DIR}.backup" ]; then
-                mv "${DATA_DIR}.backup" "${DATA_DIR}"
-                echo "✅ 数据目录已回滚"
-              else
-                echo "⚠️ 无数据备份，跳过数据回滚"
-              fi
-              
-              # 用旧代码 + 旧数据重启服务
-              if [ -d "$APP_DIR" ]; then
-                cd "$APP_DIR"
-                docker compose up -d 2>/dev/null || echo "⚠️ 旧版本重启失败"
-                echo "✅ 已恢复到旧版本"
-              fi
-              
-              exit 1
-            fi'
+
+            # 委托 VM 端部署脚本执行全流程（含回滚）
+            chmod +x ~/app/scripts/deploy/deploy-on-host.sh
+            ~/app/scripts/deploy/deploy-on-host.sh
+          "
 
           echo "✅ 部署完成"
