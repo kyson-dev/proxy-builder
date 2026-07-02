@@ -62,7 +62,10 @@ health_check() {
         echo ""
 
         # 从 users.json 读取各用户的专属订阅 URL
-        local users_file="${SCRIPT_DIR}/users.json"
+        local script_dir
+        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+        local project_root="$(cd "${script_dir}/../.." && pwd)"
+        local users_file="${project_root}/users.json"
         if [[ -f "$users_file" ]] && command -v jq &>/dev/null; then
             echo "📱 订阅链接 (复制给对应用户):"
             local user_count
