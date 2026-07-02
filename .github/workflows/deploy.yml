@@ -110,7 +110,7 @@ jobs:
             # 4. 迁移新代码到最终的应用目录
             echo "🚚 迁移新代码到应用目录..."
             mkdir -p "$APP_DIR"
-            cp -r ~/app/* "$APP_DIR/"
+            cp -r ~/app/. "$APP_DIR/"
             rm -rf ~/app
             
             # 5. 部署新版本
