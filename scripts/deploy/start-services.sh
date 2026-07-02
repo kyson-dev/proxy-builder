@@ -31,6 +31,19 @@ start_services() {
     fi
     log_substep "数据目录: $DATA_ROOT"
     
+    # 自动且精确配置本服务镜像所需的 GCP Artifact Registry 凭证助手
+    # 逻辑：从 SUBSCRIPTION_IMAGE 中（如 us-central1-docker.pkg.dev/...）提取真实的仓库域名，利用 gcloud 幂等配置
+    if [[ "${SUBSCRIPTION_IMAGE:-}" =~ ([a-z0-9-]+-docker\.pkg\.dev) ]]; then
+        local registry="${BASH_REMATCH[1]}"
+        log_substep "动态配置 Artifact Registry 凭证助手: $registry"
+        if command -v gcloud &>/dev/null; then
+            gcloud auth configure-docker "$registry" --quiet >/dev/null 2>&1 || true
+            if [[ "$docker_cmd" == *"sudo"* ]]; then
+                sudo gcloud auth configure-docker "$registry" --quiet >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+
     # 拉取最新镜像
     log_substep "拉取最新镜像..."
     $docker_cmd compose -f "$compose_file" pull

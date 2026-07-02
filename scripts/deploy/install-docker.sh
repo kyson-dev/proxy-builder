@@ -72,7 +72,7 @@ install_docker() {
 # ------------------------------------------------------------------------------
 # 检查 Docker
 # ------------------------------------------------------------------------------
-check_docker() {
+install_docker() {
     log_step "检查 Docker"
     
     if ! command_exists docker; then
@@ -98,9 +98,10 @@ is_docker_ready() {
     [[ -f "/etc/docker/daemon.json" ]]
 }
 
+
 # ------------------------------------------------------------------------------
 # 配置 Docker daemon 日志驱动
-#
+# 
 # 使用 jq 合并写入 /etc/docker/daemon.json，保留已有配置项（如 registry-mirrors）。
 # 幂等检查读取 JSON 字段值，而非 grep 字符串匹配。
 # 写入后验证 JSON 合法性，再重启 Docker 服务。
@@ -119,34 +120,33 @@ configure_docker_daemon() {
     fi
 
     if [[ "$current_driver" == "$desired_driver" ]]; then
-        log_success "Docker 日志驱动已为 journald，跳过配置与重启"
-        return 0
+        log_success "Docker 日志驱动已为 journald，跳过配置"
+    else
+        sudo mkdir -p "$(dirname "$config")"
+
+        # 合并写入：基于现有内容叠加，保留其他已有键
+        local base='{}'
+        if [[ -f "$config" ]] && jq empty "$config" 2>/dev/null; then
+            base=$(cat "$config")
+        fi
+
+        local new_config
+        new_config=$(printf '%s' "$base" | jq \
+            --arg driver "$desired_driver" \
+            --arg tag "$desired_tag" \
+            '. + {"log-driver": $driver, "log-opts": {"tag": $tag}}')
+
+        printf '%s\n' "$new_config" | sudo tee "$config" > /dev/null
+
+        # 写入后验证 JSON 合法性，防止磁盘满等异常导致文件损坏后直接重启 Docker
+        if ! sudo jq empty "$config" 2>/dev/null; then
+            die "daemon.json 写入后 JSON 格式无效，已中止，请手动检查 $config"
+        fi
+
+        log_warn "Docker 日志驱动已变更，重启 Docker 服务（此操作会重启所有容器）..."
+        sudo systemctl restart docker
+        log_success "Docker daemon 配置完成"
     fi
-
-    sudo mkdir -p "$(dirname "$config")"
-
-    # 合并写入：基于现有内容叠加，保留其他已有键
-    local base='{}'
-    if [[ -f "$config" ]] && jq empty "$config" 2>/dev/null; then
-        base=$(cat "$config")
-    fi
-
-    local new_config
-    new_config=$(printf '%s' "$base" | jq \
-        --arg driver "$desired_driver" \
-        --arg tag "$desired_tag" \
-        '. + {"log-driver": $driver, "log-opts": {"tag": $tag}}')
-
-    printf '%s\n' "$new_config" | sudo tee "$config" > /dev/null
-
-    # 写入后验证 JSON 合法性，防止磁盘满等异常导致文件损坏后直接重启 Docker
-    if ! sudo jq empty "$config" 2>/dev/null; then
-        die "daemon.json 写入后 JSON 格式无效，已中止，请手动检查 $config"
-    fi
-
-    log_warn "Docker 日志驱动已变更，重启 Docker 服务（此操作会重启所有容器）..."
-    sudo systemctl restart docker
-    log_success "Docker daemon 配置完成"
 }
 
 # 如果直接运行此脚本

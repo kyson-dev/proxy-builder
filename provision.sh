@@ -45,7 +45,7 @@ main() {
     echo ""
 
     # Step 2: 安装 Docker 并配置 daemon 日志驱动
-    check_docker
+    install_docker
     configure_docker_daemon
     echo ""
 
