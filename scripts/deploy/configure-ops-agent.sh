@@ -20,7 +20,7 @@ fi
 install_ops_agent() {
     log_substep "下载并安装 Google Cloud Ops Agent..."
     if curl -sSO https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh; then
-        sudo bash add-google-cloud-ops-agent-repo.sh --also-install
+        sudo DEBIAN_FRONTEND=noninteractive bash add-google-cloud-ops-agent-repo.sh --also-install
         rm -f add-google-cloud-ops-agent-repo.sh
         log_success "Google Cloud Ops Agent 安装成功"
     else
