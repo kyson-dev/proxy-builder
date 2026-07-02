@@ -91,6 +91,13 @@ check_docker() {
     fi
 }
 
+is_docker_ready() {
+    command_exists docker && \
+    systemctl is-active --quiet docker 2>/dev/null && \
+    (docker compose version &>/dev/null || sudo docker compose version &>/dev/null) && \
+    [[ -f "/etc/docker/daemon.json" ]]
+}
+
 # ------------------------------------------------------------------------------
 # 配置 Docker daemon 日志驱动
 #

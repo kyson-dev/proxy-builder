@@ -101,6 +101,37 @@ EOF
     fi
 }
 
+is_ops_agent_ready() {
+    local agent_config_file="/etc/google-cloud-ops-agent/config.yaml"
+    if ! systemctl is-active --quiet google-cloud-ops-agent 2>/dev/null; then
+        return 1
+    fi
+    if [[ ! -f "$agent_config_file" ]]; then
+        return 1
+    fi
+    local expected_config="logging:
+  receivers:
+    systemd_journal:
+      type: systemd_journald
+  service:
+    pipelines:
+      default_pipeline:
+        receivers: [systemd_journal]
+metrics:
+  receivers:
+    hostmetrics:
+      type: hostmetrics
+  service:
+    pipelines:
+      default_pipeline:
+        receivers: [hostmetrics]"
+    
+    local expected_hash current_hash
+    expected_hash=$(printf '%s\n' "$expected_config" | sha256sum | cut -d' ' -f1)
+    current_hash=$(sha256sum "$agent_config_file" 2>/dev/null | cut -d' ' -f1)
+    [[ "$expected_hash" == "$current_hash" ]]
+}
+
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     configure_ops_agent

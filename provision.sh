@@ -29,29 +29,7 @@ source "${SCRIPTS_DIR}/deploy/install-docker.sh"
 source "${SCRIPTS_DIR}/deploy/enable-bbr.sh"
 source "${SCRIPTS_DIR}/deploy/configure-journald.sh"
 source "${SCRIPTS_DIR}/deploy/configure-ops-agent.sh"
-
-# ------------------------------------------------------------------------------
-# 配置数据目录权限（方案 A：授权给 docker 组，免 sudo）
-# ------------------------------------------------------------------------------
-setup_directories_permissions() {
-    log_step "配置全局工作根目录所有权与权限"
-    
-    local root_dir="${PROXY_ROOT:-/opt/proxy}"
-    
-    log_substep "确保工作根目录存在: ${root_dir}"
-    mkdir -p "${root_dir}"
-    
-    log_substep "设置根目录所属组为 docker..."
-    chown root:docker "${root_dir}"
-    
-    log_substep "设置组写权限 (775)..."
-    chmod 775 "${root_dir}"
-    
-    log_substep "设置 SGID 保证后续新建文件自动继承 docker 组..."
-    chmod g+s "${root_dir}"
-    
-    log_success "工作根目录授权完成"
-}
+source "${SCRIPTS_DIR}/deploy/configure-permission.sh"
 
 # ==============================================================================
 # 主流程
@@ -84,7 +62,7 @@ main() {
     echo ""
 
     # Step 6: 初始化并授权工作目录
-    setup_directories_permissions
+    configure_permission
     echo ""
 
     local end_time duration

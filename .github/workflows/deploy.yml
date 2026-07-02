@@ -67,8 +67,8 @@ jobs:
           echo "📤 上传文件..."
           gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 4. 初始化主机环境并停止旧服务 (第一阶段)
-          echo "🔧 初始化主机环境与供给检测..."
+          # 4. 执行主机供给与应用部署
+          echo "🚀 开始主机供给与应用部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
             
@@ -100,44 +100,20 @@ jobs:
             [ -d "$APP_DIR" ] && mv "$APP_DIR" "${APP_DIR}.backup"
             [ -d "${DATA_DIR}" ] && cp -r "${DATA_DIR}" "${DATA_DIR}.backup" || true
             
-            # 3. 检测是否需要运行主机初始化 (provision)
-            NEED_PROVISION=false
-            if ! command -v docker &>/dev/null; then
-              NEED_PROVISION=true
-            elif ! id -nG | grep -qw docker; then
-              NEED_PROVISION=true
-            elif [ ! -f /etc/docker/daemon.json ]; then
-              NEED_PROVISION=true
-            elif [ ! -f /etc/google-cloud-ops-agent/config.yaml ] || ! grep -q "systemd_journald" /etc/google-cloud-ops-agent/config.yaml; then
-              NEED_PROVISION=true
-            elif [ ! -d "$PROXY_ROOT" ] || [ "$(stat -c %G "$PROXY_ROOT" 2>/dev/null)" != "docker" ]; then
-              NEED_PROVISION=true
-            fi
-            
-            if [ "$NEED_PROVISION" = "true" ]; then
-              echo "🔧 检测到主机环境不完整，正在自动执行主机供给 (provision.sh)..."
+            # 3. 诊断主机环境并执行供给自举
+            chmod +x ~/app/scripts/deploy/check-host-env.sh
+            if ! ~/app/scripts/deploy/check-host-env.sh; then
               chmod +x ~/app/provision.sh
               sudo ~/app/provision.sh
-            else
-              echo "✅ 检测到主机环境已就绪，跳过主机供给步骤"
             fi
-          '
-
-          # 5. 执行服务部署 (第二阶段，在全新的 SSH 会话中运行以继承最新的 docker 组权限)
-          echo "🚀 在新的会话中执行服务部署..."
-          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
-            set -e
             
-            # 加载单一路径配置
-            source ~/app/scripts/lib/paths.sh
-            
-            # 1. 迁移新代码到最终的应用目录
+            # 4. 迁移新代码到最终的应用目录
             echo "🚚 迁移新代码到应用目录..."
             mkdir -p "$APP_DIR"
             cp -r ~/app/* "$APP_DIR/"
             rm -rf ~/app
             
-            # 2. 部署新版本
+            # 5. 部署新版本
             echo "🚀 部署新版本..."
             cd "$APP_DIR"
             chmod +x deploy.sh
@@ -149,8 +125,6 @@ jobs:
               echo "🧹 清理备份..."
               rm -rf "${APP_DIR}.backup"
               rm -rf "${DATA_DIR}.backup" || true
-              
-              echo "✅ 部署完成"
             else
               echo "❌ 部署失败，开始回滚..."
               
@@ -176,7 +150,6 @@ jobs:
               fi
               
               exit 1
-            fi
-          '
+            fi'
 
           echo "✅ 部署完成"

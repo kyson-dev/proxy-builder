@@ -64,6 +64,12 @@ EOF
     fi
 }
 
+is_bbr_ready() {
+    local current_cc
+    current_cc=$(get_sysctl net.ipv4.tcp_congestion_control)
+    [[ "$current_cc" == "bbr" ]]
+}
+
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     enable_bbr

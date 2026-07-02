@@ -88,6 +88,10 @@ check_dependencies() {
     fi
 }
 
+is_dependencies_ready() {
+    command_exists openssl && command_exists jq
+}
+
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     check_dependencies

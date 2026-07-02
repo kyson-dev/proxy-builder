@@ -35,6 +35,13 @@ SystemMaxUse=500M"
     log_success "journald 配置完成（SystemMaxUse=500M）"
 }
 
+is_journald_ready() {
+    local dropin_file="/etc/systemd/journald.conf.d/99-proxy-limit.conf"
+    local expected_content="[Journal]
+SystemMaxUse=500M"
+    [[ -f "$dropin_file" ]] && [[ "$(cat "$dropin_file" 2>/dev/null)" == "$expected_content" ]]
+}
+
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     configure_journald
