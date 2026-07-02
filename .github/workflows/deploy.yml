@@ -104,6 +104,8 @@ jobs:
             NEED_PROVISION=false
             if ! command -v docker &>/dev/null; then
               NEED_PROVISION=true
+            elif ! id -nG | grep -qw docker; then
+              NEED_PROVISION=true
             elif [ ! -f /etc/docker/daemon.json ]; then
               NEED_PROVISION=true
             elif [ ! -f /etc/google-cloud-ops-agent/config.yaml ] || ! grep -q "systemd_journald" /etc/google-cloud-ops-agent/config.yaml; then
