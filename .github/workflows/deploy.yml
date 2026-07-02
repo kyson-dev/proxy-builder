@@ -75,7 +75,7 @@ jobs:
       - name: Deploy
         timeout-minutes: 10
         env:
-          SUBSCRIPTION_IMAGE: ${{ needs.build-and-push.outputs.image }}
+          SUBSCRIPTION_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/subscription:latest
         run: |
           # 加载单一数据源全局路径定义
           source scripts/lib/paths.sh
