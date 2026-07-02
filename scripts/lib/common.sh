@@ -173,3 +173,40 @@ wait_for() {
     echo ""
     return 1
 }
+
+# ------------------------------------------------------------------------------
+# 幂等更新本地 .env 文件中的键值对
+# ------------------------------------------------------------------------------
+update_env_file() {
+    local file_path="$1"
+    local key="$2"
+    local value="$3"
+    
+    if [[ -z "$file_path" || -z "$key" ]]; then
+        die "update_env_file 用法: update_env_file <file_path> <key> <value>"
+    fi
+    
+    # 确保文件存在
+    touch "$file_path"
+    
+    # 检查是否已包含此键
+    if grep -q "^[[:space:]]*${key}=" "$file_path"; then
+        # 替换已有的键值对
+        local temp_file="${file_path}.tmp"
+        awk -v k="$key" -v v="$value" -F= '
+        BEGIN { OFS="="; replaced=0 }
+        $1 == k { $2=v; replaced=1 }
+        { print }
+        END { if (!replaced) print k, v }
+        ' "$file_path" > "$temp_file"
+        mv "$temp_file" "$file_path"
+    else
+        # 追加到文件末尾，确保前一行有换行
+        if [[ -s "$file_path" && ! $(tail -c1 "$file_path" | wc -l) -eq 1 ]]; then
+            echo "" >> "$file_path"
+        fi
+        echo "${key}=${value}" >> "$file_path"
+    fi
+    log_success "写入本地配置: $key"
+}
+

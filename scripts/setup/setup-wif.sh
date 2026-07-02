@@ -1,16 +1,16 @@
 #!/bin/bash
 # ==============================================================================
-# 多环境 WIF 配置脚本
+# 多环境 GCP WIF 配置脚本
 # 支持 production 和 development 环境
 # 
-# 此脚本作为编排入口，调用各个子模块完成配置
+# 此脚本作为编排入口，调用 WIF 相关子模块完成配置并写入本地 .env
 # ==============================================================================
 set -e
 
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# 加载通用库（所有库都在此加载，子模块不再重复加载）
+# 加载通用库
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
 source "${SCRIPT_DIR}/../lib/gcp.sh"
@@ -24,11 +24,6 @@ source "${SCRIPT_DIR}/wif/enable-apis.sh"
 source "${SCRIPT_DIR}/wif/setup-service-account.sh"
 source "${SCRIPT_DIR}/wif/setup-wif-pool.sh"
 source "${SCRIPT_DIR}/wif/bind-repo-to-sa.sh"
-source "${SCRIPT_DIR}/wif/create-vm.sh"
-source "${SCRIPT_DIR}/wif/select-vm.sh"
-source "${SCRIPT_DIR}/wif/setup-artifact-registry.sh"
-source "${SCRIPT_DIR}/wif/ensure-oslogin.sh"
-source "${SCRIPT_DIR}/wif/set-github-secrets.sh"
 
 # ==============================================================================
 # 配置
@@ -51,6 +46,32 @@ check_prerequisites() {
     github_check_cli
     log_success "GitHub CLI 已安装"
     
+    echo ""
+}
+
+# ==============================================================================
+# 打印摘要
+# ==============================================================================
+print_summary() {
+    local env_name="$1"
+    local project="$2"
+    local provider_id="$3"
+    local sa_email="$4"
+    
+    print_separator
+    log_success "WIF 设置完成 - '$env_name' 环境"
+    print_separator
+    echo ""
+    echo "配置摘要 (已写入本地 .env.${env_name}):"
+    echo "  环境:     $env_name"
+    echo "  项目 ID:  $project"
+    echo "  Provider: $provider_id"
+    echo "  服务账号: $sa_email"
+    echo ""
+    echo "📋 下一步:"
+    echo "   1. 运行虚拟机配置: ./scripts/setup/setup-vm.sh"
+    echo "   2. 运行仓库配置:   ./scripts/setup/setup-ar.sh"
+    echo "   3. 推送至 GitHub:  ./scripts/setup/upload-env.sh"
     echo ""
 }
 
@@ -84,20 +105,20 @@ main() {
     # Step 8: 绑定 GitHub 仓库到 Service Account
     bind_repo_to_sa "$PROJECT_ID" "$SA_NAME" "$POOL_ID" "$REPO"
     
-    # Step 9: 选择或创建 VM
-    select_vm "$PROJECT_ID" "$ENV_NAME"
+    # Step 9: 写入到本地环境配置
+    local env_file="${SCRIPT_DIR}/../../.env.${ENV_NAME}"
+    local sa_email
+    sa_email=$(gcp_sa_email "$SA_NAME" "$PROJECT_ID")
     
-    # Step 10: 确保 OS Login 启用
-    ensure_oslogin "$PROJECT_ID" "$VM_NAME" "$VM_ZONE"
-
-    # Step 10.5: 创建 Artifact Registry 仓库（从 VM_ZONE 自动派生 region）
-    setup_artifact_registry "$PROJECT_ID" "$VM_ZONE"
-    
-    # Step 11: 设置 GitHub Secrets
-    set_github_secrets "$ENV_NAME" "$REPO" "$PROJECT_ID" "$PROVIDER_ID" "$SA_NAME" "$VM_NAME" "$VM_ZONE" "$AR_LOCATION" "$AR_REPOSITORY"
+    echo ""
+    log_step "写入 GCP WIF 凭证至本地环境配置"
+    update_env_file "$env_file" "GCP_PROJECT_ID" "$PROJECT_ID"
+    update_env_file "$env_file" "GCP_WORKLOAD_IDENTITY_PROVIDER" "$PROVIDER_ID"
+    update_env_file "$env_file" "GCP_SERVICE_ACCOUNT" "$sa_email"
+    echo ""
     
     # 打印摘要
-    print_summary "$ENV_NAME" "$PROJECT_ID" "$VM_NAME" "$VM_ZONE" "$PROVIDER_ID"
+    print_summary "$ENV_NAME" "$PROJECT_ID" "$PROVIDER_ID" "$sa_email"
 }
 
 # 运行主流程

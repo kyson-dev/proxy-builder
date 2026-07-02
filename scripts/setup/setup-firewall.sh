@@ -57,7 +57,7 @@ main() {
     for port_proto in "${ports[@]}"; do
         local port="${port_proto%/*}"
         local protocol="${port_proto#*/}"
-        echo "   - allow-proxy-${protocol}-${port} (${protocol}:${port})"
+        echo "   - allow-${protocol}-${port} (${protocol}:${port})"
     done
     echo ""
     

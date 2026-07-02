@@ -23,7 +23,7 @@ select_vm() {
         die "PROJECT_ID 未设置"
     fi
     
-    log_step "Step 9: 选择 VM ('$env_name' 环境)"
+    log_step "选择 VM ('$env_name' 环境)"
     echo ""
     
     log_substep "正在获取 VM 列表..."

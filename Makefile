@@ -61,3 +61,11 @@ setup-firewall:
 	@chmod +x scripts/setup/setup-firewall.sh
 	@./scripts/setup/setup-firewall.sh
 
+setup-vm:
+	@chmod +x scripts/setup/setup-vm.sh
+	@./scripts/setup/setup-vm.sh
+
+setup-ar:
+	@chmod +x scripts/setup/setup-ar.sh
+	@./scripts/setup/setup-ar.sh
+

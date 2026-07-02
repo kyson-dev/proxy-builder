@@ -24,7 +24,7 @@ ensure_oslogin() {
         die "缺少必要参数: PROJECT_ID, VM_NAME, VM_ZONE"
     fi
     
-    log_step "Step 10: 检查 OS Login 配置"
+    log_step "检查 OS Login 配置"
     
     # 使用 timeout 避免 gcloud 命令卡住 (如果有 timeout 命令)
     local timeout_cmd=""

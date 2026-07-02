@@ -57,7 +57,7 @@ apply_firewall_rules() {
     for port_proto in "${ports[@]}"; do
         local port="${port_proto%/*}"
         local protocol="${port_proto#*/}"
-        local rule_name="allow-proxy-${protocol}-${port}"
+        local rule_name="allow-${protocol}-${port}"
         
         create_firewall_rule "$project" \
             "$rule_name" \
