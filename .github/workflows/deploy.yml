@@ -32,15 +32,15 @@ jobs:
       - name: Configure Docker auth for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev --quiet
 
-      - name: Build and push sub image
+      - name: Build and push subscription image
         id: meta
         env:
-          AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/sub
+          AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/subscription
         run: |
           docker build \
             -t "${AR_IMAGE}:latest" \
-            -f sing-box/sub/Dockerfile \
-            sing-box/sub/
+            -f sing-box/subscription/Dockerfile \
+            sing-box/subscription/
 
           docker push "${AR_IMAGE}:latest"
 
@@ -75,7 +75,7 @@ jobs:
       - name: Deploy
         timeout-minutes: 10
         env:
-          SUB_IMAGE: ${{ needs.build-and-push.outputs.image }}
+          SUBSCRIPTION_IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
           # 加载单一数据源全局路径定义
           source scripts/lib/paths.sh
@@ -90,7 +90,7 @@ jobs:
           REALITY_PUBLIC_KEY=${{ secrets.REALITY_PUBLIC_KEY }}
           REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
           REALITY_DEST=${{ secrets.REALITY_DEST }}
-          SUB_IMAGE=${SUB_IMAGE}
+          SUBSCRIPTION_IMAGE=${SUBSCRIPTION_IMAGE}
           EOF
 
           # 将 users secret 写为 json 文件
@@ -99,11 +99,11 @@ jobs:
           ${{ secrets.USERS_JSON }}
           USERS_EOF
 
-          # 2. 打包精简包（排除 sing-box/sub 源码目录）
+          # 2. 打包精简包（排除 sing-box/subscription 源码目录）
           echo "📦 打包文件..."
           tar --exclude='.git' \
               --exclude='.github' \
-              --exclude='sing-box/sub' \
+              --exclude='sing-box/subscription' \
               --exclude='vars.*.json' \
               --exclude='*.md' \
               --exclude='docs' \

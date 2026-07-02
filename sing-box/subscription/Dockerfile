@@ -10,7 +10,7 @@ COPY go.mod .
 COPY main.go .
 
 # CGO_ENABLED=0 确保静态链接，无需 glibc
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o sub .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o subscription .
 
 # 阶段 2：运行时（最小化镜像）
 FROM alpine:latest
@@ -19,8 +19,8 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates
 
 WORKDIR /
-COPY --from=builder /build/sub /sub
+COPY --from=builder /build/subscription /subscription
 
 EXPOSE 8080
 
-CMD ["/sub"]
+CMD ["/subscription"]

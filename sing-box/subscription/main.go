@@ -179,11 +179,11 @@ func buildClashConfig(user User, cfg Config) string {
 // HTTP 处理器
 // ==============================================================================
 
-type SubServer struct {
+type SubscriptionServer struct {
 	cfg Config
 }
 
-func (s *SubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (s *SubscriptionServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// 健康检查
 	if r.URL.Path == "/health" {
 		w.WriteHeader(http.StatusOK)
@@ -191,7 +191,7 @@ func (s *SubServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.URL.Path != "/sub" {
+	if r.URL.Path != "/subscription" {
 		http.NotFound(w, r)
 		return
 	}
@@ -259,7 +259,7 @@ func main() {
 	log.Printf("  Public Key: %s...", cfg.RealityPublicKey[:min(16, len(cfg.RealityPublicKey))])
 	log.Printf("  Users file: %s", cfg.UsersFile)
 
-	server := &SubServer{cfg: cfg}
+	server := &SubscriptionServer{cfg: cfg}
 	addr := ":8080"
 	log.Printf("Subscription server started on %s", addr)
 

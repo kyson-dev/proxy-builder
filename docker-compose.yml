@@ -14,9 +14,9 @@ services:
       - ${DATA_ROOT}/config.json:/etc/sing-box/config.json
       - ${DATA_ROOT}/cert:/etc/sing-box/cert
 
-  sub:
-    image: ${SUB_IMAGE}
-    container_name: sub
+  subscription:
+    image: ${SUBSCRIPTION_IMAGE}
+    container_name: subscription
     restart: unless-stopped
     ports:
       # 订阅服务端口（仅供拉取订阅使用，非代理流量）

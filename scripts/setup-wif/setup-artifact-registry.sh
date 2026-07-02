@@ -60,7 +60,7 @@ setup_artifact_registry() {
             --project="$project" \
             --repository-format=docker \
             --location="$location" \
-            --description="Proxy sub service image" \
+            --description="Proxy subscription service image" \
             --quiet
         log_success "Artifact Registry 仓库已创建: $repo"
     fi
@@ -69,7 +69,7 @@ setup_artifact_registry() {
     export AR_LOCATION="$location"
     export AR_REPOSITORY="$repo"
     export AR_HOST="${location}-docker.pkg.dev"
-    export AR_IMAGE="${AR_HOST}/${project}/${repo}/sub"
+    export AR_IMAGE="${AR_HOST}/${project}/${repo}/subscription"
 }
 
 # 如果直接运行此脚本
