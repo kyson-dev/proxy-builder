@@ -14,11 +14,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
 source "${SCRIPT_DIR}/../lib/gcp.sh"
+source "${SCRIPT_DIR}/../lib/github.sh"
 
 # 加载子模块
-source "${SCRIPT_DIR}/wif/select-environment.sh"
-source "${SCRIPT_DIR}/wif/select-project.sh"
-source "${SCRIPT_DIR}/wif/confirm-repo.sh"
+source "${SCRIPT_DIR}/shared/select-environment.sh"
+source "${SCRIPT_DIR}/shared/select-project.sh"
+source "${SCRIPT_DIR}/shared/confirm-repo.sh"
 source "${SCRIPT_DIR}/wif/enable-apis.sh"
 source "${SCRIPT_DIR}/wif/setup-service-account.sh"
 source "${SCRIPT_DIR}/wif/setup-wif-pool.sh"
@@ -47,9 +48,7 @@ check_prerequisites() {
     fi
     log_success "gcloud CLI 已安装"
     
-    if ! command_exists gh; then
-        die "GitHub CLI (gh) 未安装"
-    fi
+    github_check_cli
     log_success "GitHub CLI 已安装"
     
     echo ""

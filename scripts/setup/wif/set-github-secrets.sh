@@ -8,6 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../lib/common.sh"
 source "${SCRIPT_DIR}/../../lib/prompt.sh"
 source "${SCRIPT_DIR}/../../lib/gcp.sh"
+source "${SCRIPT_DIR}/../../lib/github.sh"
 
 # ------------------------------------------------------------------------------
 # 主函数
@@ -39,13 +40,11 @@ set_github_secrets() {
         die "缺少必要参数: ${missing_params[*]}"
     fi
     
-    log_step "Step 11: 设置 GitHub Secrets ('$env_name' 环境)"
+    log_step "设置 GitHub Secrets ('$env_name' 环境)"
     echo ""
     
     # 检查 gh CLI
-    if ! command_exists gh; then
-        die "GitHub CLI (gh) 未安装"
-    fi
+    github_check_cli
     
     # 提示用户创建 environment
     echo "📝 请确保已在 GitHub 中创建 '$env_name' 环境:"
@@ -89,12 +88,7 @@ set_github_secrets() {
         local name="${secret%%:*}"
         local value="${secret#*:}"
         
-        gh secret set "$name" \
-            --env "$env_name" \
-            --body "$value" \
-            --repo "$repo"
-        
-        echo "   ✓ $name"
+        github_set_secret "$name" "$value" "$env_name" "$repo"
     done
     
     log_success "GitHub Secrets 设置完成"

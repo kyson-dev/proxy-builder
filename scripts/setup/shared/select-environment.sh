@@ -15,7 +15,7 @@ fi
 # 主函数
 # ------------------------------------------------------------------------------
 select_environment() {
-    log_step "Step 0: 选择环境"
+    log_step "选择部署环境"
     echo ""
     
     # 根据当前 git 分支推荐默认环境
@@ -65,7 +65,6 @@ select_environment() {
     
     export ENV_NAME
 }
-
 
 # 如果直接运行此脚本
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

@@ -16,7 +16,7 @@ fi
 # 主函数
 # ------------------------------------------------------------------------------
 select_gcp_project() {
-    log_step "Step 1: 选择 GCP 项目"
+    log_step "选择 GCP 项目"
     echo ""
     
     require_gcloud

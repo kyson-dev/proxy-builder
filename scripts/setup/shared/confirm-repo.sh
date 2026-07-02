@@ -32,7 +32,7 @@ get_current_repo() {
 # 主函数
 # ------------------------------------------------------------------------------
 confirm_github_repo() {
-    log_step "Step 2: 确认 GitHub 仓库"
+    log_step "确认 GitHub 仓库"
     echo ""
     
     # 检查 gh CLI
@@ -62,7 +62,7 @@ confirm_github_repo() {
     # 导出仓库拥有者
     REPO_OWNER="${REPO%%/*}"
     
-    export REPO REPO_OWNER
+    export REPO_OWNER REPO
 }
 
 # 如果直接运行此脚本

@@ -1,101 +1,38 @@
 #!/bin/bash
 # ==============================================================================
 # 推送配置变量到 GitHub Environment Secrets
-# 参考之前的 push-config.sh 实现
+# 编排入口，调用通用组件与子模块完成配置上传
 # ==============================================================================
-
 set -e
 
 # 获取脚本目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# 加载依赖库
+# 加载通用库
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
+source "${SCRIPT_DIR}/../lib/github.sh"
+
+# 加载子模块
+source "${SCRIPT_DIR}/shared/select-environment.sh"
+source "${SCRIPT_DIR}/shared/confirm-repo.sh"
+source "${SCRIPT_DIR}/env/push-env-secrets.sh"
+source "${SCRIPT_DIR}/env/push-users-json.sh"
 
 # ------------------------------------------------------------------------------
 # 主函数
 # ------------------------------------------------------------------------------
-push_config() {
+main() {
     print_header "推送配置到 GitHub Secrets"
     
-    # 检查 gh CLI
-    if ! command_exists gh; then
-        die "GitHub CLI (gh) 未安装。请先安装: brew install gh"
-    fi
+    # 1. 确保 GitHub CLI 已登录
+    github_ensure_auth
     
-    # 检查是否已登录
-    if ! gh auth status &>/dev/null; then
-        log_warn "未登录 GitHub CLI"
-        echo ""
-        echo "请先登录:"
-        echo "  gh auth login"
-        echo ""
-        exit 1
-    fi
+    # 2. 选择目标环境
+    select_environment
     
-    # 根据当前 git 分支推荐默认环境
-    local current_branch=""
-    local default_env=""
-    local default_index=2 # 默认 development
-    
-    current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    
-    case "$current_branch" in
-        main|master) 
-            default_env="production" 
-            default_index=1
-            ;;
-        dev|development) 
-            default_env="development"
-            default_index=2
-            ;;
-        *) 
-            default_env="development"
-            default_index=2
-            ;;
-    esac
-    
-    if [[ -n "$current_branch" ]]; then
-        log_substep "检测到分支: $current_branch → 推荐环境: $default_env"
-    fi
-    
-    echo ""
-    echo "请选择目标环境:"
-    echo "  1. production  (.env.production)"
-    echo "  2. development (.env.development)"
-    echo "  0. 退出"
-    echo ""
-    
-    local selection
-    local env_name=""
-    local env_file=""
-    
-    while true; do
-        read -p "选择 (0-2) [默认: $default_index]: " selection
-        selection="${selection:-$default_index}"
-        
-        case "$selection" in
-            0) log_warn "已退出"; exit 0 ;;
-            1) 
-                env_name="production"
-                env_file=".env.production"
-                break 
-                ;;
-            2) 
-                env_name="development"
-                env_file=".env.development"
-                break 
-                ;;
-            *) echo "无效选择，请重试。" ;;
-        esac
-    done
-    
-    echo ""
-    log_substep "目标环境: $env_name"
-    log_substep "配置文件: $env_file"
-    echo ""
+    local env_file=".env.${ENV_NAME}"
     
     # 检查配置文件是否存在
     if [[ ! -f "${PROJECT_ROOT}/$env_file" ]]; then
@@ -108,8 +45,11 @@ push_config() {
         exit 1
     fi
     
-    # 二次确认
-    if ! confirm "确认将 '$env_file' 推送到 '$env_name' 环境?" "y"; then
+    # 3. 确认 GitHub 仓库
+    confirm_github_repo
+    
+    # 4. 二次确认
+    if ! confirm "确认将 '$env_file' 推送到 '$ENV_NAME' 环境?" "y"; then
         log_warn "已取消"
         exit 0
     fi
@@ -117,104 +57,51 @@ push_config() {
     echo ""
     log_step "正在推送配置..."
     
-    # 读取 .env 文件并逐个上传
-    local uploaded_count=0
-    local skipped_count=0
-    local failed_count=0
+    # 初始化统计变量
+    ENV_UPLOADED_COUNT=0
+    ENV_SKIPPED_COUNT=0
+    ENV_FAILED_COUNT=0
     
-    # 使用不同的方法读取文件，处理没有换行符的情况
-    while IFS='=' read -r key value || [ -n "$key" ]; do
-        # 跳过空行和注释
-        [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
-        
-        # 去除前后空格
-        key=$(echo "$key" | xargs)
-        value=$(echo "$value" | xargs)
-        
-        # 跳过空值
-        if [ -z "$value" ]; then
-            log_warn "跳过空值: $key"
-            ((skipped_count++))
-            continue
-        fi
-        
-        # 上传到 GitHub Secrets
-        if gh secret set "$key" \
-            --env "$env_name" \
-            --body "$value" 2>/dev/null; then
-            echo "   ✓ $key"
-            ((uploaded_count++))
-        else
-            log_error "上传失败: $key"
-            ((failed_count++))
-        fi
-    done < "${PROJECT_ROOT}/$env_file"
+    # 5. 上传环境变量
+    push_env_secrets "$ENV_NAME" "${PROJECT_ROOT}/$env_file" "$REPO"
     
-    # NEW: 推送结构化的用户列表文件
-    local users_file="users.${env_name}.json"
-    if [[ ! -f "${PROJECT_ROOT}/$users_file" ]]; then
-        users_file="users.json"
-    fi
-    
-    if [[ -f "${PROJECT_ROOT}/$users_file" ]]; then
-        echo ""
-        log_step "发现 ${users_file}，正在推送到 GitHub Secrets..."
-        # 使用 jq 压缩所有的空白符和换行
-        if ! command_exists jq; then
-             log_warn "未找到 jq 工具，将尝试直接上传"
-             users_json_content=$(cat "${PROJECT_ROOT}/$users_file")
-        else
-             users_json_content=$(jq -c . "${PROJECT_ROOT}/$users_file")
-        fi
-        
-        if gh secret set "USERS_JSON" \
-            --env "$env_name" \
-            --body "$users_json_content" 2>/dev/null; then
-            echo "   ✓ USERS_JSON"
-            ((uploaded_count++))
-        else
-            log_error "上传失败: USERS_JSON"
-            ((failed_count++))
-        fi
-    else
-        echo ""
-        log_substep "未发现 users.${env_name}.json 且未发现 users.json，跳过用户列表上传"
-    fi
+    # 6. 上传用户列表
+    push_users_json "$ENV_NAME" "$PROJECT_ROOT" "$REPO"
     
     echo ""
     print_separator
     
-    if [ $failed_count -eq 0 ]; then
-        log_success "✅ 配置推送完成!"
+    if [[ $ENV_FAILED_COUNT -eq 0 ]]; then
+        log_success "配置推送完成!"
     else
-        log_warn "⚠️  配置推送完成（有失败项）"
+        log_warn "配置推送完成（有失败项）"
     fi
     
     print_separator
     echo ""
     echo "📊 统计:"
-    echo "   成功: $uploaded_count"
-    echo "   跳过: $skipped_count"
-    echo "   失败: $failed_count"
+    echo "   成功: $ENV_UPLOADED_COUNT"
+    echo "   跳过: $ENV_SKIPPED_COUNT"
+    echo "   失败: $ENV_FAILED_COUNT"
     echo ""
-    echo "📋 环境: $env_name"
+    echo "📋 环境: $ENV_NAME"
     echo "📦 配置: $env_file"
     echo ""
     
-    if [ $failed_count -gt 0 ]; then
+    if [[ $ENV_FAILED_COUNT -gt 0 ]]; then
         echo "⚠️  可能原因:"
-        echo "   1. GitHub 环境 '$env_name' 不存在"
+        echo "   1. GitHub 环境 '$ENV_NAME' 不存在"
         echo "   2. 没有权限访问该仓库"
         echo "   3. gh 登录失效"
         echo ""
         echo "解决方法:"
-        echo "   - 确保已创建环境: https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)/settings/environments"
+        echo "   - 确保已创建环境: https://github.com/${REPO}/settings/environments"
         echo "   - 重新登录: gh auth login"
         echo ""
     else
         echo "🎉 下一步:"
         echo "   推送代码触发部署:"
-        if [ "$env_name" == "production" ]; then
+        if [[ "$ENV_NAME" == "production" ]]; then
             echo "     git push origin main"
         else
             echo "     git push origin dev"
@@ -223,7 +110,5 @@ push_config() {
     fi
 }
 
-# 如果直接运行此脚本
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    push_config
-fi
+# 运行主流程
+main "$@"
