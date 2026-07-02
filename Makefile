@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (Sing-box)
 # Sing-box 原生模式代理服务管理
 
-.PHONY: all uuid short-id password reality-key setup-wif setup-firewall check-scripts upload-env help
+.PHONY: all uuid short-id password reality-key setup-infra setup-wif setup-vm setup-ar setup-firewall check-scripts upload-env help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -15,17 +15,23 @@ help:
 	@echo "  make reality-key       - Generate REALITY key pair (uses Docker)"
 	@echo ""
 	@echo "🚀 Deployment Setup:"
-	@echo "  make setup-wif         - Setup WIF for an environment (interactive)"
-	@echo "  make upload-env        - Upload .env to GitHub Environment Secrets"
-	@echo "  make setup-firewall    - Configure firewall rules for service ports"
-	@echo "  make check-scripts     - Check all shell scripts syntax"
+	@echo "  make setup-infra      - One-click infra setup: WIF + VM + AR + Firewall (interactive or CI)"
+	@echo "  make setup-wif        - Setup WIF for an environment (interactive)"
+	@echo "  make setup-vm         - Setup GCE VM (interactive)"
+	@echo "  make setup-ar         - Setup Artifact Registry (interactive)"
+	@echo "  make upload-env       - Upload .env to GitHub Environment Secrets"
+	@echo "  make setup-firewall   - Configure firewall rules for service ports"
+	@echo "  make check-scripts    - Check all shell scripts syntax"
 	@echo ""
 	@echo "📁 Script Entrypoints:"
-	@echo "  scripts/setup/setup-wif.sh       - Interactive WIF setup"
-	@echo "  scripts/setup/upload-env.sh      - Interactive env upload"
-	@echo "  scripts/setup/setup-firewall.sh  - Interactive firewall setup"
-	@echo "  scripts/provision/provision.sh   - Host provisioning (run on VM)"
-	@echo "  scripts/deploy/deploy.sh         - App deployment (run on VM)"
+	@echo "  scripts/setup/setup-infra.sh       - One-click infra setup"
+	@echo "  scripts/setup/setup-wif.sh         - Interactive WIF setup"
+	@echo "  scripts/setup/setup-vm.sh          - Interactive VM setup"
+	@echo "  scripts/setup/setup-ar.sh          - Interactive AR setup"
+	@echo "  scripts/setup/upload-env.sh        - Interactive env upload"
+	@echo "  scripts/setup/setup-firewall.sh    - Interactive firewall setup"
+	@echo "  scripts/provision/provision.sh     - Host provisioning (run on VM)"
+	@echo "  scripts/deploy/deploy.sh           - App deployment (run on VM)"
 
 
 # ============================================================
@@ -48,6 +54,10 @@ reality-key:
 # ============================================================
 # Deployment Setup
 # ============================================================
+
+setup-infra:
+	@chmod +x scripts/setup/setup-infra.sh
+	@./scripts/setup/setup-infra.sh
 
 setup-wif:
 	@chmod +x scripts/setup/setup-wif.sh

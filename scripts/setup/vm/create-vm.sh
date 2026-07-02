@@ -2,6 +2,14 @@
 # ==============================================================================
 # 创建新 VM（包含服务账号和防火墙规则）
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
+#
+# 导出函数（纯操作，无交互）:
+#   ensure_ssh_firewall <project>                    — 确保 SSH 防火墙规则存在
+#   create_vm_service_account <project> <sa_name>   — 创建 VM 服务账号并授权
+#   create_vm_core <project> <vm> <zone> ...        — 执行 gcloud instances create
+#   create_vm_with_sa <project> <vm> <zone> ...     — 完整 VM 创建流程（含 SA）
+#
+# 交互逻辑已迁移至 setup-vm.sh 入口层
 # ==============================================================================
 
 # 如果直接运行，加载依赖
@@ -139,97 +147,6 @@ create_vm_core() {
 }
 
 # ------------------------------------------------------------------------------
-# 创建 VM 交互流程
-# ------------------------------------------------------------------------------
-create_vm_interactive() {
-    local project="${1:-$PROJECT_ID}"
-    
-    if [[ -z "$project" ]]; then
-        die "PROJECT_ID 未设置"
-    fi
-    
-    echo ""
-    echo "🆕 创建新 VM"
-    echo ""
-    echo "预设配置:"
-    echo "  1. Google Free Tier (e2-micro, us-west1)"
-    echo "     - 机器类型: e2-micro (0.25-2 vCPU, 1GB RAM)"
-    echo "     - 磁盘: 30GB Standard"
-    echo "     - 网络: 200GB/月免费 (STANDARD 模式)"
-    echo "     - 费用: 免费 (在配额内)"
-    echo ""
-    echo "  2. 经济型 Spot 实例 (e2-micro, 可被抢占)"
-    echo "     - 机器类型: e2-micro"
-    echo "     - 磁盘: 10GB Standard"
-    echo "     - 费用: ~\$5/月 (可能被回收)"
-    echo ""
-    echo "  3. 自定义配置"
-    echo "  0. 返回"
-    echo ""
-    
-    local preset_choice
-    while true; do
-        read -p "选择预设 (0-3): " preset_choice
-        
-        case $preset_choice in
-            0)
-                return 1  # 返回上级
-                ;;
-            1)
-                local default_name="instance-$(date +%Y%m%d)"
-                prompt_with_default "VM 名称" "$default_name"
-                VM_NAME="$INPUT_VALUE"
-                VM_ZONE="$FREETIER_ZONE"
-                
-                echo ""
-                create_vm_with_sa "$project" "$VM_NAME" "$VM_ZONE" \
-                    "$FREETIER_MACHINE" "$FREETIER_DISK_SIZE" "$FREETIER_DISK_TYPE" \
-                    "$FREETIER_NETWORK_TIER" "false"
-                return 0
-                ;;
-            2)
-                local default_name="spot-$(date +%Y%m%d)"
-                prompt_with_default "VM 名称" "$default_name"
-                VM_NAME="$INPUT_VALUE"
-                VM_ZONE="$SPOT_ZONE"
-                
-                echo ""
-                create_vm_with_sa "$project" "$VM_NAME" "$VM_ZONE" \
-                    "$SPOT_MACHINE" "$SPOT_DISK_SIZE" "$SPOT_DISK_TYPE" \
-                    "$SPOT_NETWORK_TIER" "true"
-                log_warn "注意: Spot 实例可能随时被抢占"
-                return 0
-                ;;
-            3)
-                local default_name="gcpvm-$(date +%Y%m%d)"
-                prompt_with_default "VM 名称" "$default_name"
-                VM_NAME="$INPUT_VALUE"
-                
-                prompt_with_default "区域 (如 us-central1-a)" "us-central1-a"
-                VM_ZONE="$INPUT_VALUE"
-                
-                prompt_with_default "机器类型" "e2-micro"
-                local machine_type="$INPUT_VALUE"
-                
-                prompt_with_default "磁盘大小 (GB)" "20"
-                local disk_size="$INPUT_VALUE"
-                
-                prompt_with_default "网络层级 (STANDARD/PREMIUM)" "STANDARD"
-                local network_tier="$INPUT_VALUE"
-                
-                echo ""
-                create_vm_with_sa "$project" "$VM_NAME" "$VM_ZONE" \
-                    "$machine_type" "$disk_size" "pd-standard" "$network_tier" "false"
-                return 0
-                ;;
-            *)
-                echo "无效选择，请重试。"
-                ;;
-        esac
-    done
-}
-
-# ------------------------------------------------------------------------------
 # 创建 VM（包含服务账号和防火墙规则）
 # ------------------------------------------------------------------------------
 create_vm_with_sa() {
@@ -269,9 +186,9 @@ create_vm_with_sa() {
     export VM_ZONE="$zone"
 }
 
-# 如果直接运行此脚本
+# 如果直接运行此脚本（仅测试用）
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    create_vm_interactive "$PROJECT_ID"
-    echo "VM_NAME=$VM_NAME"
-    echo "VM_ZONE=$VM_ZONE"
+    echo "此文件为函数库，不支持直接运行。"
+    echo "请通过 setup-vm.sh 或 setup-infra.sh 调用。"
+    exit 1
 fi

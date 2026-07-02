@@ -2,6 +2,10 @@
 # ==============================================================================
 # 创建 Artifact Registry Docker 仓库
 # 注意: 此脚本应被主脚本 source，依赖库由主脚本加载
+#
+# 导出函数:
+#   ar_create_repository <project> <location> <repo>  — 纯操作，幂等，无交互
+#   setup_artifact_registry <project> [zone]          — 交互式，供入口层使用
 # ==============================================================================
 
 # 如果直接运行，加载依赖
@@ -33,7 +37,42 @@ _ar_repo_exists() {
 }
 
 # ------------------------------------------------------------------------------
-# 创建或选择 AR Docker 仓库（交互式）
+# 纯操作函数: 创建 AR Docker 仓库（幂等，无交互）
+# 供 Layer 2 modules 层直接调用
+# 参数: <project> <location> <repo_name>
+# 导出: AR_LOCATION, AR_REPOSITORY, AR_HOST, AR_IMAGE
+# ------------------------------------------------------------------------------
+ar_create_repository() {
+    local project="$1"
+    local location="$2"
+    local repo_name="$3"
+
+    if [[ -z "$project" ]] || [[ -z "$location" ]] || [[ -z "$repo_name" ]]; then
+        die "ar_create_repository: 缺少必要参数 project/location/repo_name"
+    fi
+
+    if _ar_repo_exists "$project" "$location" "$repo_name"; then
+        log_substep "AR 仓库已存在: $repo_name (区域: $location)"
+    else
+        log_substep "创建 AR Docker 仓库: $repo_name (位置: $location)..."
+        gcloud artifacts repositories create "$repo_name" \
+            --project="$project" \
+            --repository-format=docker \
+            --location="$location" \
+            --description="Proxy subscription service image" \
+            --quiet
+        log_success "Artifact Registry 仓库已创建: $repo_name"
+    fi
+
+    export AR_LOCATION="$location"
+    export AR_REPOSITORY="$repo_name"
+    export AR_HOST="${location}-docker.pkg.dev"
+    export AR_IMAGE="${AR_HOST}/${project}/${repo_name}/subscription"
+}
+
+# ------------------------------------------------------------------------------
+# 交互式函数: 创建或选择 AR Docker 仓库
+# 供入口层（setup-ar.sh）使用
 # ------------------------------------------------------------------------------
 setup_artifact_registry() {
     local project="${1:-$PROJECT_ID}"
