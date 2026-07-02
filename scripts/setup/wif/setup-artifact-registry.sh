@@ -51,18 +51,23 @@ setup_artifact_registry() {
     repo_list=$(gcloud artifacts repositories list \
         --project="$project" \
         --filter="format=docker" \
-        --format="csv[no-heading](name,location)" 2>/dev/null || echo "")
+        --format="value[no-transforms](name)" 2>/dev/null || echo "")
 
     local repo_names=()
     local repo_locations=()
     local repo_count=0
 
     if [[ -n "$repo_list" ]]; then
-        while IFS=',' read -r name location; do
+        while read -r name; do
             if [[ -n "$name" ]]; then
                 # 提取仓库短名称，以防返回完整资源路径
                 local base_name
                 base_name=$(basename "$name")
+                
+                # 从完整资源路径提取区域 (location)
+                local temp="${name#*/locations/}"
+                local location="${temp%%/repositories/*}"
+                
                 repo_names+=("$base_name")
                 repo_locations+=("$location")
                 ((repo_count++))
