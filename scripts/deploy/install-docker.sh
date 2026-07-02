@@ -64,7 +64,7 @@ install_docker() {
     sudo systemctl enable docker
     
     # 将当前用户添加到 docker 组
-    sudo usermod -aG docker "$USER" 2>/dev/null || true
+    sudo usermod -aG docker "${SUDO_USER:-$USER}" 2>/dev/null || true
     
     log_success "Docker 安装完成"
 }

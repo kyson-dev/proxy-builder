@@ -67,8 +67,8 @@ jobs:
           echo "📤 上传文件..."
           gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
-          # 4. 部署
-          echo "🚀 执行部署..."
+          # 4. 初始化主机环境并停止旧服务 (第一阶段)
+          echo "🔧 初始化主机环境与供给检测..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
             
@@ -119,14 +119,23 @@ jobs:
             else
               echo "✅ 检测到主机环境已就绪，跳过主机供给步骤"
             fi
+          '
+
+          # 5. 执行服务部署 (第二阶段，在全新的 SSH 会话中运行以继承最新的 docker 组权限)
+          echo "🚀 在新的会话中执行服务部署..."
+          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
+            set -e
             
-            # 4. 迁移新代码到最终的应用目录
+            # 加载单一路径配置
+            source ~/app/scripts/lib/paths.sh
+            
+            # 1. 迁移新代码到最终的应用目录
             echo "🚚 迁移新代码到应用目录..."
             mkdir -p "$APP_DIR"
             cp -r ~/app/* "$APP_DIR/"
             rm -rf ~/app
             
-            # 5. 部署新版本
+            # 2. 部署新版本
             echo "🚀 部署新版本..."
             cd "$APP_DIR"
             chmod +x deploy.sh
