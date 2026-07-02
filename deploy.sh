@@ -71,7 +71,7 @@ main() {
     echo ""
 
     # Step 4: 生成自签名证书
-    generate_certs "${SING_BOX_DATA_DIR}/cert"
+    generate_certs "${DATA_ROOT}/cert"
     echo ""
 
     # Step 5: 构建 sing-box config.json

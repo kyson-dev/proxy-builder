@@ -63,21 +63,26 @@ jobs:
               --exclude='.env.*' \
               -czf /tmp/app.tar.gz .
 
-          # 3. 上传到虚拟机临时目录
+          # 3. 上传到虚拟机家目录暂存区
           echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz ${VM}:/tmp/app.tar.gz --zone=${ZONE} --quiet
+          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
 
           # 4. 部署
           echo "🚀 执行部署..."
           gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command='
             set -e
             
-            # 从上传的压缩包中提取路径定义，以此作为虚拟机执行的唯一路径数据源
-            tar -xzf /tmp/app.tar.gz -C /tmp scripts/lib/paths.sh
-            source /tmp/scripts/lib/paths.sh
-            rm -rf /tmp/scripts
+            # 1. 解压新版本到虚拟机家目录暂存区
+            echo "📦 解压新版本到暂存区..."
+            rm -rf ~/app
+            mkdir -p ~/app
+            tar -xzf ~/app.tar.gz -C ~/app
+            rm -f ~/app.tar.gz
             
-            # 停止当前服务（如果存在）
+            # 加载单一路径配置
+            source ~/app/scripts/lib/paths.sh
+            
+            # 2. 停止当前服务（如果存在）
             if [ -d "$APP_DIR" ] && [ -f "$APP_DIR/docker-compose.yml" ]; then
               echo "⏸️  停止当前服务..."
               cd "$APP_DIR"
@@ -90,18 +95,12 @@ jobs:
             # ==================================================================
             echo "💾 备份当前版本..."
             rm -rf "${APP_DIR}.backup"
-            rm -rf "${SING_BOX_DATA_DIR}.backup"
+            rm -rf "${DATA_DIR}.backup"
             
             [ -d "$APP_DIR" ] && mv "$APP_DIR" "${APP_DIR}.backup"
-            [ -d "${SING_BOX_DATA_DIR}" ] && cp -r "${SING_BOX_DATA_DIR}" "${SING_BOX_DATA_DIR}.backup" || true
+            [ -d "${DATA_DIR}" ] && cp -r "${DATA_DIR}" "${DATA_DIR}.backup" || true
             
-            # 解压新版本到统一的应用目录
-            echo "📦 解压新版本..."
-            mkdir -p "$APP_DIR"
-            tar -xzf /tmp/app.tar.gz -C "$APP_DIR"
-            rm -f /tmp/app.tar.gz
-            
-            # 检测是否需要运行主机初始化 (provision)
+            # 3. 检测是否需要运行主机初始化 (provision)
             NEED_PROVISION=false
             if ! command -v docker &>/dev/null; then
               NEED_PROVISION=true
@@ -109,19 +108,25 @@ jobs:
               NEED_PROVISION=true
             elif [ ! -f /etc/google-cloud-ops-agent/config.yaml ] || ! grep -q "systemd_journald" /etc/google-cloud-ops-agent/config.yaml; then
               NEED_PROVISION=true
-            elif [ ! -d "$DATA_DIR" ] || [ "$(stat -c %G "$DATA_DIR" 2>/dev/null)" != "docker" ]; then
+            elif [ ! -d "$PROXY_ROOT" ] || [ "$(stat -c %G "$PROXY_ROOT" 2>/dev/null)" != "docker" ]; then
               NEED_PROVISION=true
             fi
-
+            
             if [ "$NEED_PROVISION" = "true" ]; then
               echo "🔧 检测到主机环境不完整，正在自动执行主机供给 (provision.sh)..."
-              chmod +x "${APP_DIR}/provision.sh"
-              sudo "${APP_DIR}/provision.sh"
+              chmod +x ~/app/provision.sh
+              sudo ~/app/provision.sh
             else
               echo "✅ 检测到主机环境已就绪，跳过主机供给步骤"
             fi
             
-            # 部署新版本
+            # 4. 迁移新代码到最终的应用目录
+            echo "🚚 迁移新代码到应用目录..."
+            mkdir -p "$APP_DIR"
+            cp -r ~/app/* "$APP_DIR/"
+            rm -rf ~/app
+            
+            # 5. 部署新版本
             echo "🚀 部署新版本..."
             cd "$APP_DIR"
             chmod +x deploy.sh
@@ -132,7 +137,7 @@ jobs:
               # 清理备份（代码 + 数据）
               echo "🧹 清理备份..."
               rm -rf "${APP_DIR}.backup"
-              rm -rf "${SING_BOX_DATA_DIR}.backup" || true
+              rm -rf "${DATA_DIR}.backup" || true
               
               echo "✅ 部署完成"
             else
@@ -144,9 +149,9 @@ jobs:
               rm -rf "$APP_DIR"
               [ -d "${APP_DIR}.backup" ] && mv "${APP_DIR}.backup" "$APP_DIR" || echo "⚠️ 无代码备份"
               
-              rm -rf "${SING_BOX_DATA_DIR}" || true
-              if [ -d "${SING_BOX_DATA_DIR}.backup" ]; then
-                mv "${SING_BOX_DATA_DIR}.backup" "${SING_BOX_DATA_DIR}"
+              rm -rf "${DATA_DIR}" || true
+              if [ -d "${DATA_DIR}.backup" ]; then
+                mv "${DATA_DIR}.backup" "${DATA_DIR}"
                 echo "✅ 数据目录已回滚"
               else
                 echo "⚠️ 无数据备份，跳过数据回滚"

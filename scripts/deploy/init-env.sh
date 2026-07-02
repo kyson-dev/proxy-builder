@@ -12,12 +12,10 @@ init_env() {
     
     log_step "初始化环境配置"
     
-    export DATA_ROOT="${DATA_ROOT:-/opt/proxy/data}"
-    export SING_BOX_DATA_DIR="${SING_BOX_DATA_DIR:-${DATA_ROOT}/sing-box}"
+    export DATA_ROOT="${DATA_ROOT:-${DATA_DIR}}"
     
     log_substep "配置路径:"
     log_substep "  DATA_ROOT: $DATA_ROOT"
-    log_substep "  SING_BOX_DATA_DIR: $SING_BOX_DATA_DIR"
 
     # 2. 确保 .env 文件存在
     touch "$env_file"
@@ -39,7 +37,6 @@ init_env() {
         fi
     }
     append_if_missing "DATA_ROOT" "$DATA_ROOT"
-    append_if_missing "SING_BOX_DATA_DIR" "$SING_BOX_DATA_DIR"
     
     # 确保文件结尾有换行符（可选，为了美观）
     if [ -n "$(tail -c1 "$env_file")" ]; then

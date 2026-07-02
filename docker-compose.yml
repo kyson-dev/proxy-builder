@@ -11,8 +11,8 @@ services:
       - "443:443/tcp"
       - "443:443/udp"
     volumes:
-      - ${SING_BOX_DATA_DIR}/config.json:/etc/sing-box/config.json
-      - ${SING_BOX_DATA_DIR}/cert:/etc/sing-box/cert
+      - ${DATA_ROOT}/config.json:/etc/sing-box/config.json
+      - ${DATA_ROOT}/cert:/etc/sing-box/cert
 
   sub:
     build:
@@ -24,7 +24,7 @@ services:
       # 订阅服务端口（仅供拉取订阅使用，非代理流量）
       - "8080:8080/tcp"
     volumes:
-      - ${SING_BOX_DATA_DIR}/users.json:/etc/sing-box/users.json:ro
+      - ${DATA_ROOT}/users.json:/etc/sing-box/users.json:ro
     environment:
       - REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}

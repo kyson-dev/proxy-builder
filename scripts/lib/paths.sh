@@ -5,6 +5,6 @@
 [[ -n "${_LIB_PATHS_LOADED:-}" ]] && return 0
 _LIB_PATHS_LOADED=1
 
-export APP_DIR="/opt/proxy/app"
-export DATA_DIR="/opt/proxy/data"
-export SING_BOX_DATA_DIR="${DATA_DIR}/sing-box"
+export PROXY_ROOT="/opt/proxy"
+export APP_DIR="${PROXY_ROOT}/app"
+export DATA_DIR="${PROXY_ROOT}/data"

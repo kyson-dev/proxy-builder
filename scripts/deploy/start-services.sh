@@ -26,10 +26,10 @@ start_services() {
     log_step "启动服务"
     
     # 验证环境变量
-    if [[ -z "$SING_BOX_DATA_DIR" ]]; then
-        die "SING_BOX_DATA_DIR 环境变量未设置"
+    if [[ -z "$DATA_ROOT" ]]; then
+        die "DATA_ROOT 环境变量未设置"
     fi
-    log_substep "数据目录: $SING_BOX_DATA_DIR"
+    log_substep "数据目录: $DATA_ROOT"
     
     # 拉取最新镜像
     log_substep "拉取最新镜像..."

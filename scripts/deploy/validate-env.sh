@@ -23,7 +23,6 @@ validate_env() {
     # 2. 定义必填变量列表
     local required_vars=(
         "DATA_ROOT"
-        "SING_BOX_DATA_DIR"
         "REALITY_PRIVATE_KEY"
         "REALITY_SHORT_ID"
         "REALITY_DEST"

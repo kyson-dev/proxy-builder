@@ -34,23 +34,23 @@ source "${SCRIPTS_DIR}/deploy/configure-ops-agent.sh"
 # 配置数据目录权限（方案 A：授权给 docker 组，免 sudo）
 # ------------------------------------------------------------------------------
 setup_directories_permissions() {
-    log_step "配置全局工作目录的所有权与权限"
+    log_step "配置全局工作根目录所有权与权限"
     
-    log_substep "确保应用和数据目录存在..."
-    mkdir -p "${APP_DIR}"
-    mkdir -p "${SING_BOX_DATA_DIR}/cert"
+    local root_dir="${PROXY_ROOT:-/opt/proxy}"
     
-    log_substep "设置目录所属组为 docker..."
-    chown -R root:docker "${APP_DIR}" "${DATA_DIR}"
+    log_substep "确保工作根目录存在: ${root_dir}"
+    mkdir -p "${root_dir}"
+    
+    log_substep "设置根目录所属组为 docker..."
+    chown root:docker "${root_dir}"
     
     log_substep "设置组写权限 (775)..."
-    chmod -R 775 "${APP_DIR}" "${DATA_DIR}"
+    chmod 775 "${root_dir}"
     
     log_substep "设置 SGID 保证后续新建文件自动继承 docker 组..."
-    find "${APP_DIR}" -type d -exec chmod g+s {} +
-    find "${DATA_DIR}" -type d -exec chmod g+s {} +
+    chmod g+s "${root_dir}"
     
-    log_success "全局工作目录授权完成"
+    log_success "工作根目录授权完成"
 }
 
 # ==============================================================================
