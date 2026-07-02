@@ -8,6 +8,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # 加载通用库
 source "${SCRIPT_DIR}/../lib/common.sh"
@@ -59,10 +60,10 @@ main() {
     assert_provisioned
 
     # Step 1: 初始化环境变量（补充默认路径并写入 .env）
-    init_env "${SCRIPT_DIR}/.env"
+    init_env "${PROJECT_ROOT}/.env"
 
     # Step 2: 验证必要配置（REALITY_PRIVATE_KEY 等核心参数）
-    validate_env "${SCRIPT_DIR}/.env"
+    validate_env "${PROJECT_ROOT}/.env"
     echo ""
 
     # Step 3: 初始化数据目录
