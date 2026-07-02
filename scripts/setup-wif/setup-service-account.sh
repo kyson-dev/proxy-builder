@@ -21,6 +21,7 @@ SA_ROLES=(
     "roles/compute.osAdminLogin"
     "roles/iam.serviceAccountUser"
     "roles/storage.admin"
+    "roles/artifactregistry.writer"
 )
 
 # ------------------------------------------------------------------------------
