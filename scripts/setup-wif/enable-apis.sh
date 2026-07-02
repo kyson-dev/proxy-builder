@@ -17,6 +17,7 @@ REQUIRED_APIS=(
     "cloudresourcemanager.googleapis.com"
     "iamcredentials.googleapis.com"
     "compute.googleapis.com"
+    "artifactregistry.googleapis.com"
 )
 
 # ------------------------------------------------------------------------------

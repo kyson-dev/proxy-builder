@@ -8,9 +8,52 @@ permissions:
   id-token: write
 
 jobs:
+  # ============================================================================
+  # Job 1: 构建 sub 镜像并推送到 Artifact Registry
+  # ============================================================================
+  build-and-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Configure Docker auth for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev --quiet
+
+      - name: Build and push sub image
+        id: meta
+        env:
+          AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/sub
+        run: |
+          docker build \
+            -t "${AR_IMAGE}:latest" \
+            -f sing-box/sub/Dockerfile \
+            sing-box/sub/
+
+          docker push "${AR_IMAGE}:latest"
+
+          echo "image=${AR_IMAGE}:latest" >> "$GITHUB_OUTPUT"
+          echo "✅ 镜像已推送: ${AR_IMAGE}:latest"
+
+  # ============================================================================
+  # Job 2: 将精简包部署到 VM
+  # ============================================================================
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    needs: build-and-push
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
@@ -31,6 +74,8 @@ jobs:
 
       - name: Deploy
         timeout-minutes: 10
+        env:
+          SUB_IMAGE: ${{ needs.build-and-push.outputs.image }}
         run: |
           # 加载单一数据源全局路径定义
           source scripts/lib/paths.sh
@@ -38,13 +83,14 @@ jobs:
           VM="${{ secrets.GCP_VM_NAME }}"
           ZONE="${{ secrets.GCP_VM_ZONE }}"
 
-          # 1. 创建 .env 文件
+          # 1. 创建 .env 文件（注入 secrets + 镜像地址）
           echo "📝 创建环境配置..."
           cat > .env << EOF
           REALITY_PRIVATE_KEY=${{ secrets.REALITY_PRIVATE_KEY }}
           REALITY_PUBLIC_KEY=${{ secrets.REALITY_PUBLIC_KEY }}
           REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
           REALITY_DEST=${{ secrets.REALITY_DEST }}
+          SUB_IMAGE=${SUB_IMAGE}
           EOF
 
           # 将 users secret 写为 json 文件
@@ -53,10 +99,11 @@ jobs:
           ${{ secrets.USERS_JSON }}
           USERS_EOF
 
-          # 2. 打包
+          # 2. 打包精简包（排除 sing-box/sub 源码目录）
           echo "📦 打包文件..."
           tar --exclude='.git' \
               --exclude='.github' \
+              --exclude='sing-box/sub' \
               --exclude='vars.*.json' \
               --exclude='*.md' \
               --exclude='docs' \

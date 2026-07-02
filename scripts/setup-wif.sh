@@ -25,6 +25,7 @@ source "${SCRIPT_DIR}/setup-wif/setup-wif-pool.sh"
 source "${SCRIPT_DIR}/setup-wif/bind-repo-to-sa.sh"
 source "${SCRIPT_DIR}/setup-wif/create-vm.sh"
 source "${SCRIPT_DIR}/setup-wif/select-vm.sh"
+source "${SCRIPT_DIR}/setup-wif/setup-artifact-registry.sh"
 source "${SCRIPT_DIR}/setup-wif/ensure-oslogin.sh"
 source "${SCRIPT_DIR}/setup-wif/set-github-secrets.sh"
 
@@ -89,9 +90,12 @@ main() {
     
     # Step 10: 确保 OS Login 启用
     ensure_oslogin "$PROJECT_ID" "$VM_NAME" "$VM_ZONE"
+
+    # Step 10.5: 创建 Artifact Registry 仓库（从 VM_ZONE 自动派生 region）
+    setup_artifact_registry "$PROJECT_ID" "$VM_ZONE"
     
     # Step 11: 设置 GitHub Secrets
-    set_github_secrets "$ENV_NAME" "$REPO" "$PROJECT_ID" "$PROVIDER_ID" "$SA_NAME" "$VM_NAME" "$VM_ZONE"
+    set_github_secrets "$ENV_NAME" "$REPO" "$PROJECT_ID" "$PROVIDER_ID" "$SA_NAME" "$VM_NAME" "$VM_ZONE" "$AR_LOCATION" "$AR_REPOSITORY"
     
     # 打印摘要
     print_summary "$ENV_NAME" "$PROJECT_ID" "$VM_NAME" "$VM_ZONE" "$PROVIDER_ID"

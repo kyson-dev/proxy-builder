@@ -84,7 +84,13 @@ create_vm_service_account() {
     gcloud projects add-iam-policy-binding "$project" \
         --member="serviceAccount:${sa_email}" \
         --role="roles/monitoring.metricWriter" \
-        --quiet >/dev/null
+        --quiet > /dev/null
+
+    # 授权从 Artifact Registry 拉取镜像（用于 docker compose pull）
+    gcloud projects add-iam-policy-binding "$project" \
+        --member="serviceAccount:${sa_email}" \
+        --role="roles/artifactregistry.reader" \
+        --quiet > /dev/null
 }
 
 # ------------------------------------------------------------------------------

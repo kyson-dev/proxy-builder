@@ -20,6 +20,8 @@ set_github_secrets() {
     local sa_name="${5:-$SA_NAME}"
     local vm_name="${6:-$VM_NAME}"
     local vm_zone="${7:-$VM_ZONE}"
+    local ar_location="${8:-$AR_LOCATION}"
+    local ar_repository="${9:-$AR_REPOSITORY}"
     
     # 验证必要参数
     local missing_params=()
@@ -30,6 +32,8 @@ set_github_secrets() {
     [[ -z "$sa_name" ]] && missing_params+=("SA_NAME")
     [[ -z "$vm_name" ]] && missing_params+=("VM_NAME")
     [[ -z "$vm_zone" ]] && missing_params+=("VM_ZONE")
+    [[ -z "$ar_location" ]] && missing_params+=("AR_LOCATION")
+    [[ -z "$ar_repository" ]] && missing_params+=("AR_REPOSITORY")
     
     if [[ ${#missing_params[@]} -gt 0 ]]; then
         die "缺少必要参数: ${missing_params[*]}"
@@ -77,6 +81,8 @@ set_github_secrets() {
         "GCP_SERVICE_ACCOUNT:$sa_email"
         "GCP_VM_NAME:$vm_name"
         "GCP_VM_ZONE:$vm_zone"
+        "GCP_AR_LOCATION:$ar_location"
+        "GCP_AR_REPOSITORY:$ar_repository"
     )
     
     for secret in "${secrets[@]}"; do

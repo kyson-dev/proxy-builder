@@ -26,6 +26,7 @@ validate_env() {
         "REALITY_PRIVATE_KEY"
         "REALITY_SHORT_ID"
         "REALITY_DEST"
+        "SUB_IMAGE"
     )
 
     # 3. 检查必填变量

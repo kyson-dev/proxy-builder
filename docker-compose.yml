@@ -15,9 +15,7 @@ services:
       - ${DATA_ROOT}/cert:/etc/sing-box/cert
 
   sub:
-    build:
-      context: ./sing-box/sub
-      dockerfile: Dockerfile
+    image: ${SUB_IMAGE}
     container_name: sub
     restart: unless-stopped
     ports:
