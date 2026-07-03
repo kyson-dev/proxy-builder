@@ -36,7 +36,7 @@ infra::create_ar_repo() {
     if gcloud artifacts repositories describe "$repo_name" \
         --project="$project_id" \
         --location="$location" &>/dev/null; then
-        log_substep "AR 仓库已存在: $repo_name，跳过创建"
+        log_substep "AR 仓库已存在: ${repo_name}，跳过创建"
     else
         log_substep "创建 AR Docker 仓库: $repo_name..."
         gcloud artifacts repositories create "$repo_name" \

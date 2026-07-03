@@ -2,20 +2,18 @@
 # ==============================================================================
 # 多环境 GCP Artifact Registry 配置脚本（重构版）
 # 支持 production 和 development 环境
-#
-# 此脚本作为编排入口，通过 modules/infra-ar.sh 调用底层 AR 操作并写入本地 .env
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # --- 加载公共库 ---
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
 source "${SCRIPT_DIR}/../lib/gcp.sh"
 
-# --- 加载上下文解析器 + 功能模块 ---
-source "${SCRIPT_DIR}/shared/resolve-context.sh"
+# --- 加载系统执行层 ---
 source "${SCRIPT_DIR}/modules/infra-ar.sh"
 
 # ==============================================================================
@@ -28,37 +26,6 @@ check_prerequisites() {
     fi
     log_success "gcloud CLI 已安装"
     echo ""
-}
-
-# ==============================================================================
-# 交互式收集 AR 参数
-# 导出: GCP_AR_LOCATION, GCP_AR_REPOSITORY
-# ==============================================================================
-_collect_ar_params_interactive() {
-    local env_name="$1"
-    local env_file="${SCRIPT_DIR}/../../.env.${env_name}"
-
-    echo ""
-    log_step "Artifact Registry 参数配置"
-
-    # 从已有 .env 文件读取 VM Zone 作为 region 推导依据
-    local zone=""
-    if [[ -f "$env_file" ]]; then
-        zone=$(grep "^[[:space:]]*GCP_VM_ZONE=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
-    fi
-
-    # 推导默认 region
-    local default_location="us-west1"
-    if [[ -n "$zone" ]]; then
-        default_location="${zone%-*}"
-    fi
-
-    # 交互式：列出现有 AR 仓库或创建新仓库
-    source "${SCRIPT_DIR}/ar/setup-artifact-registry.sh"
-    setup_artifact_registry "$PROJECT_ID" "$zone"
-    # setup_artifact_registry 导出 AR_LOCATION, AR_REPOSITORY
-    GCP_AR_LOCATION="$AR_LOCATION"
-    GCP_AR_REPOSITORY="$AR_REPOSITORY"
 }
 
 # ==============================================================================
@@ -94,21 +61,96 @@ main() {
 
     check_prerequisites
 
-    # 解析上下文（选择环境 + 项目）
-    resolve_context
+    # 1. 检测非交互模式条件
+    local is_non_interactive=false
+    if [[ "${CI:-}" == "true" ]] || [[ "${NON_INTERACTIVE:-}" == "true" ]]; then
+        is_non_interactive=true
+    fi
 
-    # 交互式收集 AR 参数（列出现有仓库 or 创建新仓库）
-    _collect_ar_params_interactive "$ENV_NAME"
+    # 解析参数
+    local args=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --non-interactive) is_non_interactive=true ;;
+            *) args+=("$1") ;;
+        esac
+        shift
+    done
 
-    # 写入本地环境配置
-    local env_file="${SCRIPT_DIR}/../../.env.${ENV_NAME}"
+    # 2. 确定环境并加载环境上下文
+    if [[ "$is_non_interactive" == "true" ]]; then
+        if [[ -z "${ENV_NAME:-}" ]]; then
+            die "非交互模式错误: 必须指定环境变量 ENV_NAME (production 或 development)"
+        fi
+    else
+        # 交互模式仅选择环境，不要求选择项目
+        source "${SCRIPT_DIR}/shared/select-environment.sh"
+        select_environment
+    fi
+
+    local env_file="${PROJECT_ROOT}/.env.${ENV_NAME}"
+
+    # 3. 提取本地环境文件中的项目ID与VM区域 (统一读取，避免重复编码)
+    local env_project_id=""
+    local env_vm_zone=""
+    if [[ -f "$env_file" ]]; then
+        env_project_id=$(grep "^[[:space:]]*GCP_PROJECT_ID=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
+        env_vm_zone=$(grep "^[[:space:]]*GCP_VM_ZONE=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
+    fi
+
+    # 4. 统一推导默认区域与仓库默认值 (default_location & default_repository)
+    local default_location="us-west1"
+    if [[ -n "$env_vm_zone" ]]; then
+        default_location="${env_vm_zone%-*}"
+    fi
+    local default_repository="proxy"
+
+    # 5. 根据模式配置 Artifact Registry 变量
+    if [[ "$is_non_interactive" == "true" ]]; then
+        # 非交互模式下的参数校验与推导
+        if [[ -z "$env_project_id" ]]; then
+            die "非交互模式错误: 本地环境文件 '.env.${ENV_NAME}' 不存在或缺失 GCP_PROJECT_ID，请先执行 WIF 或 VM 初始化配置！"
+        fi
+
+        # 如果外部传入了项目 ID (GCP_PROJECT_ID 或 PROJECT_ID)，则校验其与本地文件是否一致
+        local target_project_id="${GCP_PROJECT_ID:-${PROJECT_ID:-}}"
+        if [[ -n "$target_project_id" && "$target_project_id" != "$env_project_id" ]]; then
+            die "项目 ID 冲突: 传入的项目 ID '$target_project_id' 与环境文件中的 '$env_project_id' 不一致"
+        fi
+
+        PROJECT_ID="$env_project_id"
+        GCP_AR_LOCATION="${GCP_AR_LOCATION:-$default_location}"
+        GCP_AR_REPOSITORY="${GCP_AR_REPOSITORY:-$default_repository}"
+    else
+        # 交互模式下的配置与选择
+        if [[ -z "$env_project_id" ]]; then
+            die "在本地环境配置 '.env.${ENV_NAME}' 中没有找到 GCP_PROJECT_ID，请先执行 WIF 或 VM 初始化配置！"
+        fi
+
+        PROJECT_ID="$env_project_id"
+        log_success "检测并复用项目环境: $PROJECT_ID"
+
+        # 调用辅助层获取 AR 变量 (以回传值方式，不使用全局变量导出)
+        source "${SCRIPT_DIR}/ar/helpers.sh"
+        local selected_loc=""
+        local selected_repo=""
+        ar_select_or_configure_interactive "$PROJECT_ID" "$default_repository" "$default_location" "selected_loc" "selected_repo"
+        
+        GCP_AR_LOCATION="$selected_loc"
+        GCP_AR_REPOSITORY="$selected_repo"
+    fi
+
+    # 2. 调用系统执行层执行物理创建/校验并导出标准化变量
+    infra::create_ar_repo "$PROJECT_ID" "$GCP_AR_LOCATION" "$GCP_AR_REPOSITORY"
+
+    # 3. 写入本地环境配置
     echo ""
     log_step "写入 Artifact Registry 参数至本地环境配置"
-    update_env_file "$env_file" "GCP_AR_LOCATION"   "$GCP_AR_LOCATION"
-    update_env_file "$env_file" "GCP_AR_REPOSITORY" "$GCP_AR_REPOSITORY"
+    update_env_file "$env_file" "GCP_AR_LOCATION"   "$AR_LOCATION"
+    update_env_file "$env_file" "GCP_AR_REPOSITORY" "$AR_REPOSITORY"
     echo ""
 
-    print_summary "$ENV_NAME" "$PROJECT_ID" "$GCP_AR_LOCATION" "$GCP_AR_REPOSITORY"
+    print_summary "$ENV_NAME" "$PROJECT_ID" "$AR_LOCATION" "$AR_REPOSITORY"
 }
 
-main "$@"
+main "${args[@]:+${args[@]}}"

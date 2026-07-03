@@ -15,6 +15,11 @@ fi
 # 主函数
 # ------------------------------------------------------------------------------
 select_environment() {
+    if [[ -n "${ENV_NAME:-}" ]]; then
+        log_success "使用已设置的环境: $ENV_NAME"
+        echo ""
+        return 0
+    fi
     log_step "选择部署环境"
     echo ""
     

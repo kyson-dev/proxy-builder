@@ -150,25 +150,7 @@ _collect_vm_params_interactive() {
     done
 }
 
-# ==============================================================================
-# 交互模式: 交互式收集 AR 参数
-# ==============================================================================
-_collect_ar_params_interactive() {
-    local vm_zone="${1:-}"
-    echo ""
-    log_step "Artifact Registry 参数配置"
 
-    local default_location="us-west1"
-    if [[ -n "$vm_zone" ]]; then
-        default_location=$(_zone_to_region "$vm_zone")
-    fi
-
-    prompt_with_default "AR 区域" "$default_location"
-    GCP_AR_LOCATION="$INPUT_VALUE"
-
-    prompt_with_default "AR 仓库名称" "proxy"
-    GCP_AR_REPOSITORY="$INPUT_VALUE"
-}
 
 # ==============================================================================
 # 打印最终摘要
@@ -282,27 +264,13 @@ main() {
         echo ""
         log_step "阶段 3/4: Artifact Registry"
 
-        # 非交互模式: 从环境变量读取 AR 参数（含默认值推导）
+        # 调用 setup-ar.sh 独立脚本进行处理，实现交互与非交互的统一
         if [[ "${NON_INTERACTIVE:-}" == "true" ]] || [[ "${CI:-}" == "true" ]]; then
-            # 若未指定 location，从 VM zone 推导
-            if [[ -z "${GCP_AR_LOCATION:-}" ]]; then
-                if [[ -n "${GCP_VM_ZONE:-}" ]]; then
-                    GCP_AR_LOCATION=$(_zone_to_region "$GCP_VM_ZONE")
-                else
-                    GCP_AR_LOCATION="us-west1"
-                fi
-            fi
-            GCP_AR_REPOSITORY="${GCP_AR_REPOSITORY:-proxy}"
+            GCP_PROJECT_ID="$PROJECT_ID" ENV_NAME="$ENV_NAME" GCP_VM_ZONE="${GCP_VM_ZONE:-}" \
+                "${SCRIPT_DIR}/setup-ar.sh" --non-interactive
         else
-            # 交互模式: 询问 AR 参数
-            _collect_ar_params_interactive "${GCP_VM_ZONE:-}"
+            ENV_NAME="$ENV_NAME" "${SCRIPT_DIR}/setup-ar.sh"
         fi
-
-        infra::create_ar_repo "$PROJECT_ID" "$GCP_AR_LOCATION" "$GCP_AR_REPOSITORY"
-
-        # 写入 .env 文件
-        update_env_file "$env_file" "GCP_AR_LOCATION"   "$AR_LOCATION"
-        update_env_file "$env_file" "GCP_AR_REPOSITORY" "$AR_REPOSITORY"
     fi
 
     # ---- Step 4: Firewall ----
