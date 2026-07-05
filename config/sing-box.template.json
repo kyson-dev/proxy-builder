@@ -9,13 +9,15 @@
                 "type": "udp",
                 "tag": "google",
                 "server": "8.8.8.8",
-                "detour": "direct"
+                "detour": "direct",
+                "domain_resolver": "local"
             },
             {
                 "type": "udp",
                 "tag": "cf",
                 "server": "1.1.1.1",
-                "detour": "direct"
+                "detour": "direct",
+                "domain_resolver": "local"
             },
             {
                 "type": "local",
@@ -72,7 +74,8 @@
     "outbounds": [
         {
             "type": "direct",
-            "tag": "direct"
+            "tag": "direct",
+            "domain_resolver": "local"
         },
         {
             "type": "block",

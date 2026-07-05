@@ -64,7 +64,8 @@ _rollback() {
     # 清除已迁移（损坏）的新版本，还原代码目录
     rm -rf "${APP_DIR}"
     if [ -d "${APP_DIR}.backup" ]; then
-        mv "${APP_DIR}.backup" "${APP_DIR}"
+        # -T: 若 rm 未彻底清空导致目标仍存在，强制报错而非静默嵌套进目标目录
+        mv -T "${APP_DIR}.backup" "${APP_DIR}"
         log_success "代码目录已回滚"
     else
         log_warn "无代码备份，跳过代码回滚"
@@ -73,7 +74,9 @@ _rollback() {
     # 还原数据目录
     rm -rf "${DATA_DIR}" || true
     if [ -d "${DATA_DIR}.backup" ]; then
-        mv "${DATA_DIR}.backup" "${DATA_DIR}"
+        # -T: 若上面 rm -rf 因残留 root 属主文件未能彻底删除 DATA_DIR，
+        # 强制报错而非把备份静默嵌套进残留目录（曾导致 data/data.backup 的错误结构）
+        mv -T "${DATA_DIR}.backup" "${DATA_DIR}"
         log_success "数据目录已回滚"
     else
         log_warn "无数据备份，跳过数据回滚"

@@ -75,10 +75,17 @@ build_config() {
     if ! $docker_cmd run --rm \
         -v "$tmp_file":/etc/sing-box/config.json \
         -v "${DATA_ROOT}/cert":/etc/sing-box/cert:ro \
-        ghcr.io/sagernet/sing-box:latest \
+        ghcr.io/sagernet/sing-box:v1.13.14 \
         check -c /etc/sing-box/config.json; then
         rm -f "$tmp_file"
         die "Sing-box 配置文件格式验证失败，请检查 users.json 或 .env 参数是否有误。原配置文件未被修改。"
+    fi
+
+    # 🚨 防御性处理：如果 docker up 之前 config.json 不存在，
+    # Docker volumes 会默认把它当作"目录"创建（并赋予 root 权限），导致挂载失败
+    if [[ -d "$output_file" ]]; then
+        log_warn "检测到 config.json 是错误的目录结构，正在修复..."
+        sudo rm -rf "$output_file" || rm -rf "$output_file"
     fi
 
     # 校验通过 → 原子性替换（不会中断正在运行的服务读取）

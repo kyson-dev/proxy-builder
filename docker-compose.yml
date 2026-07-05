@@ -1,6 +1,6 @@
 services:
   sing-box:
-    image: ghcr.io/sagernet/sing-box:latest
+    image: ghcr.io/sagernet/sing-box:v1.13.14
     container_name: sing-box
     hostname: sing-box
     restart: unless-stopped
