@@ -94,6 +94,12 @@ _cleanup_backup() {
     rm -rf "${DATA_DIR}.backup" || true
 }
 
+# 清理不再被任何容器引用的旧镜像（含已打 tag 的旧版本），控制磁盘占用
+_prune_old_images() {
+    log_step "清理无用 Docker 镜像..."
+    docker image prune -af || true
+}
+
 # ------------------------------------------------------------------------------
 # 主流程
 # ------------------------------------------------------------------------------
@@ -120,6 +126,7 @@ main() {
     if ./scripts/deploy/deploy.sh; then
         log_success "部署成功"
         _cleanup_backup
+        _prune_old_images
     else
         _rollback
         exit 1

@@ -173,7 +173,7 @@ main() {
         VM_NAME="${VM_NAME:-proxy-vm-$(date +%Y%m%d)}"
         GCP_VM_ZONE="${GCP_VM_ZONE:-us-west1-b}"
         VM_MACHINE_TYPE="${VM_MACHINE_TYPE:-e2-micro}"
-        VM_DISK_SIZE="${VM_DISK_SIZE:-20}"
+        VM_DISK_SIZE="${VM_DISK_SIZE:-10}"
         VM_DISK_TYPE="${VM_DISK_TYPE:-pd-standard}"
         VM_NETWORK_TIER="${VM_NETWORK_TIER:-STANDARD}"
         VM_IS_SPOT="${VM_IS_SPOT:-false}"
