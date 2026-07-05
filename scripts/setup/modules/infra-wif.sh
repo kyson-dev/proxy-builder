@@ -172,7 +172,7 @@ _infra_wif_bind_repo_to_sa() {
 infra::setup_wif() {
     local project_id="${1:?infra::setup_wif: project_id 不能为空}"
     local github_repo="${2:?infra::setup_wif: github_repo 不能为空 (格式: owner/repo)}"
-    local sa_name="${3:-github-deploy}"
+    local sa_name="${3:-github-deploy-sa}"
     local pool_name="${4:-github-pool}"
     local provider_name="${5:-github-provider}"
 

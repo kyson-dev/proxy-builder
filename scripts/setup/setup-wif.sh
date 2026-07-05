@@ -123,7 +123,10 @@ main() {
         confirm_github_repo
     fi
 
-    # 5. Project 变更检测: 清除旧项目下的 VM/AR 本地配置
+    # 5. 调用 Layer 2 模块完成 WIF 配置
+    infra::setup_wif "$PROJECT_ID" "$REPO"
+
+    # 6. Project 变更检测: 清除旧项目下的 VM/AR 本地配置 (仅在 WIF 配置成功后执行)
     if [[ -n "$old_project_id" ]] && [[ "$old_project_id" != "$PROJECT_ID" ]]; then
         log_warn "检测到 project id 变更 ($old_project_id → $PROJECT_ID)，清除旧项目下的 VM/AR 本地配置"
         remove_env_file_key "$env_file" "GCP_VM_NAME"
@@ -132,9 +135,6 @@ main() {
         remove_env_file_key "$env_file" "GCP_AR_REPOSITORY"
         echo ""
     fi
-
-    # 6. 调用 Layer 2 模块完成 WIF 配置
-    infra::setup_wif "$PROJECT_ID" "$REPO"
 
     # 7. 写入本地环境配置
     echo ""

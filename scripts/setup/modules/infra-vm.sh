@@ -126,11 +126,12 @@ _infra_vm_create_core() {
 #   $1  project_id    GCP 项目 ID（必须）
 #   $2  vm_name       VM 实例名称（必须）
 #   $3  zone          GCE 区域，如 us-west1-b（必须）
-#   $4  machine_type  机器类型（可选，默认 e2-micro）
-#   $5  disk_size     磁盘大小 GB（可选，默认 20）
-#   $6  disk_type     磁盘类型（可选，默认 pd-standard）
-#   $7  network_tier  网络层级（可选，默认 STANDARD）
-#   $8  is_spot       是否为 Spot 实例，true/false（可选，默认 false）
+#   $4  sa_name       VM 专属服务账号名称（必须）
+#   $5  machine_type  机器类型（可选，默认 e2-micro）
+#   $6  disk_size     磁盘大小 GB（可选，默认 20）
+#   $7  disk_type     磁盘类型（可选，默认 pd-standard）
+#   $8  network_tier  网络层级（可选，默认 STANDARD）
+#   $9  is_spot       是否为 Spot 实例，true/false（可选，默认 false）
 #
 # 导出:
 #   VM_NAME   VM 实例名称
@@ -140,11 +141,12 @@ infra::create_vm() {
     local project_id="${1:?infra::create_vm: project_id 不能为空}"
     local vm_name="${2:?infra::create_vm: vm_name 不能为空}"
     local zone="${3:?infra::create_vm: zone 不能为空}"
-    local machine_type="${4:-e2-micro}"
-    local disk_size="${5:-20}"
-    local disk_type="${6:-pd-standard}"
-    local network_tier="${7:-STANDARD}"
-    local is_spot="${8:-false}"
+    local sa_name="${4:?infra::create_vm: sa_name 不能为空}"
+    local machine_type="${5:-e2-micro}"
+    local disk_size="${6:-20}"
+    local disk_type="${7:-pd-standard}"
+    local network_tier="${8:-STANDARD}"
+    local is_spot="${9:-false}"
 
     log_step "VM 创建: $vm_name (区域: $zone, 机器: $machine_type)"
 
@@ -158,9 +160,9 @@ infra::create_vm() {
     # 1. 确保 SSH 防火墙规则存在
     _infra_vm_ensure_ssh_firewall "$project_id"
 
-    # 2. 创建服务账号（名称与 VM 相同）
-    _infra_vm_create_service_account "$project_id" "$vm_name"
-    local sa_email="${vm_name}@${project_id}.iam.gserviceaccount.com"
+    # 2. 创建专属服务账号 (使用从上层传入的 sa_name 命名)
+    _infra_vm_create_service_account "$project_id" "$sa_name"
+    local sa_email="${sa_name}@${project_id}.iam.gserviceaccount.com"
 
     # 等待服务账号在 IAM 系统中传播
     log_substep "等待服务账号传播..."

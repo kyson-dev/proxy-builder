@@ -90,46 +90,31 @@ main() {
 
     local env_file="${PROJECT_ROOT}/.env.${ENV_NAME}"
 
-    # 3. 提取本地环境文件中的项目ID与VM区域 (统一读取，避免重复编码)
+    # 3. Project ID 只读本地 .env 文件 (统一读取，避免重复编码)
     local env_project_id=""
     local env_vm_zone=""
     if [[ -f "$env_file" ]]; then
         env_project_id=$(grep "^[[:space:]]*GCP_PROJECT_ID=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
         env_vm_zone=$(grep "^[[:space:]]*GCP_VM_ZONE=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
     fi
+    if [[ -z "$env_project_id" ]]; then
+        die "在本地环境配置 '.env.${ENV_NAME}' 中没有找到 GCP_PROJECT_ID，请先执行 WIF 或 VM 初始化配置！"
+    fi
+    PROJECT_ID="$env_project_id"
+    log_success "检测并复用项目环境: $PROJECT_ID"
 
     # 4. 统一推导默认区域与仓库默认值 (default_location & default_repository)
     local default_location="us-west1"
     if [[ -n "$env_vm_zone" ]]; then
         default_location="${env_vm_zone%-*}"
     fi
-    local default_repository="proxy"
+    local default_repository="proxy-repo"
 
     # 5. 根据模式配置 Artifact Registry 变量
     if [[ "$is_non_interactive" == "true" ]]; then
-        # 非交互模式下的参数校验与推导
-        if [[ -z "$env_project_id" ]]; then
-            die "非交互模式错误: 本地环境文件 '.env.${ENV_NAME}' 不存在或缺失 GCP_PROJECT_ID，请先执行 WIF 或 VM 初始化配置！"
-        fi
-
-        # 如果外部传入了项目 ID (GCP_PROJECT_ID 或 PROJECT_ID)，则校验其与本地文件是否一致
-        local target_project_id="${GCP_PROJECT_ID:-${PROJECT_ID:-}}"
-        if [[ -n "$target_project_id" && "$target_project_id" != "$env_project_id" ]]; then
-            die "项目 ID 冲突: 传入的项目 ID '$target_project_id' 与环境文件中的 '$env_project_id' 不一致"
-        fi
-
-        PROJECT_ID="$env_project_id"
         GCP_AR_LOCATION="${GCP_AR_LOCATION:-$default_location}"
         GCP_AR_REPOSITORY="${GCP_AR_REPOSITORY:-$default_repository}"
     else
-        # 交互模式下的配置与选择
-        if [[ -z "$env_project_id" ]]; then
-            die "在本地环境配置 '.env.${ENV_NAME}' 中没有找到 GCP_PROJECT_ID，请先执行 WIF 或 VM 初始化配置！"
-        fi
-
-        PROJECT_ID="$env_project_id"
-        log_success "检测并复用项目环境: $PROJECT_ID"
-
         # 调用辅助层获取 AR 变量 (以回传值方式，不使用全局变量导出)
         source "${SCRIPT_DIR}/ar/helpers.sh"
         local selected_loc=""

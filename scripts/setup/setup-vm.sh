@@ -43,7 +43,7 @@ _collect_vm_params_interactive() {
     echo ""
     log_step "VM 参数配置"
 
-    prompt_with_default "VM 实例名称" "proxy-vm-${env_name}"
+    prompt_with_default "VM 实例名称" "proxy-vm-$(date +%Y%m%d)"
     VM_NAME="$INPUT_VALUE"
 
     echo ""
@@ -51,7 +51,7 @@ _collect_vm_params_interactive() {
     echo "  1. Google Free Tier (e2-micro, us-west1-b, 30GB)"
     echo "     - 费用: 免费 (在配额内)"
     echo "  2. Spot 实例        (e2-micro, us-central1-a, 10GB)"
-    echo "     - 费用: ~\$5/月 (可能被回收)"
+    echo "     - 费用: ~\$5/月 (可能被回收)，网络层级为 STANDARD"
     echo "  3. 自定义配置"
     echo ""
 
@@ -168,8 +168,9 @@ main() {
     log_success "检测并复用项目环境: $PROJECT_ID"
 
     # 4. 确定 VM 参数并创建/复用
+    local sa_name="proxy-vm-sa"
     if [[ "$is_non_interactive" == "true" ]]; then
-        VM_NAME="${VM_NAME:-proxy-vm-${ENV_NAME}}"
+        VM_NAME="${VM_NAME:-proxy-vm-$(date +%Y%m%d)}"
         GCP_VM_ZONE="${GCP_VM_ZONE:-us-west1-b}"
         VM_MACHINE_TYPE="${VM_MACHINE_TYPE:-e2-micro}"
         VM_DISK_SIZE="${VM_DISK_SIZE:-20}"
@@ -178,7 +179,7 @@ main() {
         VM_IS_SPOT="${VM_IS_SPOT:-false}"
 
         infra::create_vm \
-            "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" \
+            "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" "$sa_name" \
             "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT"
     else
         source "${SCRIPT_DIR}/vm/select-vm.sh"
@@ -189,7 +190,7 @@ main() {
             # 用户选择了创建新 VM
             _collect_vm_params_interactive "$ENV_NAME"
             infra::create_vm \
-                "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" \
+                "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" "$sa_name" \
                 "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT"
         fi
     fi
