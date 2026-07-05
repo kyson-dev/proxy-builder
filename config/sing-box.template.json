@@ -6,25 +6,11 @@
     "dns": {
         "servers": [
             {
-                "type": "udp",
-                "tag": "google",
-                "server": "8.8.8.8",
-                "detour": "direct",
-                "domain_resolver": "local"
-            },
-            {
-                "type": "udp",
-                "tag": "cf",
-                "server": "1.1.1.1",
-                "detour": "direct",
-                "domain_resolver": "local"
-            },
-            {
                 "type": "local",
                 "tag": "local"
             }
         ],
-        "final": "google",
+        "final": "local",
         "strategy": "prefer_ipv4"
     },
     "inbounds": [
@@ -74,8 +60,7 @@
     "outbounds": [
         {
             "type": "direct",
-            "tag": "direct",
-            "domain_resolver": "local"
+            "tag": "direct"
         },
         {
             "type": "block",
