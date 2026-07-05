@@ -210,3 +210,24 @@ update_env_file() {
     log_success "写入本地配置: $key"
 }
 
+# ------------------------------------------------------------------------------
+# 从本地 .env 文件中删除指定的键（若不存在则静默跳过）
+# ------------------------------------------------------------------------------
+remove_env_file_key() {
+    local file_path="$1"
+    local key="$2"
+
+    if [[ -z "$file_path" || -z "$key" ]]; then
+        die "remove_env_file_key 用法: remove_env_file_key <file_path> <key>"
+    fi
+
+    [[ -f "$file_path" ]] || return 0
+
+    if grep -q "^[[:space:]]*${key}=" "$file_path"; then
+        local temp_file="${file_path}.tmp"
+        grep -v "^[[:space:]]*${key}=" "$file_path" > "$temp_file"
+        mv "$temp_file" "$file_path"
+        log_substep "已清除本地配置: $key"
+    fi
+}
+

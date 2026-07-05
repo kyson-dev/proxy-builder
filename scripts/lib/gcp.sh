@@ -304,13 +304,16 @@ gcp_oslogin_enabled() {
     local vm_name="$1"
     local zone="$2"
     local project="$3"
-    local status
+    local status=""
     status=$(gcloud compute instances describe "$vm_name" \
         --zone "$zone" \
         --project "$project" \
-        --format="get(metadata.items[key=enable-oslogin].value)" 2>/dev/null)
-    # 处理大小写：TRUE, true, True 都算启用
-    [[ "${status,,}" == "true" ]] 2>/dev/null || [[ "$status" == "TRUE" ]] || [[ "$status" == "true" ]]
+        --format="get(metadata.items[key=enable-oslogin].value)" 2>/dev/null) || true
+    # 处理大小写：TRUE, true, True 都算启用 (兼容 bash 3.2，不使用 ${var,,} 语法)
+    case "$status" in
+        [Tt][Rr][Uu][Ee]) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 

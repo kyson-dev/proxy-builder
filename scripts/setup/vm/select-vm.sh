@@ -44,10 +44,12 @@ select_vm() {
             ((vm_count++))
         done <<< "$vm_list"
     fi
-    
+
     # 显示菜单：所有 VM + 创建新 VM + 退出
     echo ""
     local default_vm_index=""
+    VM_NAME=""
+    VM_ZONE=""
     if [[ $vm_count -eq 0 ]]; then
         log_warn "项目中没有现有 VM 实例"
         echo ""
@@ -55,17 +57,17 @@ select_vm() {
         echo "  1. 🆕 创建新 VM"
         echo "  0. 退出"
         echo ""
-        
+
         local choice
         read -p "选择 (0-1): " choice
         case "$choice" in
-            1) 
-                # 调用创建 VM 脚本
-                create_vm_interactive "$project"
+            1)
+                # 留空 VM_NAME，交由调用方 (setup-vm.sh) 收集参数并创建
+                log_substep "将创建新 VM"
                 ;;
-            *) 
+            *)
                 log_warn "已退出"
-                exit 0 
+                exit 0
                 ;;
         esac
     else
@@ -104,9 +106,9 @@ select_vm() {
                 exit 0
             fi
             
-            # 创建新 VM
+            # 创建新 VM: 留空 VM_NAME，交由调用方 (setup-vm.sh) 收集参数并创建
             if [[ "$selection" == "$((vm_count+1))" ]]; then
-                create_vm_interactive "$project"
+                log_substep "将创建新 VM"
                 break
             fi
             
@@ -131,9 +133,11 @@ select_vm() {
         done
     fi
     
-    log_success "选择的 VM: $VM_NAME (区域: $VM_ZONE)"
+    if [[ -n "$VM_NAME" ]]; then
+        log_success "选择的 VM: $VM_NAME (区域: $VM_ZONE)"
+    fi
     echo ""
-    
+
     export VM_NAME VM_ZONE
 }
 

@@ -1,7 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# 推送配置变量到 GitHub Environment Secrets（重构版）
+# 推送配置变量到 GitHub Environment Secrets（重构版，原 upload-env.sh）
 # 此脚本作为编排入口，通过 modules/infra-env.sh 调用底层上传操作
+# 不涉及 GCP_PROJECT_ID（推送 secret 不需要）
 # ==============================================================================
 set -euo pipefail
 
@@ -12,10 +13,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
 source "${SCRIPT_DIR}/../lib/github.sh"
-source "${SCRIPT_DIR}/../lib/gcp.sh"
 
-# --- 加载上下文解析器 + 功能模块 ---
-source "${SCRIPT_DIR}/shared/resolve-context.sh"
+# --- 加载系统执行层 ---
 source "${SCRIPT_DIR}/modules/infra-env.sh"
 
 # ==============================================================================
@@ -27,8 +26,40 @@ main() {
     # 1. 确保 GitHub CLI 已登录
     github_ensure_auth
 
-    # 2. 解析上下文（选择环境 + 确认 GitHub 仓库）
-    resolve_context --need-repo
+    # 2. 检测非交互模式条件
+    local is_non_interactive=false
+    if [[ "${CI:-}" == "true" ]] || [[ "${NON_INTERACTIVE:-}" == "true" ]]; then
+        is_non_interactive=true
+    fi
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --non-interactive) is_non_interactive=true ;;
+        esac
+        shift
+    done
+
+    # 3. 确定环境
+    if [[ "$is_non_interactive" == "true" ]]; then
+        if [[ -z "${ENV_NAME:-}" ]]; then
+            die "非交互模式错误: 必须指定环境变量 ENV_NAME (production 或 development)"
+        fi
+    else
+        source "${SCRIPT_DIR}/shared/select-environment.sh"
+        select_environment
+    fi
+
+    # 4. 确定 GitHub 仓库
+    if [[ "$is_non_interactive" == "true" ]]; then
+        if [[ -z "${GITHUB_REPO:-}" ]]; then
+            die "非交互模式缺少必须变量: GITHUB_REPO (格式: owner/repo)"
+        fi
+        REPO="$GITHUB_REPO"
+        REPO_OWNER="${REPO%%/*}"
+    else
+        source "${SCRIPT_DIR}/shared/confirm-repo.sh"
+        confirm_github_repo
+    fi
 
     local env_file="${PROJECT_ROOT}/.env.${ENV_NAME}"
 
@@ -43,25 +74,36 @@ main() {
         exit 1
     fi
 
-    # 3. 二次确认
-    if ! confirm "确认将 '.env.${ENV_NAME}' 推送到 '$ENV_NAME' 环境?" "y"; then
-        log_warn "已取消"
-        exit 0
+    # 5. 二次确认（非交互模式下跳过）
+    if [[ "$is_non_interactive" == "false" ]]; then
+        if ! confirm "确认将 '.env.${ENV_NAME}' 推送到 '$ENV_NAME' 环境?" "y"; then
+            log_warn "已取消"
+            exit 0
+        fi
     fi
 
     echo ""
     log_step "正在推送配置..."
 
-    # 初始化统计变量
     ENV_UPLOADED_COUNT=0
     ENV_SKIPPED_COUNT=0
     ENV_FAILED_COUNT=0
 
-    # 4. 调用 Layer 2 模块上传环境变量
+    # 6. 推送环境变量
     infra::push_env_to_github "$ENV_NAME" "$env_file" "$REPO"
 
-    # 5. 调用 Layer 2 模块上传用户列表
-    infra::push_users_to_github "$ENV_NAME" "$PROJECT_ROOT" "$REPO"
+    # 7. 发现并推送用户列表文件（users.<env>.json 优先，否则 fallback users.json）
+    local users_file="${PROJECT_ROOT}/users.${ENV_NAME}.json"
+    if [[ ! -f "$users_file" ]]; then
+        users_file="${PROJECT_ROOT}/users.json"
+    fi
+
+    if [[ -f "$users_file" ]]; then
+        log_step "发现用户列表文件: $(basename "$users_file")，准备推送到 GitHub Secrets"
+        infra::push_json_secret_from_file "USERS_JSON" "$users_file" "$ENV_NAME" "$REPO"
+    else
+        log_substep "未检测到 users.${ENV_NAME}.json 或 users.json，跳过用户配置上传"
+    fi
 
     echo ""
     print_separator

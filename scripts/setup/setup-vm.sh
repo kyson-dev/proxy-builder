@@ -2,20 +2,18 @@
 # ==============================================================================
 # 多环境 GCP 虚拟机配置脚本（重构版）
 # 支持 production 和 development 环境
-#
-# 此脚本作为编排入口，通过 modules/infra-vm.sh 调用底层 VM 操作并写入本地 .env
 # ==============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 # --- 加载公共库 ---
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
 source "${SCRIPT_DIR}/../lib/gcp.sh"
 
-# --- 加载上下文解析器 + 功能模块 ---
-source "${SCRIPT_DIR}/shared/resolve-context.sh"
+# --- 加载系统执行层 ---
 source "${SCRIPT_DIR}/modules/infra-vm.sh"
 
 # 预设常量（供交互模式使用）
@@ -99,19 +97,6 @@ _collect_vm_params_interactive() {
 }
 
 # ==============================================================================
-# 交互式选择或创建 VM
-# ==============================================================================
-_select_or_create_vm_interactive() {
-    local project="$1"
-    local env_name="$2"
-
-    source "${SCRIPT_DIR}/vm/select-vm.sh"
-    select_vm "$project" "$env_name"
-    # select_vm 导出 VM_NAME 和 VM_ZONE（即 GCP_VM_ZONE）
-    GCP_VM_ZONE="$VM_ZONE"
-}
-
-# ==============================================================================
 # 打印摘要
 # ==============================================================================
 print_summary() {
@@ -145,17 +130,74 @@ main() {
 
     check_prerequisites
 
-    # 解析上下文（选择环境 + 项目）
-    resolve_context
+    # 1. 检测非交互模式条件
+    local is_non_interactive=false
+    if [[ "${CI:-}" == "true" ]] || [[ "${NON_INTERACTIVE:-}" == "true" ]]; then
+        is_non_interactive=true
+    fi
 
-    # 交互式选择或创建 VM（含 VM 参数采集）
-    _select_or_create_vm_interactive "$PROJECT_ID" "$ENV_NAME"
+    # 解析参数
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --non-interactive) is_non_interactive=true ;;
+        esac
+        shift
+    done
 
-    # 确保 OS Login 启用（通过 infra-vm.sh 的无交互函数）
+    # 2. 确定环境
+    if [[ "$is_non_interactive" == "true" ]]; then
+        if [[ -z "${ENV_NAME:-}" ]]; then
+            die "非交互模式错误: 必须指定环境变量 ENV_NAME (production 或 development)"
+        fi
+    else
+        source "${SCRIPT_DIR}/shared/select-environment.sh"
+        select_environment
+    fi
+
+    local env_file="${PROJECT_ROOT}/.env.${ENV_NAME}"
+
+    # 3. Project ID 只读本地 .env 文件（只能由 setup-wif.sh 写入）
+    local env_project_id=""
+    if [[ -f "$env_file" ]]; then
+        env_project_id=$(grep "^[[:space:]]*GCP_PROJECT_ID=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
+    fi
+    if [[ -z "$env_project_id" ]]; then
+        die "在本地环境配置 '.env.${ENV_NAME}' 中没有找到 GCP_PROJECT_ID，请先执行: make setup-wif"
+    fi
+    PROJECT_ID="$env_project_id"
+    log_success "检测并复用项目环境: $PROJECT_ID"
+
+    # 4. 确定 VM 参数并创建/复用
+    if [[ "$is_non_interactive" == "true" ]]; then
+        VM_NAME="${VM_NAME:-proxy-vm-${ENV_NAME}}"
+        GCP_VM_ZONE="${GCP_VM_ZONE:-us-west1-b}"
+        VM_MACHINE_TYPE="${VM_MACHINE_TYPE:-e2-micro}"
+        VM_DISK_SIZE="${VM_DISK_SIZE:-20}"
+        VM_DISK_TYPE="${VM_DISK_TYPE:-pd-standard}"
+        VM_NETWORK_TIER="${VM_NETWORK_TIER:-STANDARD}"
+        VM_IS_SPOT="${VM_IS_SPOT:-false}"
+
+        infra::create_vm \
+            "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" \
+            "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT"
+    else
+        source "${SCRIPT_DIR}/vm/select-vm.sh"
+        select_vm "$PROJECT_ID" "$ENV_NAME"
+        GCP_VM_ZONE="$VM_ZONE"
+
+        if [[ -z "$VM_NAME" ]]; then
+            # 用户选择了创建新 VM
+            _collect_vm_params_interactive "$ENV_NAME"
+            infra::create_vm \
+                "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" \
+                "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT"
+        fi
+    fi
+
+    # 5. 确保 OS Login 启用
     infra::ensure_vm_oslogin "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE"
 
-    # 写入本地环境配置
-    local env_file="${SCRIPT_DIR}/../../.env.${ENV_NAME}"
+    # 6. 写入本地环境配置
     echo ""
     log_step "写入虚拟机参数至本地环境配置"
     update_env_file "$env_file" "GCP_VM_NAME" "$VM_NAME"

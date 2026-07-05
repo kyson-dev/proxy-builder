@@ -1,7 +1,6 @@
 #!/bin/bash
 # ==============================================================================
 # 配置服务端口防火墙规则（重构版）
-# 此脚本作为编排入口，通过 modules/infra-firewall.sh 调用底层防火墙操作
 # ==============================================================================
 set -euo pipefail
 
@@ -13,9 +12,11 @@ source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/prompt.sh"
 source "${SCRIPT_DIR}/../lib/gcp.sh"
 
-# --- 加载上下文解析器 + 功能模块 ---
-source "${SCRIPT_DIR}/shared/resolve-context.sh"
+# --- 加载系统执行层 ---
 source "${SCRIPT_DIR}/modules/infra-firewall.sh"
+
+# --- 加载辅助脚本 (解析项目 docker-compose.yml) ---
+source "${SCRIPT_DIR}/firewall/parse-compose-ports.sh"
 
 # ==============================================================================
 # 主流程
@@ -23,12 +24,43 @@ source "${SCRIPT_DIR}/modules/infra-firewall.sh"
 main() {
     print_header "配置服务端口防火墙规则"
 
-    # 仅需选择项目，无需选择环境（防火墙规则与环境无关）
-    # 通过 resolve_context 会调用 select_environment + select_gcp_project
-    # 对于 setup-firewall 而言只需 PROJECT_ID，ENV_NAME 不使用
-    resolve_context
+    # 1. 检测非交互模式条件
+    local is_non_interactive=false
+    if [[ "${CI:-}" == "true" ]] || [[ "${NON_INTERACTIVE:-}" == "true" ]]; then
+        is_non_interactive=true
+    fi
 
-    # 解析 docker-compose.yml 中的端口配置
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --non-interactive) is_non_interactive=true ;;
+        esac
+        shift
+    done
+
+    # 2. 确定环境
+    if [[ "$is_non_interactive" == "true" ]]; then
+        if [[ -z "${ENV_NAME:-}" ]]; then
+            die "非交互模式错误: 必须指定环境变量 ENV_NAME (production 或 development)"
+        fi
+    else
+        source "${SCRIPT_DIR}/shared/select-environment.sh"
+        select_environment
+    fi
+
+    local env_file="${PROJECT_ROOT}/.env.${ENV_NAME}"
+
+    # 3. Project ID 只读本地 .env 文件（只能由 setup-wif.sh 写入）
+    local env_project_id=""
+    if [[ -f "$env_file" ]]; then
+        env_project_id=$(grep "^[[:space:]]*GCP_PROJECT_ID=" "$env_file" | cut -d'=' -f2- | xargs 2>/dev/null || echo "")
+    fi
+    if [[ -z "$env_project_id" ]]; then
+        die "在本地环境配置 '.env.${ENV_NAME}' 中没有找到 GCP_PROJECT_ID，请先执行: make setup-wif"
+    fi
+    PROJECT_ID="$env_project_id"
+    log_success "检测并复用项目环境: $PROJECT_ID"
+
+    # 4. 解析 docker-compose.yml 中的端口配置
     local compose_file="${PROJECT_ROOT}/docker-compose.yml"
 
     log_step "解析 docker-compose.yml 端口配置"
@@ -61,14 +93,15 @@ main() {
     done
     echo ""
 
-    if ! confirm "是否继续?" "y"; then
-        log_warn "已取消"
-        exit 0
+    if [[ "$is_non_interactive" == "false" ]]; then
+        if ! confirm "是否继续?" "y"; then
+            log_warn "已取消"
+            exit 0
+        fi
+        echo ""
     fi
 
-    echo ""
-
-    # 调用 Layer 2 功能模块执行防火墙规则
+    # 5. 调用 Layer 2 功能模块执行防火墙规则
     infra::apply_firewall_rules "$PROJECT_ID" "${ports[@]}"
 }
 

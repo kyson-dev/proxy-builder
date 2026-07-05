@@ -28,7 +28,7 @@ help:
 	@echo "  scripts/setup/setup-wif.sh         - Interactive WIF setup"
 	@echo "  scripts/setup/setup-vm.sh          - Interactive VM setup"
 	@echo "  scripts/setup/setup-ar.sh          - Interactive AR setup"
-	@echo "  scripts/setup/upload-env.sh        - Interactive env upload"
+	@echo "  scripts/setup/setup-env.sh         - Interactive env upload"
 	@echo "  scripts/setup/setup-firewall.sh    - Interactive firewall setup"
 	@echo "  scripts/provision/provision.sh     - Host provisioning (run on VM)"
 	@echo "  scripts/deploy/deploy.sh           - App deployment (run on VM)"
@@ -64,8 +64,8 @@ setup-wif:
 	@./scripts/setup/setup-wif.sh
 
 upload-env:
-	@chmod +x scripts/setup/upload-env.sh
-	@./scripts/setup/upload-env.sh
+	@chmod +x scripts/setup/setup-env.sh
+	@./scripts/setup/setup-env.sh
 
 setup-firewall:
 	@chmod +x scripts/setup/setup-firewall.sh

@@ -153,4 +153,4 @@ main() {
     print_summary "$ENV_NAME" "$PROJECT_ID" "$AR_LOCATION" "$AR_REPOSITORY"
 }
 
-main "${args[@]:+${args[@]}}"
+main "$@"
