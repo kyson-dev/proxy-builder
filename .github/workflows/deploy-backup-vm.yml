@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       zone:
-        description: "GCE 可用区（留空则使用当前环境的 GCP_VM_ZONE, 可使用首尔可用区 asia-northeast3-a）"
+        description: "GCE 区域（留空则使用当前环境的 GCP_VM_ZONE, 可使用seoul区域 asia-northeast3-a）"
         required: false
         type: string
       machine_type:
