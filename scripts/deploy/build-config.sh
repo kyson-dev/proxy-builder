@@ -31,6 +31,10 @@ build_config() {
         dest_port="443"
     fi
     
+    # Hysteria2 混淆密码与 SNI（默认 www.bing.com，与自签证书 CN、masquerade 保持一致）
+    local obfs_password="${OBFS_PASSWORD:-}"
+    local hy2_sni="${HY2_SNI:-www.bing.com}"
+
     # 构建用户数组
     local vless_users="[]"
     local hy2_users="[]"
@@ -52,13 +56,17 @@ build_config() {
        --argjson dest_port "$dest_port" \
        --arg private_key "$REALITY_PRIVATE_KEY" \
        --arg short_id "$REALITY_SHORT_ID" \
+       --arg obfs_password "$obfs_password" \
+       --arg hy2_sni "$hy2_sni" \
        '(.inbounds[] | select(.type=="vless")).users = $vless |
         (.inbounds[] | select(.type=="vless")).tls.server_name = $dest_name |
         (.inbounds[] | select(.type=="vless")).tls.reality.handshake.server = $dest_name |
         (.inbounds[] | select(.type=="vless")).tls.reality.handshake.server_port = $dest_port |
         (.inbounds[] | select(.type=="vless")).tls.reality.private_key = $private_key |
         (.inbounds[] | select(.type=="vless")).tls.reality.short_id = ($short_id | split(",")) |
-        (.inbounds[] | select(.type=="hysteria2")).users = $hy2' \
+        (.inbounds[] | select(.type=="hysteria2")).users = $hy2 |
+        (.inbounds[] | select(.type=="hysteria2")).masquerade = ("https://" + $hy2_sni) |
+        (.inbounds[] | select(.type=="hysteria2")) |= (if $obfs_password == "" then del(.obfs) else .obfs.password = $obfs_password end)' \
        "$template_file" > "$tmp_file"
 
     log_substep "校验 Sing-box 配置文件..."

@@ -3,13 +3,30 @@
         "level": "info",
         "timestamp": true
     },
+    "dns": {
+        "servers": [
+            {
+                "type": "udp",
+                "tag": "google",
+                "server": "8.8.8.8",
+                "detour": "direct"
+            },
+            {
+                "type": "udp",
+                "tag": "cf",
+                "server": "1.1.1.1",
+                "detour": "direct"
+            }
+        ],
+        "final": "google",
+        "strategy": "prefer_ipv4"
+    },
     "inbounds": [
         {
             "type": "vless",
             "tag": "vless-in",
             "listen": "::",
             "listen_port": 443,
-            "tcp_fast_open": true,
             "udp_fragment": true,
             "users": [],
             "tls": {
@@ -31,9 +48,13 @@
             "tag": "hy2-in",
             "listen": "::",
             "listen_port": 443,
-            "up_mbps": 200,
-            "down_mbps": 200,
+            "ignore_client_bandwidth": true,
             "users": [],
+            "obfs": {
+                "type": "salamander",
+                "password": ""
+            },
+            "masquerade": "https://www.bing.com",
             "tls": {
                 "enabled": true,
                 "alpn": [

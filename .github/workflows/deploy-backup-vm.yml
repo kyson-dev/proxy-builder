@@ -162,6 +162,8 @@ jobs:
           REALITY_PUBLIC_KEY=${{ secrets.REALITY_PUBLIC_KEY }}
           REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
           REALITY_DEST=${{ secrets.REALITY_DEST }}
+          HY2_SNI=${{ secrets.HY2_SNI }}
+          OBFS_PASSWORD=${{ secrets.OBFS_PASSWORD }}
           SUBSCRIPTION_IMAGE=${SUBSCRIPTION_IMAGE}
           EOF
 

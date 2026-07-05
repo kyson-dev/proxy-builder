@@ -70,8 +70,8 @@ main() {
     init_data_dir
     echo ""
 
-    # Step 4: 生成自签名证书
-    generate_certs "${DATA_ROOT}/cert"
+    # Step 4: 生成自签名证书（CN 用 HY2_SNI，与 Hy2 客户端 SNI、masquerade 保持一致）
+    generate_certs "${DATA_ROOT}/cert" "${HY2_SNI:-www.bing.com}"
     echo ""
 
     # Step 5: 构建 sing-box config.json
