@@ -11,6 +11,8 @@ data/
 .env.production
 .env.development
 users.json
+users.development.json
+users.production.json
 
 # macOS
 .DS_Store

@@ -12,9 +12,13 @@ fi
 build_config() {
     log_step "构建 Sing-box 配置文件"
     
-    local template_file="${SCRIPT_DIR}/sing-box/config.template.json"
-    local output_file="${SING_BOX_DATA_DIR}/config.json"
-    local users_file="${SCRIPT_DIR}/users.json"
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local project_root="$(cd "${script_dir}/../.." && pwd)"
+    
+    local template_file="${project_root}/config/sing-box.template.json"
+    local output_file="${DATA_ROOT}/config.json"
+    local users_file="${project_root}/users.json"
     
     if [[ ! -f "$template_file" ]]; then
         die "找不到配置文件模板: $template_file"
@@ -62,7 +66,7 @@ build_config() {
     docker_cmd=$(get_docker_cmd) || die "无法连接到 Docker，请确认 Docker 已安装并运行"
     if ! $docker_cmd run --rm \
         -v "$tmp_file":/etc/sing-box/config.json \
-        -v "${SING_BOX_DATA_DIR}/cert":/etc/sing-box/cert:ro \
+        -v "${DATA_ROOT}/cert":/etc/sing-box/cert:ro \
         ghcr.io/sagernet/sing-box:latest \
         check -c /etc/sing-box/config.json; then
         rm -f "$tmp_file"
@@ -77,13 +81,13 @@ build_config() {
     if [[ -f "$users_file" ]]; then
         # 🚨 防御性处理：如果 docker up 之前 users.json 不存在，
         # Docker volumes 会默认把它当作"目录"创建（并赋予 root 权限），导致之后 cp 报错
-        if [[ -d "${SING_BOX_DATA_DIR}/users.json" ]]; then
+        if [[ -d "${DATA_ROOT}/users.json" ]]; then
             log_warn "检测到 users.json 是错误的目录结构，正在修复..."
-            sudo rm -rf "${SING_BOX_DATA_DIR}/users.json" || rm -rf "${SING_BOX_DATA_DIR}/users.json"
+            sudo rm -rf "${DATA_ROOT}/users.json" || rm -rf "${DATA_ROOT}/users.json"
         fi
         
-        cp "$users_file" "${SING_BOX_DATA_DIR}/users.json"
-        log_substep "users.json 已同步到: ${SING_BOX_DATA_DIR}/users.json"
+        cp "$users_file" "${DATA_ROOT}/users.json"
+        log_substep "users.json 已同步到: ${DATA_ROOT}/users.json"
     fi
 }
 

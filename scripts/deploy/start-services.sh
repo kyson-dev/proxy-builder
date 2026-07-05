@@ -26,20 +26,32 @@ start_services() {
     log_step "启动服务"
     
     # 验证环境变量
-    if [[ -z "$SING_BOX_DATA_DIR" ]]; then
-        die "SING_BOX_DATA_DIR 环境变量未设置"
+    if [[ -z "$DATA_ROOT" ]]; then
+        die "DATA_ROOT 环境变量未设置"
     fi
-    log_substep "数据目录: $SING_BOX_DATA_DIR"
+    log_substep "数据目录: $DATA_ROOT"
     
+    # 自动且精确配置本服务镜像所需的 GCP Artifact Registry 凭证助手
+    # 逻辑：从 SUBSCRIPTION_IMAGE 中（如 us-central1-docker.pkg.dev/...）提取真实的仓库域名，利用 gcloud 幂等配置
+    if [[ "${SUBSCRIPTION_IMAGE:-}" =~ ([a-z0-9-]+-docker\.pkg\.dev) ]]; then
+        local registry="${BASH_REMATCH[1]}"
+        log_substep "动态配置 Artifact Registry 凭证助手: $registry"
+        if command -v gcloud &>/dev/null; then
+            gcloud auth configure-docker "$registry" --quiet >/dev/null 2>&1 || true
+            if [[ "$docker_cmd" == *"sudo"* ]]; then
+                sudo gcloud auth configure-docker "$registry" --quiet >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+
     # 拉取最新镜像
     log_substep "拉取最新镜像..."
     $docker_cmd compose -f "$compose_file" pull
     
     # 启动服务
     # --remove-orphans 会自动清理不在 compose 文件中定义的旧容器
-    # --build 确保本地构建的代码（如 sub 服务）得到更新
     log_substep "启动 Sing-box..."
-    $docker_cmd compose -f "$compose_file" up -d --remove-orphans --build
+    $docker_cmd compose -f "$compose_file" up -d --remove-orphans
     
     log_success "服务已启动"
 }

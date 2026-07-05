@@ -23,16 +23,18 @@ validate_env() {
     # 2. 定义必填变量列表
     local required_vars=(
         "DATA_ROOT"
-        "SING_BOX_DATA_DIR"
         "REALITY_PRIVATE_KEY"
         "REALITY_SHORT_ID"
         "REALITY_DEST"
+        "SUBSCRIPTION_IMAGE"
     )
 
     # 3. 检查必填变量
     local missing_vars=()
     for var in "${required_vars[@]}"; do
-        if [ -z "${!var}" ]; then
+        # 在严格模式下，间接引用动态变量前先安全展开，防止 unbound variable 报错
+        local val="${!var:-}"
+        if [ -z "$val" ]; then
             missing_vars+=("$var")
         fi
     done

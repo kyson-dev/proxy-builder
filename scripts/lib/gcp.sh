@@ -1,7 +1,8 @@
 #!/bin/bash
 # ==============================================================================
 # GCP 相关通用函数库
-# 依赖: common.sh, prompt.sh (由主脚本预先加载)
+# 依赖: common.sh (由主脚本预先加载)
+# 职责: 纯 gcloud CLI 封装，所有函数通过参数接收上下文，不包含交互逻辑
 # ==============================================================================
 
 # 防止重复加载
@@ -58,29 +59,6 @@ gcp_list_projects() {
 gcp_project_exists() {
     local project="$1"
     gcloud projects describe "$project" &>/dev/null
-}
-
-# 交互式选择项目
-# 返回: 项目ID 通过 $GCP_PROJECT_ID
-gcp_select_project() {
-    local current_project
-    current_project=$(gcp_get_current_project)
-    
-    log_substep "正在获取 GCP 项目列表..."
-    local projects=()
-    while IFS= read -r line; do
-        [[ -n "$line" ]] && projects+=("$line")
-    done < <(gcp_list_projects)
-    
-    if [[ ${#projects[@]} -eq 0 ]]; then
-        log_warn "未找到可用项目"
-        prompt_required "请输入 GCP Project ID"
-        GCP_PROJECT_ID="$INPUT_VALUE"
-        return
-    fi
-    
-    select_with_default "选择项目" "$current_project" "${projects[@]}"
-    GCP_PROJECT_ID="$SELECTED_VALUE"
 }
 
 # ------------------------------------------------------------------------------
@@ -326,13 +304,16 @@ gcp_oslogin_enabled() {
     local vm_name="$1"
     local zone="$2"
     local project="$3"
-    local status
+    local status=""
     status=$(gcloud compute instances describe "$vm_name" \
         --zone "$zone" \
         --project "$project" \
-        --format="get(metadata.items[key=enable-oslogin].value)" 2>/dev/null)
-    # 处理大小写：TRUE, true, True 都算启用
-    [[ "${status,,}" == "true" ]] 2>/dev/null || [[ "$status" == "TRUE" ]] || [[ "$status" == "true" ]]
+        --format="get(metadata.items[key=enable-oslogin].value)" 2>/dev/null) || true
+    # 处理大小写：TRUE, true, True 都算启用 (兼容 bash 3.2，不使用 ${var,,} 语法)
+    case "$status" in
+        [Tt][Rr][Uu][Ee]) return 0 ;;
+        *) return 1 ;;
+    esac
 }
 
 
