@@ -76,6 +76,7 @@
         }
     ],
     "route": {
+        "default_domain_resolver": "google",
         "rules": [
             {
                 "inbound": [
