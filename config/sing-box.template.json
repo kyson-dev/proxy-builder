@@ -16,6 +16,10 @@
                 "tag": "cf",
                 "server": "1.1.1.1",
                 "detour": "direct"
+            },
+            {
+                "type": "local",
+                "tag": "local"
             }
         ],
         "final": "google",
@@ -76,7 +80,7 @@
         }
     ],
     "route": {
-        "default_domain_resolver": "google",
+        "default_domain_resolver": "local",
         "rules": [
             {
                 "inbound": [
