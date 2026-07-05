@@ -31,7 +31,7 @@ permissions:
 
 env:
   IMAGE_NAME: subscription
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
 
 jobs:
   # ============================================================================

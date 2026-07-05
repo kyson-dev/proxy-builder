@@ -57,7 +57,10 @@
     "route": {
         "rules": [
             {
-                "inbound": "vless-in",
+                "inbound": [
+                    "vless-in",
+                    "hy2-in"
+                ],
                 "action": "sniff"
             },
             {

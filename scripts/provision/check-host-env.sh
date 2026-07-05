@@ -17,7 +17,7 @@ source "${SCRIPT_DIR}/install-dependencies.sh"
 source "${SCRIPT_DIR}/install-docker.sh"
 source "${SCRIPT_DIR}/enable-bbr.sh"
 source "${SCRIPT_DIR}/configure-journald.sh"
-source "${SCRIPT_DIR}/configure-ops-agent.sh"
+# source "${SCRIPT_DIR}/configure-ops-agent.sh"  # 已禁用：学习项目不需要云端日志，需要时取消注释
 source "${SCRIPT_DIR}/configure-permission.sh"
 
 log_step "启动主机部署环境健康诊断"
@@ -49,13 +49,13 @@ else
     env_ok=false
 fi
 
-# 4. 检查 Google Cloud Ops Agent
-if is_ops_agent_ready; then
-    log_success "系统监控: Google Cloud Ops Agent 已启动且日志/指标流水线就绪"
-else
-    log_warn "系统监控: Ops Agent 尚未安装、未运行或配置有偏差"
-    env_ok=false
-fi
+# 4. 检查 Google Cloud Ops Agent（已禁用：学习项目不需要云端日志，需要时取消下方注释）
+# if is_ops_agent_ready; then
+#     log_success "系统监控: Google Cloud Ops Agent 已启动且日志/指标流水线就绪"
+# else
+#     log_warn "系统监控: Ops Agent 尚未安装、未运行或配置有偏差"
+#     env_ok=false
+# fi
 
 # 5. 检查 Docker 引擎与容器运行环境
 if is_docker_ready; then
