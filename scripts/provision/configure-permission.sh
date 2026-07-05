@@ -33,7 +33,14 @@ is_permission_ready() {
     if [[ ! -g "$root_dir" ]]; then
         return 1
     fi
-    
+
+    # 递归检查子目录/文件所有权：避免容器以 root 身份自动创建绑定挂载路径
+    # （如宿主机路径不存在时 docker compose 自动创建）导致所有权漂移，
+    # 若只检查根目录会误判为"已就绪"从而跳过自举修复
+    if [[ -n "$(find "$root_dir" \( ! -user "$USER" -o ! -group "docker" \) -print -quit 2>/dev/null)" ]]; then
+        return 1
+    fi
+
     return 0
 }
 
