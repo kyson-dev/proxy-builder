@@ -1,7 +1,17 @@
-name: Deploy to VM
+name: Deploy to Backup VM (Emergency)
 
 on:
   workflow_dispatch:
+    inputs:
+      zone:
+        description: "GCE 区域（留空则使用当前环境的 GCP_VM_ZONE）"
+        required: false
+        type: string
+      machine_type:
+        description: "机器类型"
+        required: false
+        default: "e2-micro"
+        type: string
 
 permissions:
   contents: read
@@ -10,10 +20,53 @@ permissions:
 env:
   IMAGE_NAME: subscription
   IMAGE_TAG: ${{ github.sha }}
+  VM_NAME: proxy-vm-backup
+  VM_SA_NAME: proxy-vm-sa
 
 jobs:
   # ============================================================================
-  # Job 1: 构建 sub 镜像并推送到 Artifact Registry
+  # Job 1: 确保备用 VM 存在（幂等，若已存在则跳过创建）
+  # ============================================================================
+  ensure-vm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          install_components: "beta"
+
+      - name: 创建/复用备用 VM
+        env:
+          VM_ZONE: ${{ inputs.zone || secrets.GCP_VM_ZONE }}
+        run: |
+          source scripts/lib/common.sh
+          source scripts/lib/gcp.sh
+          source scripts/setup/modules/infra-vm.sh
+
+          infra::create_vm \
+            "${{ secrets.GCP_PROJECT_ID }}" "${{ env.VM_NAME }}" \
+            "${VM_ZONE}" "${{ env.VM_SA_NAME }}" \
+            "${{ inputs.machine_type }}"
+
+          infra::ensure_vm_oslogin \
+            "${{ secrets.GCP_PROJECT_ID }}" "${{ env.VM_NAME }}" \
+            "${VM_ZONE}"
+
+  # ============================================================================
+  # Job 2: 构建 sub 镜像并推送到 Artifact Registry
   # ============================================================================
   build-and-push:
     runs-on: ubuntu-latest
@@ -52,12 +105,12 @@ jobs:
           echo "✅ 镜像已推送: ${AR_IMAGE}:${{ env.IMAGE_TAG }}"
 
   # ============================================================================
-  # Job 2: 将精简包部署到 VM
+  # Job 3: 将精简包部署到备用 VM
   # ============================================================================
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: build-and-push
+    needs: [ensure-vm, build-and-push]
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
@@ -80,12 +133,13 @@ jobs:
         timeout-minutes: 10
         env:
           SUBSCRIPTION_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          VM_ZONE: ${{ inputs.zone || secrets.GCP_VM_ZONE }}
         run: |
           # 加载单一数据源全局路径定义
           source scripts/lib/paths.sh
 
-          VM="${{ secrets.GCP_VM_NAME }}"
-          ZONE="${{ secrets.GCP_VM_ZONE }}"
+          VM="${{ env.VM_NAME }}"
+          ZONE="${VM_ZONE}"
 
           # 1. 创建 .env 文件（注入 secrets + 镜像地址）
           echo "📝 创建环境配置..."
@@ -133,4 +187,4 @@ jobs:
             ~/app/scripts/deploy/deploy-on-host.sh
           "
 
-          echo "✅ 部署完成"
+          echo "✅ 部署完成（备用 VM: ${VM}）"

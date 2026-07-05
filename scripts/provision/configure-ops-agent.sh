@@ -15,6 +15,30 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 fi
 
 # ------------------------------------------------------------------------------
+# 期望的 Ops Agent 完整配置内容
+# ------------------------------------------------------------------------------
+_get_expected_ops_agent_config() {
+    cat <<'EOF'
+logging:
+  receivers:
+    systemd_journal:
+      type: systemd_journald
+  service:
+    pipelines:
+      default_pipeline:
+        receivers: [systemd_journal]
+metrics:
+  receivers:
+    hostmetrics:
+      type: hostmetrics
+  service:
+    pipelines:
+      default_pipeline:
+        receivers: [hostmetrics]
+EOF
+}
+
+# ------------------------------------------------------------------------------
 # 安装 Ops Agent
 # ------------------------------------------------------------------------------
 install_ops_agent() {
@@ -50,25 +74,7 @@ configure_ops_agent() {
 
     # 期望的完整配置内容
     local expected_config
-    expected_config=$(cat <<'EOF'
-logging:
-  receivers:
-    systemd_journal:
-      type: systemd_journald
-  service:
-    pipelines:
-      default_pipeline:
-        receivers: [systemd_journal]
-metrics:
-  receivers:
-    hostmetrics:
-      type: hostmetrics
-  service:
-    pipelines:
-      default_pipeline:
-        receivers: [hostmetrics]
-EOF
-)
+    expected_config=$(_get_expected_ops_agent_config)
 
     # 幂等检查：用内容哈希对比，而非关键词 grep
     local expected_hash current_hash
@@ -109,22 +115,8 @@ is_ops_agent_ready() {
     if [[ ! -f "$agent_config_file" ]]; then
         return 1
     fi
-    local expected_config="logging:
-  receivers:
-    systemd_journal:
-      type: systemd_journald
-  service:
-    pipelines:
-      default_pipeline:
-        receivers: [systemd_journal]
-metrics:
-  receivers:
-    hostmetrics:
-      type: hostmetrics
-  service:
-    pipelines:
-      default_pipeline:
-        receivers: [hostmetrics]"
+    local expected_config
+    expected_config=$(_get_expected_ops_agent_config)
     
     local expected_hash current_hash
     expected_hash=$(printf '%s\n' "$expected_config" | sha256sum | cut -d' ' -f1)
