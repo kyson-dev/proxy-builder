@@ -108,6 +108,8 @@ jobs:
           AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}
         run: |
           docker build \
+            --provenance=false \
+            --sbom=false \
             -t "${AR_IMAGE}:${{ env.IMAGE_TAG }}" \
             -f services/${{ env.IMAGE_NAME }}/Dockerfile \
             services/${{ env.IMAGE_NAME }}/
