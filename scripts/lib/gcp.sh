@@ -310,31 +310,6 @@ gcp_get_vm_service_account() {
         --format="value(serviceAccounts[0].email)" 2>/dev/null
 }
 
-# 获取 VM 当前的 access scopes（未绑定则为空）
-gcp_get_vm_scopes() {
-    local vm_name="$1"
-    local zone="$2"
-    local project="$3"
-    gcloud compute instances describe "$vm_name" \
-        --zone "$zone" \
-        --project "$project" \
-        --format="value(serviceAccounts[0].scopes)" 2>/dev/null
-}
-
-# 修改 VM 绑定的服务账号与 access scope（要求 VM 处于停止状态，由调用方保证）
-gcp_set_vm_service_account() {
-    local vm_name="$1"
-    local zone="$2"
-    local project="$3"
-    local sa_email="$4"
-    local scopes="$5"
-    gcloud compute instances set-service-account "$vm_name" \
-        --zone "$zone" \
-        --project "$project" \
-        --service-account "$sa_email" \
-        --scopes "$scopes"
-}
-
 # 检查 OS Login 是否启用
 gcp_oslogin_enabled() {
     local vm_name="$1"
