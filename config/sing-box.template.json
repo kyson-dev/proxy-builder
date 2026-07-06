@@ -3,13 +3,22 @@
         "level": "info",
         "timestamp": true
     },
+    "dns": {
+        "servers": [
+            {
+                "type": "local",
+                "tag": "local"
+            }
+        ],
+        "final": "local",
+        "strategy": "prefer_ipv4"
+    },
     "inbounds": [
         {
             "type": "vless",
             "tag": "vless-in",
             "listen": "::",
             "listen_port": 443,
-            "tcp_fast_open": true,
             "udp_fragment": true,
             "users": [],
             "tls": {
@@ -31,9 +40,13 @@
             "tag": "hy2-in",
             "listen": "::",
             "listen_port": 443,
-            "up_mbps": 200,
-            "down_mbps": 200,
+            "ignore_client_bandwidth": true,
             "users": [],
+            "obfs": {
+                "type": "salamander",
+                "password": ""
+            },
+            "masquerade": "https://www.bing.com",
             "tls": {
                 "enabled": true,
                 "alpn": [
@@ -55,9 +68,13 @@
         }
     ],
     "route": {
+        "default_domain_resolver": "local",
         "rules": [
             {
-                "inbound": "vless-in",
+                "inbound": [
+                    "vless-in",
+                    "hy2-in"
+                ],
                 "action": "sniff"
             },
             {

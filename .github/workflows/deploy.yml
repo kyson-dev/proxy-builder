@@ -9,7 +9,7 @@ permissions:
 
 env:
   IMAGE_NAME: subscription
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
 
 jobs:
   # ============================================================================
@@ -42,6 +42,8 @@ jobs:
           AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}
         run: |
           docker build \
+            --provenance=false \
+            --sbom=false \
             -t "${AR_IMAGE}:${{ env.IMAGE_TAG }}" \
             -f services/${{ env.IMAGE_NAME }}/Dockerfile \
             services/${{ env.IMAGE_NAME }}/
@@ -94,6 +96,8 @@ jobs:
           REALITY_PUBLIC_KEY=${{ secrets.REALITY_PUBLIC_KEY }}
           REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
           REALITY_DEST=${{ secrets.REALITY_DEST }}
+          HY2_SNI=${{ secrets.HY2_SNI }}
+          OBFS_PASSWORD=${{ secrets.OBFS_PASSWORD }}
           SUBSCRIPTION_IMAGE=${SUBSCRIPTION_IMAGE}
           EOF
 

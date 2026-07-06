@@ -1,6 +1,6 @@
 services:
   sing-box:
-    image: ghcr.io/sagernet/sing-box:latest
+    image: ghcr.io/sagernet/sing-box:v1.13.14
     container_name: sing-box
     hostname: sing-box
     restart: unless-stopped
@@ -23,7 +23,11 @@ services:
       - "8080:8080/tcp"
     volumes:
       - ${DATA_ROOT}/users.json:/etc/sing-box/users.json:ro
+      # 只读挂载证书，供订阅服务计算 pinSHA256 指纹下发给客户端
+      - ${DATA_ROOT}/cert:/etc/sing-box/cert:ro
     environment:
       - REALITY_PUBLIC_KEY=${REALITY_PUBLIC_KEY}
       - REALITY_SHORT_ID=${REALITY_SHORT_ID}
       - REALITY_DEST=${REALITY_DEST}
+      - HY2_SNI=${HY2_SNI:-www.bing.com}
+      - OBFS_PASSWORD=${OBFS_PASSWORD:-}

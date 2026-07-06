@@ -2,7 +2,7 @@
 # ==============================================================================
 # Layer 2: VM 功能模块
 # 职责: 完成虚拟机创建、服务账号绑定、OS Login 启用
-# 接口: infra::create_vm <project_id> <vm_name> <zone> [machine_type] [disk_size] [disk_type] [network_tier] [is_spot]
+# 接口: infra::create_vm <project_id> <vm_name> <zone> <sa_name> [machine_type] [disk_size] [disk_type] [network_tier] [is_spot]
 #        infra::ensure_vm_oslogin <project_id> <vm_name> <zone>
 # 依赖: lib/common.sh, lib/gcp.sh (由调用方预先加载)
 # 无交互: 不调用任何 prompt_* / read 函数; 自包含，不 source 其它 setup 子文件

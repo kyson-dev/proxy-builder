@@ -11,7 +11,8 @@
 #   - Docker 已安装，daemon 日志驱动配置为 journald
 #   - BBR 已启用
 #   - systemd-journald 日志容量已限制为 500M（drop-in 机制）
-#   - Google Cloud Ops Agent 已安装并配置（systemd_journal + hostmetrics）
+#   - Google Cloud Ops Agent 未启用（学习项目暂不需要云端日志/监控，
+#     相关步骤已注释保留，如需启用云端日志采集，取消下方注释即可）
 # ==============================================================================
 set -euo pipefail
 
@@ -27,7 +28,7 @@ source "${SCRIPT_DIR}/install-dependencies.sh"
 source "${SCRIPT_DIR}/install-docker.sh"
 source "${SCRIPT_DIR}/enable-bbr.sh"
 source "${SCRIPT_DIR}/configure-journald.sh"
-source "${SCRIPT_DIR}/configure-ops-agent.sh"
+# source "${SCRIPT_DIR}/configure-ops-agent.sh"  # 已禁用：学习项目不需要云端日志，需要时取消注释
 source "${SCRIPT_DIR}/configure-permission.sh"
 
 # ==============================================================================
@@ -56,9 +57,9 @@ main() {
     configure_journald
     echo ""
 
-    # Step 5: 安装并配置 Google Cloud Ops Agent
-    configure_ops_agent
-    echo ""
+    # Step 5: 安装并配置 Google Cloud Ops Agent（已禁用，需要时取消注释）
+    # configure_ops_agent
+    # echo ""
 
     # Step 6: 初始化并授权工作目录
     configure_permission

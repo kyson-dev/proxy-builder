@@ -299,6 +299,17 @@ gcp_get_vm_external_ip() {
         --format="value(networkInterfaces[0].accessConfigs[0].natIP)"
 }
 
+# 获取 VM 当前绑定的服务账号邮箱（未绑定则返回空字符串）
+gcp_get_vm_service_account() {
+    local vm_name="$1"
+    local zone="$2"
+    local project="$3"
+    gcloud compute instances describe "$vm_name" \
+        --zone "$zone" \
+        --project "$project" \
+        --format="value(serviceAccounts[0].email)" 2>/dev/null
+}
+
 # 检查 OS Login 是否启用
 gcp_oslogin_enabled() {
     local vm_name="$1"

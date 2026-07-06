@@ -49,10 +49,17 @@ start_services() {
     $docker_cmd compose -f "$compose_file" pull
     
     # 启动服务
-    # --remove-orphans 会自动清理不在 compose 文件中定义的旧容器
+    # --remove-orphans 清理不在 compose 文件中定义的旧容器。
+    # --force-recreate 强制重建所有容器：sing-box 的 config.json、subscription 的
+    # cert.pem 都是 bind mount 且只在启动时读一次（sing-box 读 config.json；
+    # subscription 的 loadConfig()/loadCertFingerprints() 只在 main() 里跑一次），内容
+    # 变化不会被 compose 视为服务定义变化。若某次部署只重新生成了 config.json 或轮换了
+    # 证书，但镜像 tag/环境变量都没变，普通 up -d 不会重建这两个容器，导致它们继续用旧
+    # 内容跑（config 不生效，或 subscription 发出跟服务端证书对不上的旧指纹）。
+    # 注：users.json 不受影响，subscription 的 loadUsers() 是每次请求都重新读的。
     log_substep "启动 Sing-box..."
-    $docker_cmd compose -f "$compose_file" up -d --remove-orphans
-    
+    $docker_cmd compose -f "$compose_file" up -d --remove-orphans --force-recreate
+
     log_success "服务已启动"
 }
 

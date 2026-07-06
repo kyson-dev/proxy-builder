@@ -31,6 +31,10 @@ build_config() {
         dest_port="443"
     fi
     
+    # Hysteria2 混淆密码与 SNI（默认 www.bing.com，与自签证书 CN、masquerade 保持一致）
+    local obfs_password="${OBFS_PASSWORD:-}"
+    local hy2_sni="${HY2_SNI:-www.bing.com}"
+
     # 构建用户数组
     local vless_users="[]"
     local hy2_users="[]"
@@ -52,13 +56,17 @@ build_config() {
        --argjson dest_port "$dest_port" \
        --arg private_key "$REALITY_PRIVATE_KEY" \
        --arg short_id "$REALITY_SHORT_ID" \
+       --arg obfs_password "$obfs_password" \
+       --arg hy2_sni "$hy2_sni" \
        '(.inbounds[] | select(.type=="vless")).users = $vless |
         (.inbounds[] | select(.type=="vless")).tls.server_name = $dest_name |
         (.inbounds[] | select(.type=="vless")).tls.reality.handshake.server = $dest_name |
         (.inbounds[] | select(.type=="vless")).tls.reality.handshake.server_port = $dest_port |
         (.inbounds[] | select(.type=="vless")).tls.reality.private_key = $private_key |
         (.inbounds[] | select(.type=="vless")).tls.reality.short_id = ($short_id | split(",")) |
-        (.inbounds[] | select(.type=="hysteria2")).users = $hy2' \
+        (.inbounds[] | select(.type=="hysteria2")).users = $hy2 |
+        (.inbounds[] | select(.type=="hysteria2")).masquerade = ("https://" + $hy2_sni) |
+        (.inbounds[] | select(.type=="hysteria2")) |= (if $obfs_password == "" then del(.obfs) else .obfs.password = $obfs_password end)' \
        "$template_file" > "$tmp_file"
 
     log_substep "校验 Sing-box 配置文件..."
@@ -67,10 +75,17 @@ build_config() {
     if ! $docker_cmd run --rm \
         -v "$tmp_file":/etc/sing-box/config.json \
         -v "${DATA_ROOT}/cert":/etc/sing-box/cert:ro \
-        ghcr.io/sagernet/sing-box:latest \
+        ghcr.io/sagernet/sing-box:v1.13.14 \
         check -c /etc/sing-box/config.json; then
         rm -f "$tmp_file"
         die "Sing-box 配置文件格式验证失败，请检查 users.json 或 .env 参数是否有误。原配置文件未被修改。"
+    fi
+
+    # 🚨 防御性处理：如果 docker up 之前 config.json 不存在，
+    # Docker volumes 会默认把它当作"目录"创建（并赋予 root 权限），导致挂载失败
+    if [[ -d "$output_file" ]]; then
+        log_warn "检测到 config.json 是错误的目录结构，正在修复..."
+        sudo rm -rf "$output_file" || rm -rf "$output_file"
     fi
 
     # 校验通过 → 原子性替换（不会中断正在运行的服务读取）

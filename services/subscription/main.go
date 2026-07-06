@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -31,7 +35,11 @@ type Config struct {
 	ServerIP         string
 	RealityPublicKey string
 	RealityShortID   string // 多个时取第一个
-	SNI              string // 从 REALITY_DEST 提取
+	SNI              string // 从 REALITY_DEST 提取（VLESS/REALITY 用）
+	Hy2SNI           string // Hysteria2 独立 SNI，与自签证书 CN、masquerade 保持一致
+	ObfsPassword     string // Hysteria2 salamander 混淆密码（空则不下发 obfs）
+	CertPinSHA256    string // 自签证书 SHA-256 指纹（大写冒号十六进制），空则回退 insecure
+	CertSPKISHA256   string // 自签证书公钥（SPKI）SHA-256 指纹（base64），供 sing-box 客户端做 certificate_public_key_sha256 钉扎
 	UsersFile        string
 }
 
@@ -42,12 +50,61 @@ func loadConfig() Config {
 	shortIDs := os.Getenv("REALITY_SHORT_ID")
 	shortID := strings.SplitN(shortIDs, ",", 2)[0] // 多个时取第一个
 
+	hy2SNI := os.Getenv("HY2_SNI")
+	if hy2SNI == "" {
+		hy2SNI = "www.bing.com"
+	}
+
+	pinSHA256, spkiSHA256 := loadCertFingerprints("/etc/sing-box/cert/cert.pem")
+
 	return Config{
 		RealityPublicKey: os.Getenv("REALITY_PUBLIC_KEY"),
 		RealityShortID:   shortID,
 		SNI:              sni,
+		Hy2SNI:           hy2SNI,
+		ObfsPassword:     os.Getenv("OBFS_PASSWORD"),
+		CertPinSHA256:    pinSHA256,
+		CertSPKISHA256:   spkiSHA256,
 		UsersFile:        "/etc/sing-box/users.json",
 	}
+}
+
+// loadCertFingerprints 读取自签证书，返回两种指纹：
+//   - pinSHA256：整张证书的 SHA-256（大写冒号十六进制，openssl 风格），供官方 Hysteria2
+//     客户端 / Clash Meta 的 pinSHA256、fingerprint 字段直接使用。
+//   - spkiSHA256：证书公钥（SPKI）的 SHA-256（base64），供 sing-box 的
+//     tls.certificate_public_key_sha256 使用——sing-box 钉的是公钥而不是整证书，
+//     两者哈希的数据不同，不能互相转换，必须从证书原文分别算出。
+//
+// 任一步骤失败时两个值都返回空串，调用方回退到 insecure，保证订阅始终可用。
+func loadCertFingerprints(path string) (pinSHA256 string, spkiSHA256 string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Printf("⚠️  无法读取证书 %s: %v（Hy2 将回退 insecure）", path, err)
+		return "", ""
+	}
+	block, _ := pem.Decode(data)
+	if block == nil {
+		log.Printf("⚠️  证书 PEM 解析失败（Hy2 将回退 insecure）")
+		return "", ""
+	}
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		log.Printf("⚠️  证书解析失败: %v（Hy2 将回退 insecure）", err)
+		return "", ""
+	}
+
+	sum := sha256.Sum256(cert.Raw)
+	parts := make([]string, len(sum))
+	for i, b := range sum {
+		parts[i] = fmt.Sprintf("%02X", b)
+	}
+	pinSHA256 = strings.Join(parts, ":")
+
+	spkiSum := sha256.Sum256(cert.RawSubjectPublicKeyInfo)
+	spkiSHA256 = base64.StdEncoding.EncodeToString(spkiSum[:])
+
+	return pinSHA256, spkiSHA256
 }
 
 // ==============================================================================
@@ -111,9 +168,28 @@ func buildLinks(user User, cfg Config) []string {
 	}
 
 	if user.Hy2Password != "" {
+		// sni 用独立的 HY2_SNI（与证书 CN、masquerade 一致）
+		query := "sni=" + cfg.Hy2SNI
+		// 有指纹则固定证书（pinSHA256），否则回退 insecure。
+		// 冒号十六进制在 query 中为合法字符，无需转义。
+		if cfg.CertPinSHA256 != "" {
+			query += "&pinSHA256=" + cfg.CertPinSHA256
+			// pubKeySHA256 是我们自己派生的 SPKI 指纹（base64），标准 Hysteria2
+			// 客户端/Clash 会忽略这个未知字段；sing-box 客户端用它做
+			// certificate_public_key_sha256 钉扎，因为 pinSHA256 钉的是整证书，
+			// 无法转换成 sing-box 需要的公钥哈希。
+			if cfg.CertSPKISHA256 != "" {
+				query += "&pubKeySHA256=" + url.QueryEscape(cfg.CertSPKISHA256)
+			}
+		} else {
+			query += "&insecure=1"
+		}
+		if cfg.ObfsPassword != "" {
+			query += "&obfs=salamander&obfs-password=" + url.QueryEscape(cfg.ObfsPassword)
+		}
 		link := fmt.Sprintf(
-			"hysteria2://%s@%s:443?insecure=1&sni=%s#%s-HY2",
-			user.Hy2Password, cfg.ServerIP, cfg.SNI, user.Name,
+			"hysteria2://%s@%s:443?%s#%s-HY2",
+			user.Hy2Password, cfg.ServerIP, query, user.Name,
 		)
 		links = append(links, link)
 	}
@@ -151,10 +227,19 @@ func buildClashConfig(user User, cfg Config) string {
 		sb.WriteString(fmt.Sprintf("    server: \"%s\"\n", cfg.ServerIP))
 		sb.WriteString("    port: 443\n")
 		sb.WriteString(fmt.Sprintf("    password: \"%s\"\n", user.Hy2Password))
-		sb.WriteString(fmt.Sprintf("    sni: \"%s\"\n", cfg.SNI))
-		sb.WriteString("    skip-cert-verify: true\n")
-		sb.WriteString("    up: 1000\n")
-		sb.WriteString("    down: 1000\n")
+		sb.WriteString(fmt.Sprintf("    sni: \"%s\"\n", cfg.Hy2SNI))
+		// 有指纹则固定证书（fingerprint），否则回退 skip-cert-verify
+		if cfg.CertPinSHA256 != "" {
+			sb.WriteString("    skip-cert-verify: false\n")
+			sb.WriteString(fmt.Sprintf("    fingerprint: \"%s\"\n", cfg.CertPinSHA256))
+		} else {
+			sb.WriteString("    skip-cert-verify: true\n")
+		}
+		if cfg.ObfsPassword != "" {
+			sb.WriteString("    obfs: salamander\n")
+			sb.WriteString(fmt.Sprintf("    obfs-password: \"%s\"\n", cfg.ObfsPassword))
+		}
+		// 拥塞控制交由服务端 BBR 自适应，客户端不再声明固定带宽（原 up/down 1000 触发 Brutal）
 	}
 
 	sb.WriteString("\nproxy-groups:\n")
@@ -254,10 +339,14 @@ func main() {
 
 	log.Println("Detecting public IP...")
 	cfg.ServerIP = getPublicIP()
-	log.Printf("  Server IP:  %s", cfg.ServerIP)
-	log.Printf("  SNI:        %s", cfg.SNI)
-	log.Printf("  Public Key: %s...", cfg.RealityPublicKey[:min(16, len(cfg.RealityPublicKey))])
-	log.Printf("  Users file: %s", cfg.UsersFile)
+	log.Printf("  Server IP:   %s", cfg.ServerIP)
+	log.Printf("  SNI:         %s", cfg.SNI)
+	log.Printf("  Hy2 SNI:     %s", cfg.Hy2SNI)
+	log.Printf("  Obfs:        %v", cfg.ObfsPassword != "")
+	log.Printf("  Cert pin:    %v", cfg.CertPinSHA256 != "")
+	log.Printf("  Cert SPKI:   %v", cfg.CertSPKISHA256 != "")
+	log.Printf("  Public Key:  %s...", cfg.RealityPublicKey[:min(16, len(cfg.RealityPublicKey))])
+	log.Printf("  Users file:  %s", cfg.UsersFile)
 
 	server := &SubscriptionServer{cfg: cfg}
 	addr := ":8080"
