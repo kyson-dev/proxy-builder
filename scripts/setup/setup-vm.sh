@@ -180,7 +180,8 @@ main() {
 
         infra::create_vm \
             "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" "$sa_name" \
-            "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT"
+            "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT" \
+            "true"
     else
         source "${SCRIPT_DIR}/vm/select-vm.sh"
         select_vm "$PROJECT_ID" "$ENV_NAME"
@@ -191,7 +192,15 @@ main() {
             _collect_vm_params_interactive "$ENV_NAME"
             infra::create_vm \
                 "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" "$sa_name" \
-                "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT"
+                "$VM_MACHINE_TYPE" "$VM_DISK_SIZE" "$VM_DISK_TYPE" "$VM_NETWORK_TIER" "$VM_IS_SPOT" \
+                "false"
+        else
+            # 用户选择了已存在的 VM：该 VM 可能并非由本工具创建，需校验服务账号配置
+            infra::verify_vm_service_account "$PROJECT_ID" "$VM_NAME" "$GCP_VM_ZONE" "$sa_name" "false"
+            case $? in
+                1) confirm "是否仍要继续（后续部署步骤大概率失败）?" "n" || die "已中止，请先处理服务账号绑定" ;;
+                2) confirm "scope 不足，是否仍继续（docker pull / 日志写入可能失败）?" "n" || die "已中止，请先修复 scope 后重新运行" ;;
+            esac
         fi
     fi
 
