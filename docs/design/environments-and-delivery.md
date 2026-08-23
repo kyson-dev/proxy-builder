@@ -2,7 +2,7 @@
 
 本文唯一拥有环境配置归属、GitHub Variables/Secrets 名称、工作流接口以及 VM 与 Cloud Run 的发布协议。
 
-**实现状态：** 尚未实现
+**实现状态：** 环境清单、release bundle 与 host 部署组件已实现并离线验证；GitHub 工作流与 GCP 交付尚未实现。
 
 ## 环境模型
 
@@ -107,31 +107,18 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 
 ## VM 发布协议
 
-普通发布包只包含：
+普通 release bundle 与 host 接口由[代理 VM 运行时](proxy-vm-runtime.md)拥有。调用方必须使用以下发布身份：
 
 ```text
-release.json
-docker-compose.yml
-config template
-host deployment scripts
+release_id    = <40-char-git-sha>-<github-run-id>-<run-attempt>
+deployment_id = <github-run-id>-<run-attempt>
 ```
 
-`release.json` 固定字段：
+秘密不进入 bundle。部署 job 通过 IAP 加密通道单独写入 VM staging 文件，权限为 `0600`；主机脚本校验后生成运行配置，成功或失败都删除 staging 文件。
 
-```json
-{
-  "schema_version": 1,
-  "git_sha": "40-character commit SHA",
-  "sing_box_image": "registry/repository@sha256:<digest>",
-  "created_at": "RFC3339 UTC"
-}
-```
+每次部署都经 staging 传输 `REALITY_PRIVATE_KEY`、`OBFS_PASSWORD` 与 `PROXY_USERS_JSON`。`HY2_CERT_PEM`/`HY2_KEY_PEM` 只在按需时传输：部署 job 先比对 VM 当前 certificate fingerprint 与 GitHub Secret 的派生值，缺失或不一致才写入证书对。首次发布时 certificate/key 必须存在；只传一个文件必须失败。
 
-秘密不进入该包。部署 job 通过 IAP 加密通道单独写入 VM 的 staging secret 文件，权限为 `0600`；主机脚本校验后生成运行配置，成功切换后删除 staging 文件。
-
-每次部署都经 staging 传输 `REALITY_PRIVATE_KEY` 与该次 `PROXY_USERS_JSON` 中的用户凭据，用于生成新 release 的 `config.json`。`HY2_CERT_PEM`/`HY2_KEY_PEM` 只在按需时传输：部署 job 先比对 VM 当前 `secrets/hysteria2.crt` 的指纹与 GitHub Secret 中 `HY2_CERT_PEM` 计算出的指纹，缺失或不一致才通过 IAP 写入新证书和私钥，一致则跳过。该判断同时覆盖证书轮换和 VM 销毁重建后的首次发布，两种情况都必然表现为指纹缺失或不一致；一致时跳过可避免私钥在无需变更时反复经传输层。
-
-VM 目录契约由[代理与订阅契约](proxy-and-subscription-contracts.md)拥有。
+host bootstrap 版本不一致、任何输入校验失败或 `sing-box check` 失败时，job 必须在 VM current 未改变的情况下停止。退出码 `20` 表示新 release 失败但回滚成功；`21` 表示回滚也失败，workflow 必须把后者升级为环境故障。
 
 ## Cloud Run 发布协议
 
@@ -145,7 +132,6 @@ REALITY_SHORT_ID = 从环境私钥稳定派生的 8-byte hex 标识
 REALITY_DEST = environment config
 HY2_SNI = environment config
 HY2_CERT_SHA256 = 从 HY2_CERT_PEM 计算
-HY2_SPKI_SHA256 = 从 HY2_CERT_PEM 计算
 OBFS_PASSWORD = Secret Manager version 引用
 PROXY_USERS_JSON = Secret Manager version 引用
 ```
@@ -177,4 +163,4 @@ make destroy ENV=<environment> STACK=platform
 
 - Architecture：[overview.md](../architecture/overview.md)
 - ADR：[ADR-0001](../adr/0001-manage-gcp-with-opentofu.md)、[ADR-0003](../adr/0003-own-and-deliver-application-secrets.md)
-- Design：[基础设施与身份](infrastructure-and-identity.md)、[代理与订阅契约](proxy-and-subscription-contracts.md)
+- Design：[基础设施与身份](infrastructure-and-identity.md)、[共享契约](proxy-and-subscription-contracts.md)、[代理 VM 运行时](proxy-vm-runtime.md)、[订阅服务](subscription-service.md)

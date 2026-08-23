@@ -1,6 +1,8 @@
 locals {
   environment_short = var.environment == "production" ? "prod" : "dev"
   name_prefix       = "${var.resource_prefix}-${local.environment_short}"
+  startup_script    = file("${path.module}/files/startup.sh")
+  startup_sha256    = sha256(local.startup_script)
 }
 
 data "google_compute_image" "debian" {
@@ -47,6 +49,8 @@ resource "google_compute_instance" "proxy" {
   metadata = {
     block-project-ssh-keys = "TRUE"
     enable-oslogin         = "TRUE"
+    proxy-bootstrap-sha256 = local.startup_sha256
+    startup-script         = local.startup_script
   }
 
   service_account {

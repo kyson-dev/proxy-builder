@@ -1,0 +1,11 @@
+**
+!go.mod
+!go.sum
+!cmd/
+!cmd/subscription/
+!cmd/subscription/**
+!internal/
+!internal/**
+!services/
+!services/subscription/
+!services/subscription/Dockerfile

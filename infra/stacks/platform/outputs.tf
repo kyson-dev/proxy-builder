@@ -10,6 +10,10 @@ output "proxy_vm_zone" {
   value = module.proxy_vm.vm_zone
 }
 
+output "proxy_host_bootstrap_sha256" {
+  value = module.proxy_vm.host_bootstrap_sha256
+}
+
 output "artifact_repository_url" {
   value = module.artifact_registry.repository_url
 }

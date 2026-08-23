@@ -9,3 +9,7 @@ output "vm_zone" {
 output "runtime_service_account_email" {
   value = google_service_account.runtime.email
 }
+
+output "host_bootstrap_sha256" {
+  value = local.startup_sha256
+}

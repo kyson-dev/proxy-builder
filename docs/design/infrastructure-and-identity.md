@@ -105,6 +105,7 @@ platform 必须公开：
 proxy_ip_address
 proxy_vm_name
 proxy_vm_zone
+proxy_host_bootstrap_sha256
 artifact_repository_url
 subscription_service_name
 subscription_service_url
@@ -113,6 +114,14 @@ obfs_password_secret_id
 ```
 
 输出不得包含 private key、密码、token、证书正文、生成后的 sing-box 配置或 Secret Manager payload。
+
+## Proxy VM startup
+
+`proxy_vm` 通过 instance `metadata` 的 `startup-script` 下发主机供给脚本，并把脚本内容的 SHA-256 写入 `proxy-bootstrap-sha256` metadata。必须使用普通 metadata key，不使用会在内容变化时强制替换 instance 的 `metadata_startup_script` 属性。
+
+脚本更新只产生 metadata 原地变更；运行中 VM 的已执行版本由 `/var/lib/proxy-builder/bootstrap.sha256` 表示。应用发布必须先比较二者并在不一致时拒绝，具体接口由[代理 VM 运行时](proxy-vm-runtime.md)拥有。
+
+startup script 不接收 OpenTofu secret 输入，也不得把应用秘密写入 metadata、serial output 或 state。
 
 ## 身份边界
 
@@ -152,4 +161,4 @@ VM ingress 固定为：
 
 - Architecture：[overview.md](../architecture/overview.md)
 - ADR：[ADR-0001](../adr/0001-manage-gcp-with-opentofu.md)、[ADR-0002](../adr/0002-separate-proxy-and-subscription-runtimes.md)
-- Design：[环境与交付](environments-and-delivery.md)
+- Design：[环境与交付](environments-and-delivery.md)、[代理 VM 运行时](proxy-vm-runtime.md)

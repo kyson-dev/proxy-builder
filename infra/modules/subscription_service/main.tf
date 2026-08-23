@@ -28,6 +28,18 @@ resource "google_cloud_run_v2_service" "subscription" {
         container_port = 8080
       }
 
+      startup_probe {
+        failure_threshold     = 10
+        initial_delay_seconds = 0
+        period_seconds        = 3
+        timeout_seconds       = 2
+
+        http_get {
+          path = "/healthz"
+          port = 8080
+        }
+      }
+
       resources {
         cpu_idle          = true
         startup_cpu_boost = true

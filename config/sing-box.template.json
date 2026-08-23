@@ -52,8 +52,8 @@
                 "alpn": [
                     "h3"
                 ],
-                "certificate_path": "/etc/sing-box/cert/cert.pem",
-                "key_path": "/etc/sing-box/cert/key.pem"
+                "certificate_path": "/etc/sing-box/cert/hysteria2.crt",
+                "key_path": "/etc/sing-box/cert/hysteria2.key"
             }
         }
     ],

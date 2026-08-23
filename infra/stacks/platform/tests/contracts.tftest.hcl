@@ -46,4 +46,9 @@ run "platform_contract" {
     )
     error_message = "SSH 只能从 IAP 地址段进入。"
   }
+
+  assert {
+    condition     = output.proxy_host_bootstrap_sha256 == module.proxy_vm.host_bootstrap_sha256
+    error_message = "platform 必须公开 VM host bootstrap 摘要。"
+  }
 }

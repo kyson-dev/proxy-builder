@@ -66,7 +66,7 @@ bootstrap:
 	@ENV="$(ENV)" ./scripts/infra/bootstrap-state.sh
 
 validate:
-	@./scripts/infra/validate.sh
+	@./scripts/validate.sh
 
 infra-plan:
 	@ENV="$(ENV)" STACK="$(or $(STACK),platform)" ./scripts/infra/tofu-stack.sh plan
