@@ -30,4 +30,19 @@ run "identity_contract" {
     condition     = !contains(module.github_identity.secret_metadata_permissions, "secretmanager.versions.access")
     error_message = "apply 的 Secret Manager 自定义角色不得读取 secret payload。"
   }
+
+  assert {
+    condition     = module.github_identity.plan_wif_member == "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/mock-pool/subject/repo:${var.github_repository}:pull_request"
+    error_message = "plan 身份必须只允许当前仓库的 pull_request subject。"
+  }
+
+  assert {
+    condition     = contains(module.github_identity.required_services, "logging.googleapis.com")
+    error_message = "bootstrap 必须启用 Cloud Logging API。"
+  }
+
+  assert {
+    condition     = contains(module.github_identity.apply_project_roles, "roles/logging.configWriter")
+    error_message = "apply 身份必须能管理日志排除规则。"
+  }
 }

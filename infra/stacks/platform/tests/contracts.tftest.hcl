@@ -51,4 +51,10 @@ run "platform_contract" {
     condition     = output.proxy_host_bootstrap_sha256 == module.proxy_vm.host_bootstrap_sha256
     error_message = "platform 必须公开 VM host bootstrap 摘要。"
   }
+
+
+  assert {
+    condition     = output.subscription_request_log_exclusion_name == "${var.resource_prefix}-${var.environment == "production" ? "prod" : "dev"}-subscription-request-logs"
+    error_message = "platform 必须公开环境隔离的 subscription 请求日志排除名称。"
+  }
 }

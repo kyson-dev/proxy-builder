@@ -23,4 +23,19 @@ run "startup_probe_contract" {
     condition     = google_cloud_run_v2_service.subscription.template[0].containers[0].startup_probe[0].http_get[0].port == 8080
     error_message = "Cloud Run startup probe 必须检查容器端口 8080。"
   }
+
+
+  assert {
+    condition     = google_logging_project_exclusion.subscription_requests.name == "proxy-dev-subscription-request-logs"
+    error_message = "日志排除名称必须隔离环境。"
+  }
+
+  assert {
+    condition = alltrue([
+      strcontains(google_logging_project_exclusion.subscription_requests.filter, "cloud_run_revision"),
+      strcontains(google_logging_project_exclusion.subscription_requests.filter, "proxy-dev-subscription"),
+      strcontains(google_logging_project_exclusion.subscription_requests.filter, "run.googleapis.com/requests"),
+    ])
+    error_message = "日志排除必须只匹配当前 subscription 服务的 Cloud Run request log。"
+  }
 }

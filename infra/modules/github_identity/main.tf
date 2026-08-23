@@ -2,6 +2,7 @@ locals {
   environment_short = var.environment == "production" ? "prod" : "dev"
   name_prefix       = "${var.resource_prefix}-${local.environment_short}"
   environment_sub   = "repo:${var.github_repository}:environment:${var.environment}"
+  pull_request_sub  = "repo:${var.github_repository}:pull_request"
 
   required_services = toset([
     "artifactregistry.googleapis.com",
@@ -10,6 +11,7 @@ locals {
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
     "iap.googleapis.com",
+    "logging.googleapis.com",
     "oslogin.googleapis.com",
     "run.googleapis.com",
     "secretmanager.googleapis.com",
@@ -44,6 +46,7 @@ locals {
       "roles/iam.serviceAccountAdmin",
       "roles/iam.serviceAccountUser",
       "roles/iam.workloadIdentityPoolAdmin",
+      "roles/logging.configWriter",
       "roles/resourcemanager.projectIamAdmin",
       "roles/run.admin",
       google_project_iam_custom_role.secret_metadata_admin.name,
@@ -143,7 +146,7 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_service_account_iam_member" "plan_wif" {
   service_account_id = google_service_account.github["plan"].name
   role               = "roles/iam.workloadIdentityUser"
-  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository_id/${var.github_repository_id}"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${local.pull_request_sub}"
 }
 
 resource "google_service_account_iam_member" "environment_wif" {

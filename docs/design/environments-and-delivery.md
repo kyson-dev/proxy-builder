@@ -2,7 +2,7 @@
 
 本文唯一拥有环境配置归属、GitHub Variables/Secrets 名称、工作流接口以及 VM 与 Cloud Run 的发布协议。
 
-**实现状态：** 环境清单、release bundle 与 host 部署组件已实现并离线验证；GitHub 工作流与 GCP 交付尚未实现。
+**实现状态：** 环境清单、发布工具与 GitHub 工作流已实现并离线验证；GitHub/GCP 尚未配置或执行。
 
 ## 环境模型
 
@@ -80,6 +80,7 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 - 对 development 与 production 分别执行 format、validate、静态安全检查和只读 plan。
 - 使用 `github-plan`；不得引用 GitHub Environment Secrets。
 - 输出经过脱敏的 plan artifact 和 PR summary，不得输出 state 或 secret payload。
+- fork PR 与缺少 Repository Variables 的仓库安全跳过 WIF plan；所有 PR 仍由 `validate.yml` 执行无凭据验证。
 
 ### `infra-apply.yml`
 
@@ -104,6 +105,8 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 - 不接受 `stack=bootstrap`；不提供删除 GCP Project、Billing、state bucket 或 bootstrap WIF 的路径。
 
 所有第三方 Actions 必须固定到完整 commit SHA。workflow 顶层默认 `contents: read`，每个 job 只增加所需权限；使用 WIF 的 job 才能获得 `id-token: write`。
+
+全部可写 workflow 使用 `proxy-builder-<environment>` concurrency group 且不取消运行中的操作。production 还要求 workflow ref 为 `main`、目标 commit 可从 `origin/main` 到达，并且 Repository Variable `PRODUCTION_OPERATIONS_ENABLED` 精确为 `true`；配置脚本只有在环境保护审计通过后才可设置该开关。
 
 ## VM 发布协议
 
@@ -140,6 +143,8 @@ PROXY_USERS_JSON = Secret Manager version 引用
 
 Cloud Run 健康检查失败时，不把流量迁移到新 revision；VM 已发布版本保持有效。Secret version 创建成功但 revision 失败时允许保留该 version 供审计和重试。
 
+候选 revision 必须以 `--no-traffic --tag` 创建并验证 `/healthz`、Base64 和 Clash 实际响应。切流后再次检查 service URL；失败时将 100% 流量恢复到旧 revision。成功时移除候选 tag，失败 revision 与已创建 secret version 保留供审计。
+
 **Needs test coverage:** production deploy 必须拒绝不属于 `main` 的 commit，因为工作流仍可能成功部署一个合法但未经 promotion 的镜像。
 
 **Needs test coverage:** 发布日志和 artifact 不包含五个 GitHub Secret 的原文，因为部署成功不会暴露这类静默泄漏。
@@ -158,6 +163,8 @@ make destroy ENV=<environment> STACK=platform
 ```
 
 命令只作为稳定入口；具体执行步骤在实现后进入 Runbook。
+
+就绪工具固定为：`proxyctl migrate-users` 将旧数组 schema 转换为 v1；`proxyctl inspect-environment` 校验五项秘密且只输出 Reality 公钥、short ID 与证书指纹；`proxyctl validate-subscription` 严格验证候选服务的 Base64/Clash 正文。`scripts/github/configure.sh`、`audit.sh` 与 `publish-secrets.sh` 分别拥有 GitHub 名称配置、只读保护审计和五项秘密发布。
 
 ## 关联
 

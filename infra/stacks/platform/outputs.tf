@@ -26,6 +26,10 @@ output "subscription_service_url" {
   value = module.subscription_service.service_url
 }
 
+output "subscription_request_log_exclusion_name" {
+  value = module.subscription_service.request_log_exclusion_name
+}
+
 output "proxy_users_secret_id" {
   value = module.secret_runtime.proxy_users_secret_id
 }

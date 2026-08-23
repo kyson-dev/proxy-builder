@@ -29,6 +29,16 @@ stack_dir="${INFRA_ROOT}/infra/stacks/${stack}"
     -backend-config="prefix=${stack}"
 
 if [[ "$action" == "plan" ]]; then
+    if [[ -n "${PLAN_OUTPUT:-}" ]]; then
+        plan_file=$(mktemp "/private/tmp/proxy-builder-${environment}-${stack}.XXXXXX")
+        trap 'rm -f "$plan_file"' EXIT
+        "$tofu_bin" -chdir="$stack_dir" plan \
+            -lock-timeout=5m \
+            -out="$plan_file" \
+            -var-file="../../environments/${environment}.tfvars"
+        "$tofu_bin" -chdir="$stack_dir" show -no-color "$plan_file" >"$PLAN_OUTPUT"
+        exit 0
+    fi
     exec "$tofu_bin" -chdir="$stack_dir" plan \
         -lock-timeout=5m \
         -var-file="../../environments/${environment}.tfvars"

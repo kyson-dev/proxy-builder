@@ -33,10 +33,13 @@ fi
 
 "${repo_root}/scripts/release/test-build-vm-bundle.sh"
 "${repo_root}/scripts/host/test-deploy-release.sh"
+"${repo_root}/scripts/delivery/test-deploy.sh"
+"${repo_root}/scripts/github/test-tools.sh"
 
 sing_box_image="$(jq -er '.sing_box_image' "${repo_root}/config/environments/development.json")"
 PROXY_ROOT="${cache_root}/compose-root" SING_BOX_IMAGE="$sing_box_image" \
   docker compose -f "${repo_root}/docker-compose.yml" config --quiet
 
 "${repo_root}/scripts/infra/validate.sh"
+"${repo_root}/scripts/ci/validate-workflows.sh"
 printf '%s\n' 'repository validation passed'

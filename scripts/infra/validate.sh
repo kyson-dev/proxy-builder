@@ -62,8 +62,12 @@ fi
 find "${INFRA_ROOT}/scripts" -type f -name '*.sh' -exec bash -n {} +
 "$shellcheck_bin" -x -P "${INFRA_ROOT}/scripts/infra" \
     "${INFRA_ROOT}"/scripts/infra/*.sh \
+    "${INFRA_ROOT}"/scripts/ci/*.sh \
+    "${INFRA_ROOT}"/scripts/delivery/*.sh \
+    "${INFRA_ROOT}"/scripts/github/*.sh \
     "${INFRA_ROOT}"/scripts/host/*.sh \
     "${INFRA_ROOT}"/scripts/release/*.sh \
+    "${INFRA_ROOT}"/scripts/secrets/*.sh \
     "${INFRA_ROOT}/scripts/validate.sh" \
     "${INFRA_ROOT}/infra/modules/proxy_vm/files/startup.sh"
 "${SCRIPT_DIR}/test-guards.sh"

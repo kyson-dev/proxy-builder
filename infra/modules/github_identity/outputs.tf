@@ -17,3 +17,15 @@ output "deploy_service_account_email" {
 output "secret_metadata_permissions" {
   value = google_project_iam_custom_role.secret_metadata_admin.permissions
 }
+
+output "plan_wif_member" {
+  value = google_service_account_iam_member.plan_wif.member
+}
+
+output "required_services" {
+  value = local.required_services
+}
+
+output "apply_project_roles" {
+  value = local.project_roles.apply
+}

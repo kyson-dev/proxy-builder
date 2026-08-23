@@ -107,6 +107,8 @@ obfs-password=<encoded password>
 
 不得记录 raw query、token、name、password、UUID、private/public key、代理 URI、订阅正文或环境变量值。panic recovery 也只返回固定 `500 internal_error`，并遵守同一日志边界。
 
+Cloud Run 自动 request log 的 `requestUrl` 会包含 query token，因此 platform 按精确 service name 排除 `run.googleapis.com/requests`。这不改变应用日志规则，也不得扩展为排除 stdout/stderr 应用日志。
+
 ## Cloud Run Revision
 
 OpenTofu 拥有 `/healthz` startup probe。部署工作流后续只拥有 image 与上述普通/secret 环境变量，并以 no-traffic revision 发布；流量迁移属于[环境与交付](environments-and-delivery.md)。

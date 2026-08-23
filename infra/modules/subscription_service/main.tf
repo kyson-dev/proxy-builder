@@ -60,6 +60,7 @@ resource "google_cloud_run_v2_service" "subscription" {
     ignore_changes = [
       template[0].containers[0].env,
       template[0].containers[0].image,
+      traffic,
     ]
   }
 }
@@ -78,4 +79,18 @@ resource "google_cloud_run_v2_service_iam_member" "deploy" {
   name     = google_cloud_run_v2_service.subscription.name
   role     = "roles/run.developer"
   member   = "serviceAccount:${var.deploy_service_account_email}"
+}
+
+# Subscription credentials are query parameters for client compatibility.
+# Cloud Run request logs include requestUrl, so suppress the platform-generated
+# request log for this service and rely on the application's sanitized JSON log.
+resource "google_logging_project_exclusion" "subscription_requests" {
+  project     = var.project_id
+  name        = "${local.service_name}-request-logs"
+  description = "Exclude Cloud Run request URLs that may contain subscription tokens"
+  filter      = <<-EOT
+    resource.type="cloud_run_revision"
+    resource.labels.service_name="${local.service_name}"
+    log_id("run.googleapis.com/requests")
+  EOT
 }

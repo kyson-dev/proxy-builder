@@ -32,6 +32,12 @@ func run(args []string) error {
 		return deriveReality(args[1:])
 	case "inspect-certificate":
 		return inspectCertificate(args[1:])
+	case "inspect-environment":
+		return inspectEnvironment(args[1:])
+	case "migrate-users":
+		return migrateUsers(args[1:])
+	case "validate-subscription":
+		return validateSubscription(args[1:])
 	case "render-sing-box":
 		return renderSingBox(args[1:])
 	default:

@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (Sing-box)
 # Sing-box 原生模式代理服务管理
 
-.PHONY: all uuid short-id password reality-key bootstrap validate infra-plan infra-apply destroy setup-infra setup-wif setup-vm setup-ar setup-firewall check-scripts upload-env help
+.PHONY: all uuid short-id password reality-key bootstrap validate infra-plan infra-apply deploy destroy setup-infra setup-wif setup-vm setup-ar setup-firewall check-scripts upload-env help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -19,6 +19,7 @@ help:
 	@echo "  make validate"
 	@echo "  make infra-plan ENV=... [STACK=bootstrap|platform]"
 	@echo "  make infra-apply ENV=... [STACK=bootstrap|platform]"
+	@echo "  make deploy ENV=... [GIT_REF=<ref>]"
 	@echo "  make destroy ENV=... STACK=platform"
 	@echo ""
 	@echo "🚀 Deployment Setup:"
@@ -73,6 +74,9 @@ infra-plan:
 
 infra-apply:
 	@ENV="$(ENV)" STACK="$(or $(STACK),platform)" ./scripts/infra/tofu-stack.sh apply
+
+deploy:
+	@ENV="$(ENV)" GIT_REF="$(GIT_REF)" ./scripts/github/dispatch-deploy.sh
 
 destroy:
 	@ENV="$(ENV)" CONFIRM_PROJECT_ID="$(CONFIRM_PROJECT_ID)" ./scripts/infra/destroy-platform.sh
