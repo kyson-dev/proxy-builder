@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -32,6 +33,16 @@ func TestParseUsers(t *testing.T) {
 	}
 	if len(document.Users) != 2 || !document.Users[0].Enabled || document.Users[1].Enabled {
 		t.Fatalf("unexpected users document: %#v", document)
+	}
+}
+
+func TestRepositoryUsersExampleUsesV1Schema(t *testing.T) {
+	data, err := os.ReadFile("../../users.example.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ParseUsers(data); err != nil {
+		t.Fatalf("users.example.json is invalid: %v", err)
 	}
 }
 

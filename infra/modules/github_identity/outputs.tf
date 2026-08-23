@@ -29,3 +29,16 @@ output "required_services" {
 output "apply_project_roles" {
   value = local.project_roles.apply
 }
+
+output "environment_isolation_contract" {
+  value = {
+    pool_id = google_iam_workload_identity_pool.github.workload_identity_pool_id
+    service_account_ids = {
+      for identity, account in google_service_account.github : identity => account.account_id
+    }
+    environment_wif_members = {
+      for identity, binding in google_service_account_iam_member.environment_wif : identity => binding.member
+    }
+    state_bucket_name = var.state_bucket_name
+  }
+}

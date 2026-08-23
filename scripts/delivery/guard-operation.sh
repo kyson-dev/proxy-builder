@@ -16,8 +16,13 @@ case "$environment" in
       exit 1
     }
     if [[ -n "$git_sha" ]]; then
-      git fetch --quiet origin main
-      git merge-base --is-ancestor "$git_sha" origin/main || {
+      main_ref="origin/main"
+      if [[ "${PROXY_BUILDER_TESTING:-0}" == "1" ]]; then
+        main_ref="${PRODUCTION_MAIN_REF:?PRODUCTION_MAIN_REF is required in test mode}"
+      else
+        git fetch --quiet origin main
+      fi
+      git merge-base --is-ancestor "$git_sha" "$main_ref" || {
         printf '%s\n' 'production git SHA is not reachable from origin/main' >&2
         exit 1
       }
@@ -25,4 +30,3 @@ case "$environment" in
     ;;
   *) printf '%s\n' 'environment must be development or production' >&2; exit 2 ;;
 esac
-

@@ -28,7 +28,7 @@ Git 分支只标识版本，不隐式选择环境。所有可写工作流必须�
 | Cloud Run 当前用户与混淆密码 secret version | Secret Manager | 是，运行时副本 |
 | VM 当前运行秘密 | VM 限权目录 | 是，运行时副本 |
 
-同一个值不得同时由本地 `.env`、GitHub 和版本库手工维护。重构完成后删除 `.env.<environment>` 与 `users.<environment>.json` 约定。
+同一个值不得同时由本地 `.env`、GitHub 和版本库手工维护。被忽略的 `.env.<environment>` 与 `users.<environment>.json` 只作为尚未切换环境的迁移源；对应环境首次部署成功后删除。
 
 `config/environments/<environment>.json` 格式为：
 
@@ -121,7 +121,7 @@ deployment_id = <github-run-id>-<run-attempt>
 
 每次部署都经 staging 传输 `REALITY_PRIVATE_KEY`、`OBFS_PASSWORD` 与 `PROXY_USERS_JSON`。`HY2_CERT_PEM`/`HY2_KEY_PEM` 只在按需时传输：部署 job 先比对 VM 当前 certificate fingerprint 与 GitHub Secret 的派生值，缺失或不一致才写入证书对。首次发布时 certificate/key 必须存在；只传一个文件必须失败。
 
-host bootstrap 版本不一致、任何输入校验失败或 `sing-box check` 失败时，job 必须在 VM current 未改变的情况下停止。退出码 `20` 表示新 release 失败但回滚成功；`21` 表示回滚也失败，workflow 必须把后者升级为环境故障。
+host bootstrap 版本不一致、任何输入校验失败或 `sing-box check` 失败时，job 必须在 VM current 未改变的情况下停止。退出码 `20` 表示新 release 失败且旧 release 已恢复健康；`21` 表示没有可恢复的旧 release 或旧 release 未恢复健康，workflow 必须把它升级为环境故障。
 
 ## Cloud Run 发布协议
 
@@ -145,12 +145,6 @@ Cloud Run 健康检查失败时，不把流量迁移到新 revision；VM 已发�
 
 候选 revision 必须以 `--no-traffic --tag` 创建并验证 `/healthz`、Base64 和 Clash 实际响应。切流后再次检查 service URL；失败时将 100% 流量恢复到旧 revision。成功时移除候选 tag，失败 revision 与已创建 secret version 保留供审计。
 
-**Needs test coverage:** production deploy 必须拒绝不属于 `main` 的 commit，因为工作流仍可能成功部署一个合法但未经 promotion 的镜像。
-
-**Needs test coverage:** 发布日志和 artifact 不包含五个 GitHub Secret 的原文，因为部署成功不会暴露这类静默泄漏。
-
-**Needs test coverage:** VM 在 `secrets/` 为空（首次发布或销毁重建后）时，部署 job 必须判定指纹不一致并写入证书和私钥，因为跳过条件写反会让重建后的 VM 永久拿不到证书。
-
 ## 公共命令
 
 ```text
@@ -162,7 +156,7 @@ make deploy ENV=<environment> [GIT_REF=<ref>]
 make destroy ENV=<environment> STACK=platform
 ```
 
-命令只作为稳定入口；具体执行步骤在实现后进入 Runbook。
+命令只作为稳定入口；首次 development 激活步骤见 [Runbook](../runbooks/development-first-activation.md)。
 
 就绪工具固定为：`proxyctl migrate-users` 将旧数组 schema 转换为 v1；`proxyctl inspect-environment` 校验五项秘密且只输出 Reality 公钥、short ID 与证书指纹；`proxyctl validate-subscription` 严格验证候选服务的 Base64/Clash 正文。`scripts/github/configure.sh`、`audit.sh` 与 `publish-secrets.sh` 分别拥有 GitHub 名称配置、只读保护审计和五项秘密发布。
 

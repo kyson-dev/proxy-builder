@@ -17,4 +17,4 @@ if rg -n '^permissions: write-all|^[[:space:]]+[a-z-]+: write$' "${repo_root}/.g
   exit 1
 fi
 "${repo_root}/scripts/ci/test-workflow-guards.sh"
-
+"${repo_root}/scripts/ci/test-repository-shape.sh"

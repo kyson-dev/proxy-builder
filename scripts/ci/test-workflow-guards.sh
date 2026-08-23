@@ -8,6 +8,11 @@ rg -q 'head.repo.full_name == github.repository' "${workflow_root}/infra-plan.ym
 rg -q 'required repository variables are absent' "${workflow_root}/infra-plan.yml"
 rg -q 'PRODUCTION_OPERATIONS_ENABLED' "${workflow_root}/infra-apply.yml" "${workflow_root}/deploy.yml" "${workflow_root}/destroy.yml"
 rg -q 'confirm_project_id' "${workflow_root}/destroy.yml"
+if rg -q 'upload-artifact' "${workflow_root}/deploy.yml"; then
+  printf '%s\n' 'deployment workflow must not upload artifacts' >&2
+  exit 1
+fi
+rg -q 'path: \$\{\{ runner.temp \}\}/plan.txt' "${workflow_root}/infra-plan.yml"
 if rg -q 'bootstrap' "${workflow_root}/destroy.yml"; then
   printf '%s\n' 'destroy workflow must not offer bootstrap destruction' >&2
   exit 1
@@ -26,4 +31,29 @@ if GITHUB_REF=refs/heads/main PRODUCTION_OPERATIONS_ENABLED=false "${repo_root}/
   exit 1
 fi
 GITHUB_REF=refs/heads/feature "${repo_root}/scripts/delivery/guard-operation.sh" development
+
+git_root="$(mktemp -d "${TMPDIR:-/tmp}/proxy-builder-production-guard.XXXXXX")"
+trap 'rm -rf "$git_root"' EXIT
+git -C "$git_root" init --quiet
+git -C "$git_root" config user.name proxy-builder-test
+git -C "$git_root" config user.email proxy-builder-test@example.invalid
+git -C "$git_root" commit --quiet --allow-empty -m main
+git -C "$git_root" branch -M main
+main_sha="$(git -C "$git_root" rev-parse HEAD)"
+git -C "$git_root" checkout --quiet --orphan feature
+git -C "$git_root" commit --quiet --allow-empty -m feature
+feature_sha="$(git -C "$git_root" rev-parse HEAD)"
+if (
+  cd "$git_root"
+  GITHUB_REF=refs/heads/main PRODUCTION_OPERATIONS_ENABLED=true PROXY_BUILDER_TESTING=1 PRODUCTION_MAIN_REF=main \
+    "${repo_root}/scripts/delivery/guard-operation.sh" production "$feature_sha" >/dev/null 2>&1
+); then
+  printf '%s\n' 'production guard accepted a SHA outside main history' >&2
+  exit 1
+fi
+(
+  cd "$git_root"
+  GITHUB_REF=refs/heads/main PRODUCTION_OPERATIONS_ENABLED=true PROXY_BUILDER_TESTING=1 PRODUCTION_MAIN_REF=main \
+    "${repo_root}/scripts/delivery/guard-operation.sh" production "$main_sha"
+)
 printf '%s\n' 'workflow guard tests passed'

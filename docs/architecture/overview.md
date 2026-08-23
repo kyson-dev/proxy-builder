@@ -1,6 +1,6 @@
 # 当前架构
 
-本文描述重构开始前仍在运行的系统。已接受但尚未实现的目标位于 [ADR](../adr/README.md) 和 [Design](../design/README.md)。
+本文描述重构开始前仍在运行的系统。新系统已在仓库实现但尚未激活，其契约位于 [ADR](../adr/README.md) 和 [Design](../design/README.md)。
 
 ## 目的与边界
 
@@ -32,19 +32,17 @@ GitHub Actions ──OIDC/WIF──> GCP deploy Service Account
 
 ### GitHub Actions
 
-`.github/workflows/deploy.yml` 手动构建订阅服务镜像、推送 Artifact Registry，并把配置、用户文件、Compose 文件和脚本打包上传到 VM。`main` 分支映射到 `production`，其他分支映射到 `development`。
-
-`.github/workflows/deploy-backup-vm.yml` 可在发布过程中创建或复用一台应急 VM，然后执行相同的构建与部署过程。
+线上系统由重构前的 GitHub Actions 交付：构建订阅镜像、推送 Artifact Registry，并把应用与秘密一并上传到 VM。环境由 Git 分支隐式选择。
 
 ### GCP 身份与资源
 
 每个环境的 GitHub OIDC 身份通过 WIF 模拟一个部署 Service Account。该账号同时承担 VM、OS Login、Artifact Registry、Storage 和 Service Account 使用相关操作。
 
-基础设施没有声明式 state。`scripts/setup/` 中的 Bash 脚本通过 `gcloud` 创建或更新 WIF、VM、Artifact Registry 和防火墙资源。
+线上基础设施没有声明式 state，历史上由 Bash 调用 `gcloud` 创建或更新 WIF、VM、Artifact Registry 和防火墙资源；当前重构分支不再保留这些命令入口。
 
 ### 代理 VM
 
-VM 由 `scripts/provision/` 安装 Docker、启用 BBR 并配置主机。部署脚本生成 sing-box 配置和自签证书，然后启动 Docker Compose。
+VM 通过命令式脚本安装 Docker、启用 BBR 并配置主机。部署过程生成 sing-box 配置和自签证书，然后启动 Docker Compose。
 
 `sing-box` 容器监听公网 TCP/UDP 443。它从宿主机挂载生成的配置和证书。
 

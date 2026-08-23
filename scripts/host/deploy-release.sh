@@ -271,6 +271,7 @@ restore_previous() {
     image="$(jq -er '.sing_box_image' "${final_release}/release.json")" || return 1
     PROXY_ROOT="$root_dir" SING_BOX_IMAGE="$image" \
       docker compose --project-name proxy-builder --file "${final_release}/docker-compose.yml" down >/dev/null 2>&1 || true
+    return 1
   fi
 }
 

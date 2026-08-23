@@ -68,6 +68,10 @@ if rg -q 'CANARY|subscription_token|REALITY_PRIVATE' "$command_log" "${test_root
   printf '%s\n' 'secret canary leaked into arguments or logs' >&2
   exit 1
 fi
+if ! rg 'gcloud compute scp' "$command_log" | rg -q 'hysteria2\.crt.*hysteria2\.key'; then
+  printf '%s\n' 'first deployment did not upload the certificate pair' >&2
+  exit 1
+fi
 
 : >"$command_log"
 matching_fingerprint='AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA'

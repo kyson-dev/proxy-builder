@@ -124,7 +124,7 @@ sudo bin/deploy-release --bundle <directory> --inputs <directory>
 5. 以固定 Compose project 重建 sing-box，轮询容器 Running，并确认宿主机 TCP/UDP 443 均监听。
 6. 成功后把旧 current 写入 `previous`；只保留 current 与 previous。
 
-激活失败时恢复旧 current 与旧证书并重建旧容器。首次部署失败时移除 current 并停止失败容器。退出码固定为：
+激活失败时恢复旧 current 与旧证书并重建旧容器。首次部署失败时移除 current、停止失败容器并返回 `21`，因为环境没有可恢复的健康 release。退出码固定为：
 
 | code | 语义 |
 | ---: | --- |

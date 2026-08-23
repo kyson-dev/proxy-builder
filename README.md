@@ -24,6 +24,7 @@ make validate
 | [当前架构](docs/architecture/overview.md) | 已实现组件、数据流和状态所有权 |
 | [ADR](docs/adr/README.md) | 已接受的架构决策及原因 |
 | [Design](docs/design/README.md) | OpenTofu、交付和应用目标契约 |
+| [Runbooks](docs/runbooks/README.md) | 首次激活和后续人工操作步骤 |
 | [CLAUDE.md](CLAUDE.md) | 修改仓库前的安全与阅读规则 |
 
 ## 范围外

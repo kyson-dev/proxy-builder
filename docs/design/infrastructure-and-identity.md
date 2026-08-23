@@ -138,8 +138,6 @@ WIF attribute mapping 必须包含 `repository_id`、`repository_owner_id`、`ev
 
 subscription token 为客户端兼容性保留在 query parameter。platform 必须按当前环境的 subscription service 名创建 `google_logging_project_exclusion`，仅排除 `run.googleapis.com/requests` 的 Cloud Run 自动 request log，避免其 `requestUrl` 持久化 token；应用自身的脱敏结构化日志继续保留。bootstrap 因此启用 Cloud Logging API，并仅向 `github-apply` 授予 `roles/logging.configWriter`。
 
-**Needs test coverage:** production 身份不能读取或修改 development state，反之亦然，因为跨环境授权错误不会阻止单环境部署继续成功。
-
 ## 网络规则
 
 VM ingress 固定为：

@@ -120,6 +120,18 @@ run_deploy() {
     "${stage}/bundle/bin/deploy-release" --bundle "${stage}/bundle" --inputs "${stage}/inputs"
 }
 
+failed_first_sha="$(printf '9%.0s' {1..40})"
+failed_first_stage="$(make_stage "$failed_first_sha" 99 1 failed-first)"
+touch "${root_dir}/fail-next-up"
+set +e
+run_deploy "$failed_first_stage" "$bootstrap_sha" >/dev/null 2>&1
+failed_first_status=$?
+set -e
+[[ "$failed_first_status" -eq 21 ]]
+[[ ! -e "${root_dir}/current" ]]
+[[ ! -d "$failed_first_stage" ]]
+[[ -f "${root_dir}/failed/${failed_first_sha}-99-1/failure.json" ]]
+
 first_sha="$(printf 'a%.0s' {1..40})"
 first_stage="$(make_stage "$first_sha" 100 1 first)"
 run_deploy "$first_stage" "$bootstrap_sha"

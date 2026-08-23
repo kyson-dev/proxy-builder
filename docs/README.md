@@ -11,10 +11,9 @@ docs/
 ├── README.md                   本文件
 ├── architecture/overview.md   当前系统组成和职责
 ├── adr/                        决策索引、模板和历史决策
-└── design/                     具体接口、schema、路径和规则
+├── design/                     具体接口、schema、路径和规则
+└── runbooks/                   可执行操作、成功标准和失败处理
 ```
-
-当前不创建 `runbooks/`。只有新命令已经实现，且能写出可独立验证的操作步骤时才增加 Runbook。
 
 ## 信息归属
 
@@ -47,7 +46,8 @@ Design 是字段、格式、命令和路径的唯一所有者，其他文档只�
 - [Architecture](architecture/overview.md) 只描述仓库当前已实现、可观察的系统。
 - [ADR](adr/README.md) 保存已接受决策及其原因。
 - [Design](design/README.md) 是当前重构必须实现的目标契约；实现前必须明确标记为尚未落地。
-- 实现完成并验证后，更新 Architecture 反映新现状，并移除 Design 中的“尚未实现”标记。
+- [Runbooks](runbooks/README.md) 只保存使用已实现命令的人工操作步骤。
+- 在目标系统激活并经运行环境验证后，更新 Architecture 反映新现状，并移除 Design 中的“尚未部署”标记。
 
 ## 新增、修改和删除
 
