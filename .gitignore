@@ -21,3 +21,11 @@ users.production.json
 *.tmp
 *.swp
 
+# OpenTofu 本地产物与临时凭证
+**/.terraform/
+*.tfplan
+crash.log
+crash.*.log
+gha-creds-*.json
+*.auto.tfvars
+*.auto.tfvars.json

@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (Sing-box)
 # Sing-box 原生模式代理服务管理
 
-.PHONY: all uuid short-id password reality-key setup-infra setup-wif setup-vm setup-ar setup-firewall check-scripts upload-env help
+.PHONY: all uuid short-id password reality-key bootstrap validate infra-plan infra-apply destroy setup-infra setup-wif setup-vm setup-ar setup-firewall check-scripts upload-env help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -13,6 +13,13 @@ help:
 	@echo "  make short-id          - Generate a random 8-character hex ID"
 	@echo "  make password          - Generate a random secure password"
 	@echo "  make reality-key       - Generate REALITY key pair (uses Docker)"
+	@echo ""
+	@echo "🏗️  OpenTofu Platform:"
+	@echo "  make bootstrap ENV=development|production"
+	@echo "  make validate"
+	@echo "  make infra-plan ENV=... [STACK=bootstrap|platform]"
+	@echo "  make infra-apply ENV=... [STACK=bootstrap|platform]"
+	@echo "  make destroy ENV=... STACK=platform"
 	@echo ""
 	@echo "🚀 Deployment Setup:"
 	@echo "  make setup-infra      - One-click infra setup: WIF + VM + AR + Firewall (interactive or CI)"
@@ -52,6 +59,25 @@ reality-key:
 	@docker run --rm ghcr.io/sagernet/sing-box generate reality-keypair
 
 # ============================================================
+# OpenTofu Platform
+# ============================================================
+
+bootstrap:
+	@ENV="$(ENV)" ./scripts/infra/bootstrap-state.sh
+
+validate:
+	@./scripts/infra/validate.sh
+
+infra-plan:
+	@ENV="$(ENV)" STACK="$(or $(STACK),platform)" ./scripts/infra/tofu-stack.sh plan
+
+infra-apply:
+	@ENV="$(ENV)" STACK="$(or $(STACK),platform)" ./scripts/infra/tofu-stack.sh apply
+
+destroy:
+	@ENV="$(ENV)" CONFIRM_PROJECT_ID="$(CONFIRM_PROJECT_ID)" ./scripts/infra/destroy-platform.sh
+
+# ============================================================
 # Deployment Setup
 # ============================================================
 
@@ -78,4 +104,3 @@ setup-vm:
 setup-ar:
 	@chmod +x scripts/setup/setup-ar.sh
 	@./scripts/setup/setup-ar.sh
-

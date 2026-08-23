@@ -2,13 +2,12 @@
 
 本文唯一拥有 OpenTofu 目录、stack/state 划分、模块接口、GCP 资源拓扑以及 IAM/WIF 边界。
 
-**实现状态：** 尚未实现
+**实现状态：** 代码已实现并通过离线契约测试，尚未 apply 到 GCP
 
 ## 目录接口
 
 ```text
 infra/
-├── versions.tf
 ├── modules/
 │   ├── github_identity/
 │   ├── network/
@@ -17,8 +16,8 @@ infra/
 │   ├── secret_runtime/
 │   └── subscription_service/
 ├── stacks/
-│   ├── bootstrap/
-│   └── platform/
+│   ├── bootstrap/             独立 root，包含 versions.tf 与 lock file
+│   └── platform/              独立 root，包含 versions.tf 与 lock file
 └── environments/
     ├── development.tfvars
     └── production.tfvars
@@ -58,6 +57,7 @@ region             = "asia-northeast3"
 zone               = "asia-northeast3-a"
 resource_prefix    = "proxy"
 network_cidr       = "10.20.0.0/24"
+network_tier       = "STANDARD"
 vm_machine_type    = "e2-micro"
 vm_boot_disk_gb    = 10
 artifact_location  = "asia-northeast3"
@@ -77,7 +77,7 @@ labels             = { application = "proxy-builder", environment = "development
 拥有：
 
 - 必需 Project API；
-- GitHub WIF pool、PR plan provider、Environment provider 与 attribute mapping；
+- GitHub WIF pool、单一 GitHub provider 与 attribute mapping；
 - `plan`、`apply`、`deploy` Service Account 及最小 IAM；
 - GitHub 身份模拟各 Service Account 的绑定。
 
@@ -91,9 +91,9 @@ labels             = { application = "proxy-builder", environment = "development
 - Artifact Registry repository；
 - proxy VM 与 runtime Service Account；
 - `proxy-users`、`obfs-password` Secret Manager 容器与 Cloud Run runtime Service Account；
-- Cloud Run subscription 服务的区域、ingress、权限、资源限制和 secret 引用。
+- Cloud Run subscription 服务的区域、ingress、权限和资源限制。
 
-部署工作流拥有 Cloud Run revision 的运行时字段（清单见[环境与交付](environments-and-delivery.md)的 Cloud Run 发布协议）：这些字段来自派生计算或 Secret Manager version，不作为 OpenTofu 变量存在，platform 的 Cloud Run resource 必须对全部这些字段声明 `lifecycle { ignore_changes }`，platform apply 不得覆盖它们。platform 仍然收敛 region、ingress、资源限制、Service Account 绑定和 secret 容器引用等结构性配置。
+部署工作流拥有 Cloud Run revision 的运行时字段（清单见[环境与交付](environments-and-delivery.md)的 Cloud Run 发布协议）：这些字段来自派生计算或 Secret Manager version，不作为 OpenTofu 变量存在，platform 的 Cloud Run resource 必须对全部这些字段声明 `lifecycle { ignore_changes }`，platform apply 不得覆盖它们。platform 仍然收敛 region、ingress、资源限制、Service Account 和 Secret Manager IAM；Secret 引用随第一个可运行 revision 由 deploy 建立，避免在 secret 尚无 version 时创建无效 revision。
 
 ## 模块接口
 
@@ -119,12 +119,12 @@ obfs_password_secret_id
 | 身份 | 能力边界 |
 | --- | --- |
 | `github-plan` | 读取受管资源和 state；获取与释放 state lock；不能修改 GCP 资源 |
-| `github-apply` | 修改 bootstrap、platform 两个 OpenTofu stack 声明的资源；不能读取 secret payload 或登录 VM |
+| `github-apply` | 修改 bootstrap、platform 两个 OpenTofu stack 声明的资源；Secret Manager 使用不含 `versions.access` 的自定义 metadata/IAM 角色，不能直接读取 payload 或登录 VM |
 | `github-deploy` | 读取 platform outputs、推送镜像、增加指定 secret version、更新 Cloud Run revision、通过 IAP/OS Login 发布 VM |
 | `proxy-runtime` | 运行 VM；无 Project 级管理角色，无 Secret Manager 读取权限 |
 | `subscription-runtime` | 仅读取指定环境的 `proxy-users` 与 `obfs-password` secret |
 
-WIF attribute mapping 必须包含 `repository_id`、`repository_owner_id`、`event_name`、`ref` 和 `sub`。绑定使用不可变 repository ID。PR plan provider 只接受 `event_name=pull_request` 或 `ref=refs/heads/main`；Environment provider 的 `sub` 必须匹配 `repo:<owner>/<repo>:environment:<environment>`，只允许模拟 apply/deploy 身份。
+WIF attribute mapping 必须包含 `repository_id`、`repository_owner_id`、`event_name`、`ref` 和 `sub`。每个环境只有一个 GitHub provider，其 admission condition 使用不可变 repository ID。`github-plan` 的 IAM binding 接受该 repository ID；`github-apply` 与 `github-deploy` 只绑定精确的 `repo:<owner>/<repo>:environment:<environment>` subject。GitHub Environment 审批因此仍是可写身份的必要条件。
 
 **Needs test coverage:** production 身份不能读取或修改 development state，反之亦然，因为跨环境授权错误不会阻止单环境部署继续成功。
 
@@ -142,7 +142,7 @@ VM ingress 固定为：
 
 ## 生命周期规则
 
-- Provider 和 module 版本必须固定；提交 `.terraform.lock.hcl`。
+- 每个 root stack 固定 OpenTofu 与 provider 版本，并提交自己的 `.terraform.lock.hcl`；module 只声明 provider source，不重复版本约束。
 - production 不得与 development 共用 bucket、state prefix、Service Account、VPC、静态 IP、secret 或运行资源。
 - `platform` 连续两次 apply 的第二次必须为零变更，才算环境收敛。
 - destroy 只能作用于一个明确环境，且调用层必须要求输入该环境完整 Project ID。

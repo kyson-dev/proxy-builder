@@ -1,0 +1,17 @@
+environment          = "development"
+project_id           = "kyson-lab"
+region               = "us-west1"
+zone                 = "us-west1-b"
+resource_prefix      = "proxy"
+network_cidr         = "10.20.0.0/24"
+network_tier         = "STANDARD"
+vm_machine_type      = "e2-micro"
+vm_boot_disk_gb      = 10
+artifact_location    = "us-west1"
+github_repository    = "kyson-dev/proxy-builder"
+github_repository_id = "986343343"
+
+labels = {
+  application = "proxy-builder"
+  environment = "development"
+}

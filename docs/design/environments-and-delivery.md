@@ -54,10 +54,11 @@ PROD_GCP_PLAN_SERVICE_ACCOUNT
 每个 GitHub Environment Variables 固定为：
 
 ```text
-GCP_WIF_PROVIDER
 GCP_APPLY_SERVICE_ACCOUNT
 GCP_DEPLOY_SERVICE_ACCOUNT
 ```
+
+apply/deploy 根据显式环境复用对应 Repository Variable 中的 WIF provider；provider 标识不在 GitHub Environment 重复保存。
 
 每个 GitHub Environment Secrets 固定为：
 
