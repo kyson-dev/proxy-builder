@@ -28,7 +28,7 @@ func TestInitEnvironmentCreatesValidatedPrivateBundle(t *testing.T) {
 	}
 	usersData, _ := os.ReadFile(filepath.Join(directory, "users.json"))
 	document, err := contracts.ParseUsers(usersData)
-	if err != nil || len(document.Users) != 1 || document.Users[0].Name != "alice" || !document.Users[0].Enabled {
+	if err != nil || len(document.Users) != 1 || document.Users[0].Name != "alice" || !document.Users[0].Enabled || !document.Users[0].Protocols.VLESS || !document.Users[0].Protocols.Hysteria2 {
 		t.Fatalf("unexpected users: %#v, err = %v", document, err)
 	}
 	privateKey, _ := readTrimmed(filepath.Join(directory, "reality-private-key"), "Reality private key")
@@ -152,6 +152,19 @@ func TestUserLifecycleUsesImmediateCredentialRotation(t *testing.T) {
 	if !readUsersForTest(t, path).Users[1].Enabled {
 		t.Fatal("enable-user left the user disabled")
 	}
+	if err := mutateUser([]string{"--users", path, "--name", "alice", "--protocol", "hysteria2"}, userMutationDisableProtocol); err != nil {
+		t.Fatal(err)
+	}
+	protocols := readUsersForTest(t, path).Users[0].Protocols
+	if !protocols.VLESS || protocols.Hysteria2 {
+		t.Fatalf("disable-user-protocol did not preserve VLESS-only access: %#v", protocols)
+	}
+	if err := mutateUser([]string{"--users", path, "--name", "alice", "--protocol", "hysteria2"}, userMutationEnableProtocol); err != nil {
+		t.Fatal(err)
+	}
+	if !readUsersForTest(t, path).Users[0].Protocols.Hysteria2 {
+		t.Fatal("enable-user-protocol did not restore Hysteria2 access")
+	}
 }
 
 func TestUserLifecycleRejectsDisablingLastEnabledUserAndSymlink(t *testing.T) {
@@ -167,6 +180,12 @@ func TestUserLifecycleRejectsDisablingLastEnabledUserAndSymlink(t *testing.T) {
 	after, _ := os.ReadFile(path)
 	if string(before) != string(after) {
 		t.Fatal("failed mutation changed users.json")
+	}
+	if err := mutateUser([]string{"--users", path, "--name", "alice", "--protocol", "hysteria2"}, userMutationDisableProtocol); err != nil {
+		t.Fatal(err)
+	}
+	if err := mutateUser([]string{"--users", path, "--name", "alice", "--protocol", "vless"}, userMutationDisableProtocol); err == nil {
+		t.Fatal("disable-user-protocol accepted disabling the final protocol")
 	}
 	symlink := filepath.Join(t.TempDir(), "users.json")
 	if err := os.Symlink(path, symlink); err != nil {

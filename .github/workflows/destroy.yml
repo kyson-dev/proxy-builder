@@ -43,7 +43,6 @@ jobs:
           service_account: ${{ vars.GCP_APPLY_SERVICE_ACCOUNT }}
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
         with:
-          tofu_version: 1.12.1
+          tofu_version: 1.12.6
       - name: Destroy platform only
         run: make destroy ENV="${{ inputs.environment }}" STACK=platform CONFIRM_PROJECT_ID="${{ inputs.confirm_project_id }}"
-

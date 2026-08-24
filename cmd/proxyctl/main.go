@@ -46,6 +46,10 @@ func run(args []string) error {
 		return mutateUser(args[1:], userMutationDisable)
 	case "rotate-user":
 		return mutateUser(args[1:], userMutationRotate)
+	case "enable-user-protocol":
+		return mutateUser(args[1:], userMutationEnableProtocol)
+	case "disable-user-protocol":
+		return mutateUser(args[1:], userMutationDisableProtocol)
 	case "validate-subscription":
 		return validateSubscription(args[1:])
 	case "render-probe-config":

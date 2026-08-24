@@ -12,7 +12,7 @@ printf '%s\n' '{"version":1,"users":[{"name":"alice","enabled":true,"vless_uuid"
 chmod 0600 "$secrets_root/development/users.json"
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
-  'if [[ "${1:-}" == "version" ]]; then printf '\''{"terraform_version":"1.12.1"}\n'\''; exit 0; fi' \
+  'if [[ "${1:-}" == "version" ]]; then printf '\''{"terraform_version":"1.12.6"}\n'\''; exit 0; fi' \
   'if [[ "$*" == *" output -raw subscription_service_url"* ]]; then printf '\''https://subscription.example'\''; fi' >"$fake_tofu"
 chmod 0755 "$fake_tofu"
 

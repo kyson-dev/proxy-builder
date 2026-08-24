@@ -31,6 +31,8 @@ const (
 	userMutationEnable
 	userMutationDisable
 	userMutationRotate
+	userMutationEnableProtocol
+	userMutationDisableProtocol
 )
 
 func initEnvironment(args []string) error {
@@ -113,16 +115,21 @@ func mutateUser(args []string, mutation userMutation) error {
 	command := map[userMutation]string{
 		userMutationAdd: "add-user", userMutationEnable: "enable-user",
 		userMutationDisable: "disable-user", userMutationRotate: "rotate-user",
+		userMutationEnableProtocol: "enable-user-protocol", userMutationDisableProtocol: "disable-user-protocol",
 	}[mutation]
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	usersPath := flags.String("users", "", "users JSON path")
 	name := flags.String("name", "", "user name")
+	protocol := flags.String("protocol", "", "vless or hysteria2")
 	if err := flags.Parse(args); err != nil {
 		return fmt.Errorf("%s arguments are invalid", command)
 	}
 	if *usersPath == "" || *name == "" || flags.NArg() != 0 {
 		return fmt.Errorf("%s requires --users and --name", command)
+	}
+	if (mutation == userMutationEnableProtocol || mutation == userMutationDisableProtocol) && *protocol != "vless" && *protocol != "hysteria2" {
+		return fmt.Errorf("%s requires --protocol=vless|hysteria2", command)
 	}
 	info, err := os.Lstat(*usersPath)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
@@ -153,7 +160,7 @@ func mutateUser(args []string, mutation userMutation) error {
 			return err
 		}
 		document.Users = append(document.Users, user)
-	case userMutationEnable, userMutationDisable, userMutationRotate:
+	case userMutationEnable, userMutationDisable, userMutationRotate, userMutationEnableProtocol, userMutationDisableProtocol:
 		if index < 0 {
 			return errors.New("user name does not exist")
 		}
@@ -161,13 +168,18 @@ func mutateUser(args []string, mutation userMutation) error {
 			document.Users[index].Enabled = true
 		} else if mutation == userMutationDisable {
 			document.Users[index].Enabled = false
-		} else {
+		} else if mutation == userMutationRotate {
 			rotated, err := newUser(document.Users[index].Name)
 			if err != nil {
 				return err
 			}
 			rotated.Enabled = document.Users[index].Enabled
+			rotated.Protocols = document.Users[index].Protocols
 			document.Users[index] = rotated
+		} else if *protocol == "vless" {
+			document.Users[index].Protocols.VLESS = mutation == userMutationEnableProtocol
+		} else {
+			document.Users[index].Protocols.Hysteria2 = mutation == userMutationEnableProtocol
 		}
 	}
 	if err := document.Validate(); err != nil {
@@ -193,7 +205,7 @@ func newUser(name string) (contracts.User, error) {
 	if err != nil {
 		return contracts.User{}, err
 	}
-	return contracts.User{Name: name, Enabled: true, VLESSUUID: uuid, HY2Password: password, SubscriptionToken: token}, nil
+	return contracts.User{Name: name, Enabled: true, Protocols: contracts.Protocols{VLESS: true, Hysteria2: true}, VLESSUUID: uuid, HY2Password: password, SubscriptionToken: token}, nil
 }
 
 func randomEncoded(size int) (string, error) {

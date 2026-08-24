@@ -26,6 +26,7 @@ func validConfig() Config {
 			{
 				Name:              "alice",
 				Enabled:           true,
+				Protocols:         contracts.Protocols{VLESS: true, Hysteria2: true},
 				VLESSUUID:         "00000000-0000-4000-8000-000000000001",
 				HY2Password:       testPassword,
 				SubscriptionToken: testToken,
@@ -33,6 +34,7 @@ func validConfig() Config {
 			{
 				Name:              "disabled",
 				Enabled:           false,
+				Protocols:         contracts.Protocols{VLESS: true, Hysteria2: true},
 				VLESSUUID:         "00000000-0000-4000-8000-000000000002",
 				HY2Password:       "hy2-password-disabled-12345",
 				SubscriptionToken: "subscription-token-disabled-1",

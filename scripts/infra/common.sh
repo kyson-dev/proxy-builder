@@ -45,7 +45,7 @@ infra::read_tfvar() {
 
 infra::tofu_bin() {
     local tofu_bin="${TOFU_BIN:-tofu}"
-    command -v "$tofu_bin" >/dev/null 2>&1 || infra::die "缺少 OpenTofu；安装 1.12.1 或设置 TOFU_BIN"
+    command -v "$tofu_bin" >/dev/null 2>&1 || infra::die "缺少 OpenTofu；安装 1.12.6 或设置 TOFU_BIN"
     printf '%s\n' "$tofu_bin"
 }
 
@@ -53,5 +53,5 @@ infra::require_tofu_version() {
     local tofu_bin="$1"
     local version
     version=$($tofu_bin version -json | sed -nE 's/.*"terraform_version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -n 1)
-    [[ "$version" == "1.12.1" ]] || infra::die "需要 OpenTofu 1.12.1，当前为 ${version:-unknown}"
+    [[ "$version" == "1.12.6" ]] || infra::die "需要 OpenTofu 1.12.6，当前为 ${version:-unknown}"
 }

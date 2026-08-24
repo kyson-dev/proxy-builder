@@ -29,6 +29,8 @@ rg -q '^[[:space:]]+client_version,$' "$subscription_module" || infra::die "plat
 
 development_file=$(infra::require_environment development)
 production_file=$(infra::require_environment production)
+make -n -C "$INFRA_ROOT" infra-plan ENV=dev | rg -q 'ENV="development"'
+make -n -C "$INFRA_ROOT" deploy ENV=prod | rg -q 'ENV="production"'
 development_project=$(infra::read_tfvar "$development_file" project_id)
 production_project=$(infra::read_tfvar "$production_file" project_id)
 [[ "$development_project" != "$production_project" ]] || infra::die "两个环境不能共用 GCP Project"

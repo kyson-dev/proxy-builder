@@ -43,3 +43,38 @@ func TestRenderClashProducesParseableYAML(t *testing.T) {
 		t.Fatalf("unexpected proxies: %#v", document["proxies"])
 	}
 }
+
+func TestRenderSubscriptionsFilterUnauthorizedProtocol(t *testing.T) {
+	config := validConfig()
+	for name, protocols := range map[string]struct {
+		vless     bool
+		hysteria2 bool
+	}{
+		"VLESS only":     {vless: true, hysteria2: false},
+		"Hysteria2 only": {vless: false, hysteria2: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			user := config.Users.Users[0]
+			user.Protocols.VLESS = protocols.vless
+			user.Protocols.Hysteria2 = protocols.hysteria2
+			base64Output, err := RenderBase64(user, config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			decoded, err := base64.StdEncoding.DecodeString(base64Output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(string(decoded), "vless://") != protocols.vless || strings.Contains(string(decoded), "hysteria2://") != protocols.hysteria2 {
+				t.Fatalf("Base64 subscription did not match protocol permissions: %s", decoded)
+			}
+			clashOutput, err := RenderClash(user, config)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(clashOutput, "type: vless") != protocols.vless || strings.Contains(clashOutput, "type: hysteria2") != protocols.hysteria2 {
+				t.Fatalf("Clash subscription did not match protocol permissions: %s", clashOutput)
+			}
+		})
+	}
+}

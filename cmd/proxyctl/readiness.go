@@ -112,26 +112,41 @@ func parseBase64Subscription(data []byte) ([]*url.URL, error) {
 		return nil, errors.New("base64 subscription is not strict standard Base64")
 	}
 	lines := strings.Split(string(decoded), "\n")
-	if len(lines) != 2 || lines[0] == "" || lines[1] == "" {
-		return nil, errors.New("base64 subscription must contain exactly two non-empty links")
+	if len(lines) < 1 || len(lines) > 2 {
+		return nil, errors.New("base64 subscription must contain one or two links")
 	}
-	if err := validateSubscriptionURL(lines[0], "vless", map[string]string{
-		"encryption": "none", "flow": "xtls-rprx-vision", "fp": "chrome", "headerType": "none",
-		"pbk": "", "security": "reality", "sid": "", "sni": "", "type": "tcp",
-	}); err != nil {
-		return nil, err
-	}
-	if err := validateSubscriptionURL(lines[1], "hysteria2", map[string]string{
-		"insecure": "1", "obfs": "salamander", "obfs-password": "", "pinSHA256": "", "sni": "",
-	}); err != nil {
-		return nil, err
+	links := make([]*url.URL, 0, len(lines))
+	seen := make(map[string]struct{}, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			return nil, errors.New("base64 subscription contains an empty link")
+		}
+		parsed, err := url.Parse(line)
+		if err != nil {
+			return nil, errors.New("base64 subscription contains an invalid link")
+		}
+		if _, exists := seen[parsed.Scheme]; exists {
+			return nil, fmt.Errorf("base64 subscription duplicates %s", parsed.Scheme)
+		}
+		var expected map[string]string
+		switch parsed.Scheme {
+		case "vless":
+			expected = map[string]string{"encryption": "none", "flow": "xtls-rprx-vision", "fp": "chrome", "headerType": "none", "pbk": "", "security": "reality", "sid": "", "sni": "", "type": "tcp"}
+		case "hysteria2":
+			expected = map[string]string{"insecure": "1", "obfs": "salamander", "obfs-password": "", "pinSHA256": "", "sni": ""}
+		default:
+			return nil, errors.New("base64 subscription contains an unsupported protocol")
+		}
+		if err := validateSubscriptionURL(line, parsed.Scheme, expected); err != nil {
+			return nil, err
+		}
+		seen[parsed.Scheme] = struct{}{}
+		links = append(links, parsed)
 	}
 	if strings.Contains(string(decoded), "pubKeySHA256") {
 		return nil, errors.New("base64 subscription contains the unsupported pubKeySHA256 parameter")
 	}
-	vless, _ := url.Parse(lines[0])
-	hy2, _ := url.Parse(lines[1])
-	return []*url.URL{vless, hy2}, nil
+	return links, nil
 }
 
 func renderProbeConfig(args []string) error {
@@ -155,9 +170,15 @@ func renderProbeConfig(args []string) error {
 	if err != nil {
 		return err
 	}
-	link := links[0]
-	if *protocol == "hysteria2" {
-		link = links[1]
+	var link *url.URL
+	for _, candidate := range links {
+		if candidate.Scheme == *protocol {
+			link = candidate
+			break
+		}
+	}
+	if link == nil {
+		return fmt.Errorf("subscription does not authorize %s", *protocol)
 	}
 	query := link.Query()
 	outbound := map[string]any{
@@ -246,27 +267,41 @@ func validateClashSubscription(data []byte) error {
 	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
 		return errors.New("Clash subscription contains a trailing YAML document")
 	}
-	if len(value.Proxies) != 2 || value.Proxies[0].Type != "vless" || value.Proxies[1].Type != "hysteria2" {
-		return errors.New("Clash subscription must contain one VLESS and one Hysteria2 proxy")
+	if len(value.Proxies) < 1 || len(value.Proxies) > 2 {
+		return errors.New("Clash subscription must contain one or two proxies")
 	}
+	proxyNames := make([]string, 0, len(value.Proxies)+1)
+	seen := make(map[string]struct{}, len(value.Proxies))
 	for _, item := range value.Proxies {
 		if item.Name == "" || item.Server == "" || item.Port != 443 {
 			return errors.New("Clash subscription proxy structure is incomplete")
 		}
+		if _, exists := seen[item.Type]; exists {
+			return fmt.Errorf("Clash subscription duplicates %s", item.Type)
+		}
+		switch item.Type {
+		case "vless":
+			if item.UUID == "" || item.Network != "tcp" || !item.TLS || !item.UDP || item.Flow != "xtls-rprx-vision" || item.ServerName == "" || item.ClientFP != "chrome" || len(item.RealityOptions) != 2 || item.RealityOptions["public-key"] == nil || item.RealityOptions["short-id"] == nil {
+				return errors.New("Clash VLESS proxy structure is incomplete")
+			}
+		case "hysteria2":
+			if item.Password == "" || item.SNI == "" || item.SkipCertVerify || item.Fingerprint == "" || item.Obfs != "salamander" || item.ObfsPassword == "" {
+				return errors.New("Clash Hysteria2 proxy structure is incomplete")
+			}
+		default:
+			return errors.New("Clash subscription contains an unsupported protocol")
+		}
+		seen[item.Type] = struct{}{}
+		proxyNames = append(proxyNames, item.Name)
 	}
-	if value.Proxies[0].UUID == "" || value.Proxies[0].Network != "tcp" || !value.Proxies[0].TLS || !value.Proxies[0].UDP ||
-		value.Proxies[0].Flow != "xtls-rprx-vision" || value.Proxies[0].ServerName == "" || value.Proxies[0].ClientFP != "chrome" ||
-		len(value.Proxies[0].RealityOptions) != 2 || value.Proxies[0].RealityOptions["public-key"] == nil || value.Proxies[0].RealityOptions["short-id"] == nil {
-		return errors.New("Clash VLESS proxy structure is incomplete")
-	}
-	if value.Proxies[1].Password == "" || value.Proxies[1].SNI == "" || value.Proxies[1].SkipCertVerify ||
-		value.Proxies[1].Fingerprint == "" || value.Proxies[1].Obfs != "salamander" || value.Proxies[1].ObfsPassword == "" {
-		return errors.New("Clash Hysteria2 proxy structure is incomplete")
-	}
-	if len(value.ProxyGroups) != 1 || value.ProxyGroups[0].Name != "Auto" || value.ProxyGroups[0].Type != "select" ||
-		len(value.ProxyGroups[0].Proxies) != 3 || value.ProxyGroups[0].Proxies[0] != value.Proxies[0].Name ||
-		value.ProxyGroups[0].Proxies[1] != value.Proxies[1].Name || value.ProxyGroups[0].Proxies[2] != "DIRECT" {
+	proxyNames = append(proxyNames, "DIRECT")
+	if len(value.ProxyGroups) != 1 || value.ProxyGroups[0].Name != "Auto" || value.ProxyGroups[0].Type != "select" || len(value.ProxyGroups[0].Proxies) != len(proxyNames) {
 		return errors.New("Clash subscription proxy group is invalid")
+	}
+	for index, name := range proxyNames {
+		if value.ProxyGroups[0].Proxies[index] != name {
+			return errors.New("Clash subscription proxy group is invalid")
+		}
 	}
 	if len(value.Rules) != 1 || value.Rules[0] != "MATCH,Auto" {
 		return errors.New("Clash subscription rules are invalid")
