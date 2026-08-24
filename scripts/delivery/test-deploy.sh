@@ -88,6 +88,10 @@ run_line="$(rg -n 'gcloud run deploy' "$command_log" | cut -d: -f1 | head -n1)"
 [[ "$ssh_line" -lt "$secret_line" && "$secret_line" -lt "$run_line" ]] || { printf '%s\n' 'deployment ordering contract failed' >&2; exit 1; }
 rg -q -- '--to-revisions new-revision=100' "$command_log" || { printf '%s\n' 'healthy Cloud Run revision was not promoted by immutable revision name' >&2; exit 1; }
 rg -q 'run revisions describe new-revision' "$command_log" || { printf '%s\n' 'candidate Cloud Run revision readiness was not checked directly' >&2; exit 1; }
+rg 'gcloud run deploy' "$command_log" | rg -q -- '--ingress all.*--no-invoker-iam-check.*--default-url' || {
+  printf '%s\n' 'Cloud Run deployment did not preserve the public entry contract' >&2
+  exit 1
+}
 if rg -q -- '--tag|--to-tags' "$command_log"; then
   printf '%s\n' 'deployment still depends on Cloud Run traffic-tag routing' >&2
   exit 1

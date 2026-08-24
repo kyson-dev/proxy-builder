@@ -174,11 +174,14 @@ preflight() {
 
 prepare_release() {
   failure_stage="prepare"
-  mkdir -p "$temporary_release" || { fail "release_directory"; return 1; }
-  chmod 0700 "$temporary_release" || { fail "release_permissions"; return 1; }
+  mkdir -p "$temporary_release" "${temporary_release}/bin" || { fail "release_directory"; return 1; }
+  chmod 0700 "$temporary_release" "${temporary_release}/bin" || { fail "release_permissions"; return 1; }
   cp "${bundle_dir}/release.json" "${temporary_release}/release.json" || { fail "release_manifest_copy"; return 1; }
   cp "${bundle_dir}/docker-compose.yml" "${temporary_release}/docker-compose.yml" || { fail "compose_copy"; return 1; }
+  cp "${bundle_dir}/bin/deploy-release" "${temporary_release}/bin/deploy-release" || { fail "release_tool_copy"; return 1; }
+  cp "${bundle_dir}/bin/proxyctl" "${temporary_release}/bin/proxyctl" || { fail "release_tool_copy"; return 1; }
   chmod 0600 "${temporary_release}/release.json" "${temporary_release}/docker-compose.yml" || { fail "release_file_permissions"; return 1; }
+  chmod 0755 "${temporary_release}/bin/deploy-release" "${temporary_release}/bin/proxyctl" || { fail "release_tool_permissions"; return 1; }
 
   local sni cert_dir image
   sni="$(jq -er '.hy2_sni' "${bundle_dir}/release.json")" || { fail "release_manifest"; return 1; }
