@@ -30,7 +30,7 @@ stack_dir="${INFRA_ROOT}/infra/stacks/${stack}"
 
 if [[ "$action" == "plan" ]]; then
     if [[ -n "${PLAN_OUTPUT:-}" ]]; then
-        plan_file=$(mktemp "/private/tmp/proxy-builder-${environment}-${stack}.XXXXXX")
+        plan_file=$(mktemp "${TMPDIR:-/tmp}/proxy-builder-${environment}-${stack}.XXXXXX")
         trap 'rm -f "$plan_file"' EXIT
         "$tofu_bin" -chdir="$stack_dir" plan \
             -lock-timeout=5m \
@@ -44,7 +44,7 @@ if [[ "$action" == "plan" ]]; then
         -var-file="../../environments/${environment}.tfvars"
 fi
 
-plan_file=$(mktemp "/private/tmp/proxy-builder-${environment}-${stack}.XXXXXX")
+plan_file=$(mktemp "${TMPDIR:-/tmp}/proxy-builder-${environment}-${stack}.XXXXXX")
 trap 'rm -f "$plan_file"' EXIT
 
 "$tofu_bin" -chdir="$stack_dir" plan \
