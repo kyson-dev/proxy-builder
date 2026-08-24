@@ -2,7 +2,7 @@
 
 本文唯一拥有 OpenTofu 目录、stack/state 划分、模块接口、GCP 资源拓扑以及 IAM/WIF 边界。
 
-**实现状态：** 代码已实现并通过离线契约测试，尚未 apply 到 GCP
+**实现状态：** development 已 apply、重建并通过零变更 plan；production 尚未激活
 
 ## 目录接口
 

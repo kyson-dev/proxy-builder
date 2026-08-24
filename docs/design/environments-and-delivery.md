@@ -2,7 +2,7 @@
 
 本文唯一拥有环境配置归属、GitHub Variables/Secrets 名称、工作流接口以及 VM 与 Cloud Run 的发布协议。
 
-**实现状态：** 环境清单、发布工具与 GitHub 工作流已实现并离线验证；GitHub/GCP 尚未配置或执行。
+**实现状态：** development GitHub/GCP 已配置，并通过正式部署、协调回滚与双协议 E2E；production 尚未激活。
 
 ## 环境模型
 
