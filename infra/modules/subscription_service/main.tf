@@ -4,12 +4,14 @@ locals {
 }
 
 resource "google_cloud_run_v2_service" "subscription" {
-  project             = var.project_id
-  name                = local.service_name
-  location            = var.region
-  ingress             = "INGRESS_TRAFFIC_ALL"
-  deletion_protection = false
-  labels              = var.labels
+  project              = var.project_id
+  name                 = local.service_name
+  location             = var.region
+  ingress              = "INGRESS_TRAFFIC_ALL"
+  invoker_iam_disabled = true
+  default_uri_disabled = false
+  deletion_protection  = false
+  labels               = var.labels
 
   template {
     service_account                  = var.runtime_service_account_email
@@ -63,14 +65,6 @@ resource "google_cloud_run_v2_service" "subscription" {
       traffic,
     ]
   }
-}
-
-resource "google_cloud_run_v2_service_iam_member" "public" {
-  project  = var.project_id
-  location = google_cloud_run_v2_service.subscription.location
-  name     = google_cloud_run_v2_service.subscription.name
-  role     = "roles/run.invoker"
-  member   = "allUsers"
 }
 
 resource "google_cloud_run_v2_service_iam_member" "deploy" {

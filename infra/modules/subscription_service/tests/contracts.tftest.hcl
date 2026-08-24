@@ -24,6 +24,14 @@ run "startup_probe_contract" {
     error_message = "Cloud Run startup probe 必须检查容器端口 8080。"
   }
 
+  assert {
+    condition = (
+      google_cloud_run_v2_service.subscription.ingress == "INGRESS_TRAFFIC_ALL" &&
+      google_cloud_run_v2_service.subscription.invoker_iam_disabled == true &&
+      google_cloud_run_v2_service.subscription.default_uri_disabled == false
+    )
+    error_message = "Cloud Run subscription 必须公开默认 URL，并由应用 token 而非 Invoker IAM 认证客户端。"
+  }
 
   assert {
     condition     = google_logging_project_exclusion.subscription_requests.name == "proxy-dev-subscription-request-logs"

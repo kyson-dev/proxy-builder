@@ -91,9 +91,11 @@ labels             = { application = "proxy-builder", environment = "development
 - Artifact Registry repository；
 - proxy VM 与 runtime Service Account；
 - `proxy-users`、`obfs-password` Secret Manager 容器与 Cloud Run runtime Service Account；
-- Cloud Run subscription 服务的区域、ingress、权限和资源限制。
+- Cloud Run subscription 服务的区域、公开默认 URL、Invoker IAM 关闭状态和资源限制。
 
 部署工作流拥有 Cloud Run revision 的运行时字段（清单见[环境与交付](environments-and-delivery.md)的 Cloud Run 发布协议）：这些字段来自派生计算或 Secret Manager version，不作为 OpenTofu 变量存在，platform 的 Cloud Run resource 必须对全部这些字段声明 `lifecycle { ignore_changes }`，platform apply 不得覆盖它们。platform 仍然收敛 region、ingress、资源限制、Service Account 和 Secret Manager IAM；Secret 引用随第一个可运行 revision 由 deploy 建立，避免在 secret 尚无 version 时创建无效 revision。
+
+subscription 使用 `INGRESS_TRAFFIC_ALL`、`default_uri_disabled = false` 与 `invoker_iam_disabled = true`。platform 不创建 `allUsers roles/run.invoker` binding；终端用户认证属于[订阅服务](subscription-service.md)的应用 token 接口。
 
 ## 模块接口
 

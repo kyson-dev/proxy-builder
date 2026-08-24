@@ -22,3 +22,4 @@ Accepted 后不得重写正文。改变决定时新增 ADR，并在两份记录�
 | 0001 | [使用 OpenTofu 管理 GCP，Bash 管理过程性操作](0001-manage-gcp-with-opentofu.md) | Accepted | 2026-08-23 |
 | 0002 | [分离代理与订阅服务运行环境](0002-separate-proxy-and-subscription-runtimes.md) | Accepted | 2026-08-23 |
 | 0003 | [划分应用秘密的维护与运行时投递](0003-own-and-deliver-application-secrets.md) | Accepted | 2026-08-23 |
+| 0004 | [公开 Cloud Run 入口并由应用认证订阅用户](0004-public-cloud-run-with-application-auth.md) | Accepted | 2026-08-24 |
