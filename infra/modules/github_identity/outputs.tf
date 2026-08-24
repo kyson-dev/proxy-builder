@@ -18,6 +18,12 @@ output "secret_metadata_permissions" {
   value = google_project_iam_custom_role.secret_metadata_admin.permissions
 }
 
+output "state_iam_permissions" {
+  value = {
+    for access, role in google_project_iam_custom_role.state_iam : access => role.permissions
+  }
+}
+
 output "plan_wif_member" {
   value = google_service_account_iam_member.plan_wif.member
 }
