@@ -44,7 +44,7 @@
    ./scripts/github/configure.sh --environment production --enable-production
    ```
 
-   预期：Environment 只保留五项新架构应用 Secret；production 仅允许 `main`，且需要 `kysonzou` 审批。旧 VM 不读取 GitHub Environment Secret，不受本步骤影响。
+   预期：Environment 只保留五项新架构应用 Secret；production 仅允许 `main`，且需要当前登录的 GitHub 身份审批。旧 VM 不读取 GitHub Environment Secret，不受本步骤影响。
 
 4. 在 GitHub Actions 的 `main` 手动运行 `Infrastructure apply`，选择 `production/bootstrap`，完成 Environment 审批后确认零变更。再手动运行 `Infrastructure plan`，选择 `production/platform`，核对只会在 `kyson-proxy-prod` 创建 `proxy-*` 资源和新的 `proxy-ipv4`。
 

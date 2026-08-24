@@ -58,9 +58,10 @@ read_variable() { jq -er --arg name "$2" '.variables[] | select(.name == $name) 
 [[ "$(read_variable "$environment_variables" GCP_DEPLOY_SERVICE_ACCOUNT)" == "$deploy_sa" ]] || { printf '%s\n' 'deploy service account variable does not match bootstrap state' >&2; exit 1; }
 
 if [[ "$environment" == "production" ]]; then
+  reviewer_id="$(gh api user --jq '.id')"
   protection="$(gh api "repos/${repo}/environments/production")"
-  jq -e '
-    (.protection_rules | any(.type == "required_reviewers" and (.reviewers | any(.reviewer.login == "kysonzou")))) and
+  jq -e --argjson reviewer_id "$reviewer_id" '
+    (.protection_rules | any(.type == "required_reviewers" and (.reviewers | any(.reviewer.id == $reviewer_id)))) and
     (.deployment_branch_policy.protected_branches == false) and
     (.deployment_branch_policy.custom_branch_policies == true)
   ' <<<"$protection" >/dev/null || { printf '%s\n' 'production environment protection is incomplete' >&2; exit 1; }
