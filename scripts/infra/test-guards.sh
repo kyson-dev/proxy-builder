@@ -23,6 +23,10 @@ rg -q '确认值不匹配' "$destroy_guard_log" || infra::die "destroy 拒绝原
 rg -q -- '-auto-approve' "${SCRIPT_DIR}/destroy-platform.sh" || infra::die "GitHub destroy 必须显式非交互批准"
 rg -q -- '-input=false' "${SCRIPT_DIR}/destroy-platform.sh" || infra::die "GitHub destroy 不得等待交互输入"
 
+subscription_module="${INFRA_ROOT}/infra/modules/subscription_service/main.tf"
+rg -q '^[[:space:]]+client,$' "$subscription_module" || infra::die "platform 必须忽略 Cloud Run deploy client 元数据"
+rg -q '^[[:space:]]+client_version,$' "$subscription_module" || infra::die "platform 必须忽略 Cloud Run deploy client version 元数据"
+
 development_file=$(infra::require_environment development)
 production_file=$(infra::require_environment production)
 development_project=$(infra::read_tfvar "$development_file" project_id)

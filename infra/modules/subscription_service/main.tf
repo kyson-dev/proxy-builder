@@ -60,6 +60,8 @@ resource "google_cloud_run_v2_service" "subscription" {
 
   lifecycle {
     ignore_changes = [
+      client,
+      client_version,
       template[0].containers[0].env,
       template[0].containers[0].image,
       traffic,
