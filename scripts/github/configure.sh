@@ -49,7 +49,7 @@ gh variable set GCP_APPLY_SERVICE_ACCOUNT --repo "$repo" --env "$environment" --
 gh variable set GCP_DEPLOY_SERVICE_ACCOUNT --repo "$repo" --env "$environment" --body "$deploy_sa"
 
 if [[ "$environment" == "production" ]]; then
-  reviewer_id="$(gh api "users/kysonzou" --jq '.id')"
+  reviewer_id="$(gh api user --jq '.id')"
   jq -n --argjson reviewer_id "$reviewer_id" '{
     wait_timer: 0,
     prevent_self_review: false,
