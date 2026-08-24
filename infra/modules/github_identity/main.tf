@@ -36,38 +36,37 @@ locals {
   }
 
   project_roles = {
-    plan = toset([
-      "roles/viewer",
-    ])
-    apply = toset([
-      "roles/artifactregistry.admin",
-      "roles/compute.admin",
-      "roles/iam.roleAdmin",
-      "roles/iam.serviceAccountAdmin",
-      "roles/iam.serviceAccountUser",
-      "roles/iam.workloadIdentityPoolAdmin",
-      "roles/logging.configWriter",
-      "roles/resourcemanager.projectIamAdmin",
-      "roles/run.admin",
-      google_project_iam_custom_role.secret_metadata_admin.name,
-      "roles/serviceusage.serviceUsageAdmin",
-    ])
-    deploy = toset([
-      "roles/compute.osAdminLogin",
-      "roles/compute.viewer",
-      "roles/iap.tunnelResourceAccessor",
-    ])
+    plan = {
+      viewer = "roles/viewer"
+    }
+    apply = {
+      artifact_registry_admin          = "roles/artifactregistry.admin"
+      compute_admin                    = "roles/compute.admin"
+      iam_role_admin                   = "roles/iam.roleAdmin"
+      iam_service_account_admin        = "roles/iam.serviceAccountAdmin"
+      iam_service_account_user         = "roles/iam.serviceAccountUser"
+      iam_workload_identity_pool_admin = "roles/iam.workloadIdentityPoolAdmin"
+      logging_config_writer            = "roles/logging.configWriter"
+      project_iam_admin                = "roles/resourcemanager.projectIamAdmin"
+      run_admin                        = "roles/run.admin"
+      secret_metadata_admin            = google_project_iam_custom_role.secret_metadata_admin.name
+      service_usage_admin              = "roles/serviceusage.serviceUsageAdmin"
+    }
+    deploy = {
+      compute_os_admin_login       = "roles/compute.osAdminLogin"
+      compute_viewer               = "roles/compute.viewer"
+      iap_tunnel_resource_accessor = "roles/iap.tunnelResourceAccessor"
+    }
   }
 
-  project_role_bindings = flatten([
-    for identity, roles in local.project_roles : [
-      for role in roles : {
-        key      = "${identity}:${role}"
+  project_role_bindings = merge([
+    for identity, roles in local.project_roles : {
+      for role_key, role in roles : "${identity}:${role_key}" => {
         identity = identity
         role     = role
       }
-    ]
-  ])
+    }
+  ]...)
 }
 
 resource "google_project_service" "required" {
@@ -158,7 +157,7 @@ resource "google_service_account_iam_member" "environment_wif" {
 }
 
 resource "google_project_iam_member" "github" {
-  for_each = { for binding in local.project_role_bindings : binding.key => binding }
+  for_each = local.project_role_bindings
 
   project = var.project_id
   role    = each.value.role
