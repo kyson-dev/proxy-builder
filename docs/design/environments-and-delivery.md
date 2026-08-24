@@ -99,6 +99,7 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 
 - 触发：`workflow_dispatch`。
 - 输入：`environment` 与 `git_ref`；production 的 `git_ref` 必须解析为 `main` 可达 commit。
+- 本地 `make deploy ENV=production` 固定从 `main` 版本的 workflow dispatch；development 保持当前分支作为 workflow ref。
 - 构建 subscription 镜像并以 commit SHA 标记，推送后只使用 registry 返回的 digest。
 - 顺序：验证输入 → 发布 proxy VM → 创建无流量 Cloud Run revision 并等待 startup probe → 按不可变 revision name 切流 → 公网 health/订阅复验 → 真实双协议 E2E。
 - 使用 `github-deploy`；不得创建或修改 OpenTofu 拥有的网络、IAM、VM 或 secret 容器。

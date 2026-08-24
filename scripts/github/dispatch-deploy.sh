@@ -7,5 +7,9 @@ case "$environment" in development|production) ;; *) printf '%s\n' 'ENV must be 
 command -v gh >/dev/null 2>&1 || { printf '%s\n' 'missing command: gh' >&2; exit 1; }
 [[ -n "$git_ref" ]] || git_ref="$(git rev-parse HEAD)"
 workflow_ref="$(git symbolic-ref --quiet --short HEAD || printf '%s' main)"
+if [[ "$environment" == production ]]; then
+  workflow_ref="main"
+  [[ -n "${GIT_REF:-}" ]] || git_ref="main"
+fi
 gh workflow run deploy.yml --ref "$workflow_ref" -f "environment=${environment}" -f "git_ref=${git_ref}"
 printf 'deploy workflow dispatched for %s at %s\n' "$environment" "$git_ref"
