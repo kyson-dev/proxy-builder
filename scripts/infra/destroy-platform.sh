@@ -27,5 +27,7 @@ stack_dir="${INFRA_ROOT}/infra/stacks/platform"
     -backend-config="bucket=${bucket}" \
     -backend-config="prefix=platform"
 "$tofu_bin" -chdir="$stack_dir" destroy \
+    -auto-approve \
+    -input=false \
     -lock-timeout=5m \
     -var-file="../../environments/${environment}.tfvars"
