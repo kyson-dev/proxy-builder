@@ -97,7 +97,6 @@ resource "google_project_iam_custom_role" "secret_metadata_admin" {
 
   permissions = [
     "resourcemanager.projects.get",
-    "resourcemanager.projects.list",
     "secretmanager.locations.get",
     "secretmanager.locations.list",
     "secretmanager.secrets.create",
