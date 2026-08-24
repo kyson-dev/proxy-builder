@@ -31,7 +31,10 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'if [[ "$1 $2 $3" == "secrets versions add" ]]; then printf '\''projects/p/secrets/s/versions/1\n'\''; fi' \
   'if [[ "$1 $2 $3" == "run services update-traffic" && "$*" == *"--to-revisions old-revision=100"* ]]; then exit "${FAKE_CLOUD_ROLLBACK_STATUS:-0}"; fi' \
   'if [[ "$1 $2 $3" == "run services describe" ]]; then' \
-  '  case "$*" in *"latestReadyRevisionName"*) printf '\''new-revision\n'\'' ;; *"status.url"*) printf '\''https://service.example\n'\'' ;; *) printf '\''old-revision\n'\'' ;; esac' \
+  '  case "$*" in *"--format=json"*) printf '\''%s\n'\'' '\''{"status":{"traffic":[{"percent":100,"revisionName":"old-revision"}]}}'\'' ;; *"latestCreatedRevisionName"*) printf '\''new-revision\n'\'' ;; *"status.url"*) printf '\''https://service.example\n'\'' ;; esac' \
+  'fi' \
+  'if [[ "$1 $2 $3" == "run revisions describe" ]]; then' \
+  '  printf '\''%s\n'\'' '\''{"status":{"conditions":[{"type":"Ready","status":"True"}]}}'\''' \
   'fi' >"${fake_bin}/gcloud"
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
@@ -77,6 +80,7 @@ secret_line="$(rg -n 'gcloud secrets versions add' "$command_log" | cut -d: -f1 
 run_line="$(rg -n 'gcloud run deploy' "$command_log" | cut -d: -f1 | head -n1)"
 [[ "$ssh_line" -lt "$secret_line" && "$secret_line" -lt "$run_line" ]] || { printf '%s\n' 'deployment ordering contract failed' >&2; exit 1; }
 rg -q -- '--to-revisions new-revision=100' "$command_log" || { printf '%s\n' 'healthy Cloud Run revision was not promoted by immutable revision name' >&2; exit 1; }
+rg -q 'run revisions describe new-revision' "$command_log" || { printf '%s\n' 'candidate Cloud Run revision readiness was not checked directly' >&2; exit 1; }
 if rg -q -- '--tag|--to-tags' "$command_log"; then
   printf '%s\n' 'deployment still depends on Cloud Run traffic-tag routing' >&2
   exit 1
