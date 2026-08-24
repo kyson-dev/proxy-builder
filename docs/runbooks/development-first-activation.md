@@ -74,7 +74,7 @@
    gh run watch <run-id> --exit-status
    ```
 
-   预期：VM 健康；候选 Cloud Run 的 health/订阅校验与 VLESS、Hysteria2 真实出站 E2E 全部成功；切流后公网复验成功。
+   预期：VM 健康；无流量 Cloud Run revision 通过 startup probe；按 revision name 切流后，公网 health、两种订阅格式与 VLESS、Hysteria2 真实出站 E2E 全部成功。
 
 7. **验收并取得订阅 URL**
 
@@ -92,8 +92,8 @@
 | bootstrap/platform 失败 | 停止，检查 plan/run；不运行 destroy。 |
 | VM 返回 `20` | 旧 VM 已恢复；检查脱敏失败诊断后重新部署。 |
 | 返回 `21` | 没有完整旧版本或回滚失败；停止写操作并人工检查两侧实际流量。 |
-| Cloud Run 候选/E2E 失败 | 应未切流并尝试回滚 VM；首次部署没有 previous，因而可能返回 `21`。 |
-| 切流后失败 | 确认日志顺序为 Cloud Run 恢复旧 revision、VM 回滚；任一步未完成均按环境故障处理。 |
+| Cloud Run 无流量 revision 创建或 startup probe 失败 | 应未切流并尝试回滚 VM；首次部署没有 previous，因而可能返回 `21`。 |
+| 切流后 health、订阅或 E2E 失败 | 确认日志顺序为 Cloud Run 恢复旧 revision、VM 回滚；任一步未完成均按环境故障处理。 |
 
 ## 成功标准
 

@@ -29,9 +29,9 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'printf '\''gcloud %s\n'\'' "$*" >>"$FAKE_COMMAND_LOG"' \
   'if [[ "$1 $2 $3" == "compute ssh --tunnel-through-iap" ]]; then if [[ "$*" == *"--inspect-certificate"* ]]; then printf '\''%s'\'' "${FAKE_REMOTE_CERT:-}"; exit 0; elif [[ "$*" == *"--rollback"* ]]; then exit "${FAKE_VM_ROLLBACK_STATUS:-0}"; else exit "${FAKE_VM_STATUS:-0}"; fi; fi' \
   'if [[ "$1 $2 $3" == "secrets versions add" ]]; then printf '\''projects/p/secrets/s/versions/1\n'\''; fi' \
-  'if [[ "$1 $2 $3" == "run services update-traffic" && "$*" == *"--to-revisions"* ]]; then exit "${FAKE_CLOUD_ROLLBACK_STATUS:-0}"; fi' \
+  'if [[ "$1 $2 $3" == "run services update-traffic" && "$*" == *"--to-revisions old-revision=100"* ]]; then exit "${FAKE_CLOUD_ROLLBACK_STATUS:-0}"; fi' \
   'if [[ "$1 $2 $3" == "run services describe" ]]; then' \
-  '  case "$*" in *"traffic[tag="*) printf '\''https://candidate.example\n'\'' ;; *"status.url"*) printf '\''https://service.example\n'\'' ;; *) printf '\''old-revision\n'\'' ;; esac' \
+  '  case "$*" in *"latestReadyRevisionName"*) printf '\''new-revision\n'\'' ;; *"status.url"*) printf '\''https://service.example\n'\'' ;; *) printf '\''old-revision\n'\'' ;; esac' \
   'fi' >"${fake_bin}/gcloud"
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
@@ -76,6 +76,11 @@ ssh_line="$(rg -n 'gcloud compute ssh' "$command_log" | cut -d: -f1 | head -n1)"
 secret_line="$(rg -n 'gcloud secrets versions add' "$command_log" | cut -d: -f1 | head -n1)"
 run_line="$(rg -n 'gcloud run deploy' "$command_log" | cut -d: -f1 | head -n1)"
 [[ "$ssh_line" -lt "$secret_line" && "$secret_line" -lt "$run_line" ]] || { printf '%s\n' 'deployment ordering contract failed' >&2; exit 1; }
+rg -q -- '--to-revisions new-revision=100' "$command_log" || { printf '%s\n' 'healthy Cloud Run revision was not promoted by immutable revision name' >&2; exit 1; }
+if rg -q -- '--tag|--to-tags' "$command_log"; then
+  printf '%s\n' 'deployment still depends on Cloud Run traffic-tag routing' >&2
+  exit 1
+fi
 if rg -q 'CANARY|subscription_token|REALITY_PRIVATE' "$command_log" "${test_root}/success.log" "${test_root}/rollback.log"; then
   printf '%s\n' 'secret canary leaked into arguments or logs' >&2
   exit 1
@@ -100,10 +105,12 @@ status=$?
 set -e
 [[ "$status" == "20" ]] || { printf 'expected coordinated rollback status 20 after E2E failure, got %s\n' "$status" >&2; exit 1; }
 rg -q -- '--rollback '\''0123456789abcdef0123456789abcdef01234567-123-1'\''' "$command_log" || { printf '%s\n' 'E2E failure did not request VM rollback' >&2; exit 1; }
-if rg -q -- '--to-tags candidate-123-1=100' "$command_log"; then
-  printf '%s\n' 'traffic switched after candidate E2E failure' >&2
+e2e_cloud_rollback_line="$(rg -n -- '--to-revisions old-revision=100' "$command_log" | cut -d: -f1 | head -n1)"
+e2e_vm_rollback_line="$(rg -n -- '--rollback '\''0123456789abcdef0123456789abcdef01234567-123-1'\''' "$command_log" | cut -d: -f1 | head -n1)"
+[[ -n "$e2e_cloud_rollback_line" && -n "$e2e_vm_rollback_line" && "$e2e_cloud_rollback_line" -lt "$e2e_vm_rollback_line" ]] || {
+  printf '%s\n' 'E2E rollback did not restore Cloud Run before VM' >&2
   exit 1
-fi
+}
 
 : >"$command_log"
 set +e
