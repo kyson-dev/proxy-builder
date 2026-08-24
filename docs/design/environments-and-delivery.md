@@ -145,7 +145,7 @@ OBFS_PASSWORD = Secret Manager version 引用
 PROXY_USERS_JSON = Secret Manager version 引用
 ```
 
-以上全部字段由部署 job 拥有，platform 的 OpenTofu 定义必须对它们声明 `lifecycle { ignore_changes }`，详见[基础设施与身份](infrastructure-and-identity.md)；platform apply 不得覆盖这些字段。
+以上全部字段由部署 job 拥有，platform 的 OpenTofu 定义必须对它们声明 `lifecycle { ignore_changes }`，同时忽略 gcloud 写入的 `client` 与 `client_version` 部署者元数据，详见[基础设施与身份](infrastructure-and-identity.md)；platform apply 不得覆盖这些字段，也不得为清除部署者元数据制造空更新。
 
 Secret version 创建成功但 revision 失败时允许保留该 version 供审计和重试。
 
