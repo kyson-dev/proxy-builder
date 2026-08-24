@@ -41,3 +41,7 @@ variable "network_tag" {
 variable "labels" {
   type = map(string)
 }
+
+variable "deploy_service_account_email" {
+  type = string
+}

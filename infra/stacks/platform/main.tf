@@ -49,6 +49,8 @@ module "proxy_vm" {
   external_ip_address  = module.network.proxy_ip_address
   network_tag          = module.network.proxy_network_tag
   labels               = var.labels
+
+  deploy_service_account_email = data.terraform_remote_state.bootstrap.outputs.deploy_service_account_email
 }
 
 module "secret_runtime" {

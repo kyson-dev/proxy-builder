@@ -17,6 +17,12 @@ resource "google_service_account" "runtime" {
   description  = "Runtime identity for the proxy VM; no project roles"
 }
 
+resource "google_service_account_iam_member" "deploy_act_as" {
+  service_account_id = google_service_account.runtime.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${var.deploy_service_account_email}"
+}
+
 resource "google_compute_instance" "proxy" {
   project                   = var.project_id
   name                      = "${local.name_prefix}-vm"
