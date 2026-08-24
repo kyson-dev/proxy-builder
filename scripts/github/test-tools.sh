@@ -100,4 +100,12 @@ PATH="${fake_bin}:$PATH" FAKE_COMMAND_LOG="$command_log" \
 status=$?
 set -e
 [[ "$status" -ne 0 ]] || { printf '%s\n' 'reset accepted production' >&2; exit 1; }
+
+: >"$command_log"
+PATH="${fake_bin}:$PATH" FAKE_COMMAND_LOG="$command_log" ENV=production GIT_REF=release-sha \
+  "$script_dir/dispatch-deploy.sh" >"${test_root}/dispatch-production.log"
+rg -q 'gh workflow run deploy.yml --ref main -f environment=production -f git_ref=release-sha' "$command_log" || {
+  printf '%s\n' 'production deploy dispatch did not select the main workflow ref' >&2
+  exit 1
+}
 printf '%s\n' 'GitHub tool isolation tests passed'
