@@ -1,8 +1,7 @@
 locals {
-  environment_short = var.environment == "production" ? "prod" : "dev"
-  name_prefix       = "${var.resource_prefix}-${local.environment_short}"
-  startup_script    = file("${path.module}/files/startup.sh")
-  startup_sha256    = sha256(local.startup_script)
+  name_prefix    = var.resource_prefix
+  startup_script = file("${path.module}/files/startup.sh")
+  startup_sha256 = sha256(local.startup_script)
 }
 
 data "google_compute_image" "debian" {
@@ -12,7 +11,7 @@ data "google_compute_image" "debian" {
 
 resource "google_service_account" "runtime" {
   project      = var.project_id
-  account_id   = "${local.name_prefix}-proxy"
+  account_id   = "${local.name_prefix}-vm-sa"
   display_name = "Proxy runtime (${var.environment})"
   description  = "Runtime identity for the proxy VM; no project roles"
 }

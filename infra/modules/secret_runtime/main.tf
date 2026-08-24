@@ -1,6 +1,5 @@
 locals {
-  environment_short = var.environment == "production" ? "prod" : "dev"
-  name_prefix       = "${var.resource_prefix}-${local.environment_short}"
+  name_prefix = var.resource_prefix
 
   secrets = {
     proxy_users = "${local.name_prefix}-proxy-users"
@@ -10,7 +9,7 @@ locals {
 
 resource "google_service_account" "runtime" {
   project      = var.project_id
-  account_id   = "${local.name_prefix}-subscription"
+  account_id   = "${local.name_prefix}-subscription-sa"
   display_name = "Subscription runtime (${var.environment})"
   description  = "Runtime identity for the Cloud Run subscription service"
 }

@@ -1,6 +1,5 @@
 locals {
-  environment_short = var.environment == "production" ? "prod" : "dev"
-  service_name      = "${var.resource_prefix}-${local.environment_short}-subscription"
+  service_name = "${var.resource_prefix}-subscription"
 }
 
 resource "google_cloud_run_v2_service" "subscription" {

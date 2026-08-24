@@ -55,7 +55,7 @@ environment        = "development" # 或 production
 project_id         = "gcp-project-id"
 region             = "asia-northeast3"
 zone               = "asia-northeast3-a"
-resource_prefix    = "proxy"
+resource_prefix    = "proxy" # 完整资源名前缀，不自动拼接环境
 network_cidr       = "10.20.0.0/24"
 network_tier       = "STANDARD"
 vm_machine_type    = "e2-micro"
@@ -67,6 +67,8 @@ labels             = { application = "proxy-builder", environment = "development
 ```
 
 `environment` 只能是 `development` 或 `production`。`labels.application` 与 `labels.environment` 必须应用于支持 label 的所有资源，作为旧资源清理时的归属条件。
+
+`resource_prefix` 是资源 ID 的完整前缀，环境名不参与资源 ID 派生。当前两个环境均为 `proxy`，因此新资源命名为 `proxy-network`、`proxy-vm`、`proxy-subscription`、`proxy-github` 和 `proxy-images`。GitHub 身份为 `proxy-gh-plan`、`proxy-gh-apply`、`proxy-gh-deploy`；运行身份为 `proxy-vm-sa` 与 `proxy-subscription-sa`。Project、GitHub Environment 与 labels 继续承担环境隔离。
 
 名称包含 `_secret`、`password`、`private_key`、`token` 或证书内容的变量禁止进入 OpenTofu 输入。
 
