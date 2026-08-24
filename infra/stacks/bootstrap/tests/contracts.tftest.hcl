@@ -27,8 +27,19 @@ run "identity_contract" {
   }
 
   assert {
-    condition     = !contains(module.github_identity.secret_metadata_permissions, "secretmanager.versions.access")
-    error_message = "apply 的 Secret Manager 自定义角色不得读取 secret payload。"
+    condition = toset(module.github_identity.secret_metadata_permissions) == toset([
+      "resourcemanager.projects.get",
+      "secretmanager.locations.get",
+      "secretmanager.locations.list",
+      "secretmanager.secrets.create",
+      "secretmanager.secrets.delete",
+      "secretmanager.secrets.get",
+      "secretmanager.secrets.getIamPolicy",
+      "secretmanager.secrets.list",
+      "secretmanager.secrets.setIamPolicy",
+      "secretmanager.secrets.update",
+    ])
+    error_message = "apply 的 Secret Manager 自定义角色必须只管理 metadata，且所有权限都可用于项目级自定义角色。"
   }
 
   assert {
