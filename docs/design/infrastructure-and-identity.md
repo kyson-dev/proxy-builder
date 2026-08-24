@@ -140,7 +140,7 @@ startup script 不接收 OpenTofu secret 输入，也不得把应用秘密写入
 | `proxy-runtime` | 运行 VM；无 Project 级管理角色，无 Secret Manager 读取权限 |
 | `subscription-runtime` | 仅读取指定环境的 `proxy-users` 与 `obfs-password` secret |
 
-WIF attribute mapping 必须包含 `repository_id`、`repository_owner_id`、`event_name`、`ref` 和 `sub`。每个环境只有一个 GitHub provider，其 admission condition 使用不可变 repository ID。`github-plan` 只绑定精确的 `repo:<owner>/<repo>:pull_request` subject；`github-apply` 与 `github-deploy` 只绑定精确的 `repo:<owner>/<repo>:environment:<environment>` subject。fork PR 不获得 WIF，GitHub Environment 审批仍是可写身份的必要条件。
+WIF attribute mapping 必须包含 `repository_id`、`repository_owner_id`、`event_name`、`ref` 和 `sub`。每个环境只有一个 GitHub provider，其 admission condition 使用不可变 repository ID。`github-plan` 绑定精确的 `repo:<owner>/<repo>:pull_request` 与 `repo:<owner>/<repo>:ref:refs/heads/main` subject，分别用于 PR 和 main 的手动只读 plan；`github-apply` 与 `github-deploy` 只绑定精确的 `repo:<owner>/<repo>:environment:<environment>` subject。fork PR 不获得 WIF，GitHub Environment 审批仍是可写身份的必要条件。
 
 subscription token 为客户端兼容性保留在 query parameter。platform 必须按当前环境的 subscription service 名创建 `google_logging_project_exclusion`，仅排除 `run.googleapis.com/requests` 的 Cloud Run 自动 request log，避免其 `requestUrl` 持久化 token；应用自身的脱敏结构化日志继续保留。bootstrap 因此启用 Cloud Logging API，并仅向 `github-apply` 授予 `roles/logging.configWriter`。
 

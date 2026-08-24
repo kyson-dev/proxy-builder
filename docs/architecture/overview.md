@@ -12,7 +12,7 @@ Proxy Builder 在 GCP Compute Engine 上运行 sing-box，为每个用户提供 
 
 系统定义 `development` 与 `production` 两个环境。每个环境使用独立的 GCP Project、OpenTofu state、WIF Provider、Service Accounts、运行资源、代理密钥和用户集合。当前只有 `development` 在线。
 
-GitHub Repository Variables 保存 pull-request plan 身份；同名 GitHub Environment 保存 apply/deploy 身份与五项应用 Secrets。本地 `.secrets/<environment>/` 是权限受限的灾难恢复副本，不进入 Git。
+GitHub Repository Variables 保存 PR 与 main 手动 plan 身份；同名 GitHub Environment 保存 apply/deploy 身份与五项应用 Secrets。本地 `.secrets/<environment>/` 是权限受限的灾难恢复副本，不进入 Git。
 
 ## 组件与数据流
 

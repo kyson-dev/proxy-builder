@@ -28,6 +28,10 @@ output "plan_wif_member" {
   value = google_service_account_iam_member.plan_wif.member
 }
 
+output "plan_main_wif_member" {
+  value = google_service_account_iam_member.plan_main_wif.member
+}
+
 output "required_services" {
   value = local.required_services
 }

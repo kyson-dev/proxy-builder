@@ -55,7 +55,12 @@ run "identity_contract" {
 
   assert {
     condition     = module.github_identity.plan_wif_member == "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/mock-pool/subject/repo:${var.github_repository}:pull_request"
-    error_message = "plan 身份必须只允许当前仓库的 pull_request subject。"
+    error_message = "plan 身份必须允许当前仓库的 pull_request subject。"
+  }
+
+  assert {
+    condition     = module.github_identity.plan_main_wif_member == "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/mock-pool/subject/repo:${var.github_repository}:ref:refs/heads/main"
+    error_message = "plan 身份必须允许当前仓库 main 的手动 plan subject。"
   }
 
   assert {
