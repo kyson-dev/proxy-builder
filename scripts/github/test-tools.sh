@@ -21,10 +21,14 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'if [[ "$1" == "api" && "$*" == *"--input -"* ]]; then cat >/dev/null; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"repos/kyson-dev/proxy-builder/actions/variables"* && "$*" != *"--method DELETE"* ]]; then' \
   '  extra=""; [[ "${FAKE_AUDIT_EXTRA:-0}" == "1" ]] && extra='\'',{"name":"DEV_LEGACY","value":"legacy"}'\''' \
-  '  printf '\''{"variables":[{"name":"DEV_GCP_WIF_PROVIDER","value":"projects/123/locations/global/workloadIdentityPools/pool/providers/provider"},{"name":"DEV_GCP_PLAN_SERVICE_ACCOUNT","value":"plan@example.iam.gserviceaccount.com"}%s]}\n'\'' "$extra"; exit 0' \
+  '  printf '\''{"variables":[{"name":"DEV_GCP_WIF_PROVIDER","value":"projects/123/locations/global/workloadIdentityPools/pool/providers/provider"},{"name":"DEV_GCP_PLAN_SERVICE_ACCOUNT","value":"plan@example.iam.gserviceaccount.com"},{"name":"PROD_GCP_WIF_PROVIDER","value":"projects/123/locations/global/workloadIdentityPools/pool/providers/provider"},{"name":"PROD_GCP_PLAN_SERVICE_ACCOUNT","value":"plan@example.iam.gserviceaccount.com"}%s]}\n'\'' "$extra"; exit 0' \
   'fi' \
   'if [[ "$1" == "api" && "$*" == *"environments/development/variables"* ]]; then printf '\''{"variables":[{"name":"GCP_APPLY_SERVICE_ACCOUNT","value":"apply@example.iam.gserviceaccount.com"},{"name":"GCP_DEPLOY_SERVICE_ACCOUNT","value":"deploy@example.iam.gserviceaccount.com"}]}\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"environments/development/secrets"* ]]; then printf '\''{"secrets":[{"name":"REALITY_PRIVATE_KEY"},{"name":"OBFS_PASSWORD"},{"name":"HY2_CERT_PEM"},{"name":"HY2_KEY_PEM"},{"name":"PROXY_USERS_JSON"}]}\n'\''; exit 0; fi' \
+  'if [[ "$1" == "api" && "$*" == *"environments/production/variables"* ]]; then printf '\''{"variables":[{"name":"GCP_APPLY_SERVICE_ACCOUNT","value":"apply@example.iam.gserviceaccount.com"},{"name":"GCP_DEPLOY_SERVICE_ACCOUNT","value":"deploy@example.iam.gserviceaccount.com"}]}\n'\''; exit 0; fi' \
+  'if [[ "$1" == "api" && "$*" == *"environments/production/secrets"* ]]; then printf '\''{"secrets":[{"name":"REALITY_PRIVATE_KEY"},{"name":"OBFS_PASSWORD"},{"name":"HY2_CERT_PEM"},{"name":"HY2_KEY_PEM"},{"name":"PROXY_USERS_JSON"}]}\n'\''; exit 0; fi' \
+  'if [[ "$1" == "api" && "$*" == *"environments/production/deployment-branch-policies"* ]]; then printf '\''{"total_count":1,"branch_policies":[{"name":"main"}]}\n'\''; exit 0; fi' \
+  'if [[ "$1" == "api" && "$*" == *"environments/production"* && "$*" != *"--method DELETE"* ]]; then printf '\''{"protection_rules":[{"type":"required_reviewers","reviewers":[{"reviewer":{"id":123456}}]}],"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$2" == "user" && "$*" == *"--jq .id"* ]]; then printf '\''123456\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"repos/kyson-dev/proxy-builder"* && "$*" == *"--jq .id"* ]]; then printf '\''986343343\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"environments/development"* && "$*" != *"--method DELETE"* ]]; then printf '\''{}\n'\''; exit 0; fi' \
@@ -71,6 +75,8 @@ variable_line="$(rg -n 'gh variable set' "$command_log" | cut -d: -f1 | head -n1
 : >"$command_log"
 PATH="${fake_bin}:$PATH" FAKE_COMMAND_LOG="$command_log" \
   "$script_dir/audit.sh" --environment development --bootstrap-output "$bootstrap_output" >"${test_root}/audit.log"
+PATH="${fake_bin}:$PATH" FAKE_COMMAND_LOG="$command_log" \
+  "$script_dir/audit.sh" --environment production --bootstrap-output "$bootstrap_output" >"${test_root}/production-audit.log"
 set +e
 PATH="${fake_bin}:$PATH" FAKE_COMMAND_LOG="$command_log" FAKE_AUDIT_EXTRA=1 \
   "$script_dir/audit.sh" --environment development --bootstrap-output "$bootstrap_output" >/dev/null 2>&1
