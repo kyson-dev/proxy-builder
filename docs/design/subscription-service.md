@@ -33,6 +33,8 @@ PROXY_USERS_JSON
 
 ## HTTP API
 
+Cloud Run 默认 HTTPS URL 公开且不执行 Invoker IAM 检查。Google 身份不属于客户端接口；除健康检查外，公开请求必须通过本节定义的应用 token 边界。
+
 ### 健康检查
 
 ```http
@@ -116,5 +118,5 @@ OpenTofu 拥有 `/healthz` startup probe。部署工作流后续只拥有 image 
 ## 关联
 
 - Architecture：[overview.md](../architecture/overview.md)
-- ADR：[ADR-0002](../adr/0002-separate-proxy-and-subscription-runtimes.md)、[ADR-0003](../adr/0003-own-and-deliver-application-secrets.md)
+- ADR：[ADR-0002](../adr/0002-separate-proxy-and-subscription-runtimes.md)、[ADR-0003](../adr/0003-own-and-deliver-application-secrets.md)、[ADR-0004](../adr/0004-public-cloud-run-with-application-auth.md)
 - Design：[共享契约](proxy-and-subscription-contracts.md)、[环境与交付](environments-and-delivery.md)

@@ -64,7 +64,7 @@
    gh run watch <run-id> --exit-status
    ```
 
-   预期：platform apply 成功，plan 不含秘密。
+   预期：platform apply 成功，plan 不含秘密；Cloud Run v2 状态为 `invokerIamDisabled=true`、`defaultUriDisabled=false`，service IAM 不含 `allUsers roles/run.invoker`。
 
 6. **部署指定不可变 commit**
 
@@ -74,7 +74,7 @@
    gh run watch <run-id> --exit-status
    ```
 
-   预期：VM 健康；无流量 Cloud Run revision 通过 startup probe；按 revision name 切流后，公网 health、两种订阅格式与 VLESS、Hysteria2 真实出站 E2E 全部成功。
+   预期：VM 健康；无流量 Cloud Run revision 通过 startup probe；按 revision name 切流后，公网 health 无需 Google 身份，缺少/伪造 token 分别返回 `400`/`401`，两种有效订阅格式与 VLESS、Hysteria2 真实出站 E2E 全部成功。
 
 7. **验收并取得订阅 URL**
 
