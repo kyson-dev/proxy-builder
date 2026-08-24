@@ -2,7 +2,7 @@
 
 本文唯一拥有 VM 主机就绪标记、release bundle、staging 输入、sing-box Compose、原子切换、健康判断和回滚规则。
 
-**实现状态：** startup、bundle、Compose、发布与回滚代码已实现并离线验证，尚未在 GCE 部署。
+**实现状态：** development 已在 GCE 部署，健康 release、previous 与事后回滚均已验证；production 尚未激活。
 
 ## 主机供给接口
 

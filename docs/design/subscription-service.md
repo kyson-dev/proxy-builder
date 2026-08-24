@@ -2,7 +2,7 @@
 
 本文唯一拥有 subscription 进程配置、启动行为、HTTP API、订阅格式和日志规则。
 
-**实现状态：** Go 服务、容器定义与 OpenTofu startup probe 已实现并离线验证，尚未在 Cloud Run 部署。
+**实现状态：** development Cloud Run 已部署，公开健康、token 隔离、订阅正文和双协议 E2E 已验证；production 尚未激活。
 
 ## 进程配置
 

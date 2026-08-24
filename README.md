@@ -4,9 +4,9 @@ Proxy Builder 在 GCP 上运行基于 sing-box 的 VLESS Reality 与 Hysteria2 �
 
 ## 当前状态
 
-仓库正在 `refactor/opentofu-platform` 分支进行破坏性重构。OpenTofu、共享 Go 契约、订阅服务、代理 VM release runtime 与 GitHub Actions 交付链已完成离线实现和验证，但尚未配置 GitHub、apply 或部署；当前在线环境仍由旧 Bash 资源和同一台 GCE VM 上的 sing-box/订阅容器提供服务。
+新架构已在 `development` 完成真实激活：OpenTofu 管理 GCP 资源与 WIF，GitHub Actions 通过分离的 plan/apply/deploy 身份发布，sing-box 运行在 GCE VM，订阅服务运行在公开入口的 Cloud Run，并由应用 token 认证用户。完整事务部署和 VLESS Reality/Hysteria2 出站 E2E 已通过；`production` 尚未激活。
 
-当前系统组成见 [Architecture](docs/architecture/overview.md)。重构为什么发生见 [ADR 索引](docs/adr/README.md)，将要实现的具体契约见 [Design 索引](docs/design/README.md)。
+当前系统组成见 [Architecture](docs/architecture/overview.md)。关键决策见 [ADR 索引](docs/adr/README.md)，具体契约见 [Design 索引](docs/design/README.md)。
 
 ## 当前开发检查
 

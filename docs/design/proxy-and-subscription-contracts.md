@@ -2,7 +2,7 @@
 
 本文唯一拥有 proxy VM 与 subscription 服务共享的用户 schema、Reality 派生和 HY2 证书校验规则。VM 文件与切换规则见[代理 VM 运行时](proxy-vm-runtime.md)，HTTP 接口见[订阅服务](subscription-service.md)。
 
-**实现状态：** Go 共享契约与 `proxyctl` 已实现并离线验证，尚未部署。
+**实现状态：** Go 共享契约与 `proxyctl` 已在 development 部署，并通过双协议真实出站验证。
 
 ## 用户 Schema
 
