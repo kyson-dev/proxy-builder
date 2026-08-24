@@ -26,6 +26,9 @@ metadata、startup script 与标记不得包含应用秘密。
 │   ├── release.json
 │   ├── docker-compose.yml
 │   ├── config.json
+│   ├── bin/
+│   │   ├── deploy-release
+│   │   └── proxyctl
 │   └── cert/
 │       ├── hysteria2.crt
 │       └── hysteria2.key
@@ -120,7 +123,7 @@ sudo bin/deploy-release --bundle <directory> --inputs <directory>
 1. 校验 root 身份、主机摘要、目录权限、manifest、bundle allowlist 和全部输入。
 2. 拉取 digest image，在临时 release 中生成配置并执行目标 image 的 `sing-box check`；current 保持运行。
 3. 把新证书或 current 证书副本写入临时 release，并验证完整证书对。
-4. 将临时 release 原子改名为不可变 final directory，再原子替换 `current` symlink。
+4. 将运行配置与 `deploy-release`、`proxyctl` 一起写入不可变 final directory，再原子替换 `current` symlink；final release 中的工具用于证书复用检查和切流后的远程回滚。
 5. 以固定 Compose project 重建 sing-box，轮询容器 Running，并确认宿主机 TCP/UDP 443 均监听。
 6. 成功后把旧 current 写入 `previous`；只保留 current 与 previous。
 

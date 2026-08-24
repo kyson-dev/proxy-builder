@@ -134,6 +134,7 @@ run_deploy "$first_stage" "$bootstrap_sha"
 first_target="$(readlink "${root_dir}/current")"
 [[ "$first_target" == "releases/${first_sha}-100-1" ]]
 [[ ! -d "$first_stage" ]]
+[[ -x "${root_dir}/current/bin/deploy-release" && -x "${root_dir}/current/bin/proxyctl" ]]
 first_cert_hash="$(shasum -a 256 "${root_dir}/current/cert/hysteria2.crt" | awk '{print $1}')"
 
 concurrent_sha="$(printf 'b%.0s' {1..40})"
@@ -181,6 +182,7 @@ run_deploy "$third_stage" "$bootstrap_sha"
 third_target="$(readlink "${root_dir}/current")"
 [[ "$third_target" == "releases/${third_sha}-103-1" ]]
 [[ "$(readlink "${root_dir}/previous")" == "$first_target" ]]
+[[ -x "${root_dir}/current/bin/deploy-release" && -x "${root_dir}/current/bin/proxyctl" ]]
 [[ "$(shasum -a 256 "${root_dir}/current/cert/hysteria2.crt" | awk '{print $1}')" != "$first_cert_hash" ]]
 
 set +e
