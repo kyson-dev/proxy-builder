@@ -2,7 +2,7 @@
 
 本文唯一拥有环境配置归属、GitHub Variables/Secrets 名称、工作流接口以及 VM 与 Cloud Run 的发布协议。
 
-**实现状态：** development 已在 `kyson-proxy-dev` 配置 GitHub/GCP，并通过正式部署、协调回滚与双协议 E2E；production 尚未激活。
+**实现状态：** development 已在 `kyson-proxy-dev` 配置 GitHub/GCP，并通过正式部署、协调回滚与双协议 E2E；production 目标为 `kyson-proxy-prod`，尚未激活。
 
 ## 环境模型
 
@@ -82,7 +82,7 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 
 ### `infra-plan.yml`
 
-- 触发：PR 修改 `infra/**`、环境清单或 provider lock file。
+- 触发：PR 修改 `infra/**`、环境清单或 provider lock file；也可手动选择一个 environment/stack。
 - 对 development 与 production 分别执行 format、validate、静态安全检查和只读 plan。
 - 使用 `github-plan`；不得引用 GitHub Environment Secrets。
 - 输出经过脱敏的 plan artifact 和 PR summary，不得输出 state 或 secret payload。
@@ -158,8 +158,10 @@ Secret version 创建成功但 revision 失败时允许保留该 version 供审�
 ```text
 make bootstrap ENV=development|production
 make secrets-init ENV=<environment> USER=<name>
+make secrets-import-production
 make github-reset ENV=development CONFIRM=<owner/repo>:development
 make github-configure ENV=<environment>
+make github-clean-production-legacy CONFIRM=<owner/repo>:production
 make github-audit ENV=<environment>
 make secrets-publish ENV=<environment>
 make user-add|user-enable|user-disable|user-rotate ENV=<environment> USER=<name>
@@ -171,9 +173,11 @@ make deploy ENV=<environment> [GIT_REF=<ref>]
 make destroy ENV=<environment> STACK=platform
 ```
 
-命令只作为稳定入口；空 development 的首次激活见 [Runbook](../runbooks/development-first-activation.md)，迁移到新的 GCP Project 且复用秘密时见 [项目迁移 Runbook](../runbooks/development-project-migration.md)。
+命令只作为稳定入口；空 development 的首次激活见 [Runbook](../runbooks/development-first-activation.md)，迁移到新的 GCP Project 且复用秘密时见 [项目迁移 Runbook](../runbooks/development-project-migration.md)，production 首次激活见 [production Runbook](../runbooks/production-first-activation.md)。
 
 `secrets-init` 只在本地新建五项随机秘密，不发布或调用 GCP；已有目录时拒绝覆盖。用户变更也只改本地 `users.json`，必须随后显式执行 `secrets-publish` 和 `deploy`。`subscription-url` 从 platform state 读取公开服务 URL，从本地文件读取已启用用户 token，并只向终端输出最终 URL。
+
+`secrets-import-production` 只接受仓库根目录中受限的旧 production 输入，生成 `.secrets/production/`；它保留 UUID、subscription token、Reality 私钥和 obfs password，重置 HY2 password 与证书，并把 `KYSON` 显示名改为 `USA`。该命令不访问 GitHub/GCP，且拒绝覆盖已有 bundle。
 
 就绪工具中，`proxyctl inspect-environment` 校验五项秘密且只输出公开派生值；`validate-subscription` 严格验证 Base64/Clash；`render-probe-config` 只为部署期真实 E2E 生成临时 sing-box 客户端配置。GitHub 的配置、只读保护审计和五项秘密发布分别由 `configure.sh`、`audit.sh` 与 `publish-secrets.sh` 拥有。
 

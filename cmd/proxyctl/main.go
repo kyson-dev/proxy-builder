@@ -36,6 +36,8 @@ func run(args []string) error {
 		return inspectEnvironment(args[1:])
 	case "init-environment":
 		return initEnvironment(args[1:])
+	case "import-legacy-production":
+		return importLegacyProduction(args[1:])
 	case "add-user":
 		return mutateUser(args[1:], userMutationAdd)
 	case "enable-user":

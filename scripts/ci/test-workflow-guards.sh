@@ -6,6 +6,9 @@ workflow_root="${repo_root}/.github/workflows"
 
 rg -q 'head.repo.full_name == github.repository' "${workflow_root}/infra-plan.yml"
 rg -q 'required repository variables are absent' "${workflow_root}/infra-plan.yml"
+rg -q 'workflow_dispatch:' "${workflow_root}/infra-plan.yml"
+rg -q 'Select requested plan' "${workflow_root}/infra-plan.yml"
+rg -q 'REQUESTED_ENVIRONMENT' "${workflow_root}/infra-plan.yml"
 rg -q 'PRODUCTION_OPERATIONS_ENABLED' "${workflow_root}/infra-apply.yml" "${workflow_root}/deploy.yml" "${workflow_root}/destroy.yml"
 rg -q 'confirm_project_id' "${workflow_root}/destroy.yml"
 if rg -q 'upload-artifact' "${workflow_root}/deploy.yml"; then

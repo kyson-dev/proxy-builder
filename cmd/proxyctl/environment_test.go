@@ -54,6 +54,74 @@ func TestInitEnvironmentCreatesValidatedPrivateBundle(t *testing.T) {
 	}
 }
 
+func TestImportLegacyProductionPreservesIdentitiesAndRotatesHY2(t *testing.T) {
+	directory := t.TempDir()
+	legacySeed := filepath.Join(directory, "legacy-seed")
+	if err := initEnvironment([]string{"--output-dir", legacySeed, "--sni", "www.example.com", "--user", "seed"}); err != nil {
+		t.Fatal(err)
+	}
+	realityPrivateKey, err := os.ReadFile(filepath.Join(legacySeed, "reality-private-key"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	obfsPassword, err := os.ReadFile(filepath.Join(legacySeed, "obfs-password"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyEnvironment := filepath.Join(directory, ".env.production")
+	if err := os.WriteFile(legacyEnvironment, append(append([]byte("REALITY_PRIVATE_KEY="), realityPrivateKey...), append([]byte("\nOBFS_PASSWORD="), obfsPassword...)...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	legacyUsers := filepath.Join(directory, "users.production.json")
+	const legacyPassword = "legacy-hy2"
+	const legacyToken = "subscription-token-canary-123456789"
+	if err := os.WriteFile(legacyUsers, []byte(`[
+  {"name":"KYSON","vless_uuid":"00000000-0000-4000-8000-000000000001","hy2_password":"legacy-hy2","sub_token":"subscription-token-canary-123456789"},
+  {"name":"LMY","vless_uuid":"00000000-0000-4000-8000-000000000002","hy2_password":"legacy-hy2-two","sub_token":"subscription-token-canary-987654321"}
+]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(directory, "production")
+	if err := importLegacyProduction([]string{"--legacy-users", legacyUsers, "--legacy-env", legacyEnvironment, "--output-dir", output, "--sni", "www.example.com", "--rename-user", "KYSON=USA"}); err != nil {
+		t.Fatal(err)
+	}
+	users := readUsersForTest(t, filepath.Join(output, "users.json"))
+	if len(users.Users) != 2 || users.Users[0].Name != "USA" || !users.Users[0].Enabled || users.Users[0].VLESSUUID != "00000000-0000-4000-8000-000000000001" || users.Users[0].SubscriptionToken != legacyToken {
+		t.Fatalf("legacy identity was not preserved: %#v", users.Users[0])
+	}
+	if users.Users[0].HY2Password == legacyPassword || len(users.Users[0].HY2Password) < 24 {
+		t.Fatal("legacy HY2 password was not securely rotated")
+	}
+	importedReality, _ := os.ReadFile(filepath.Join(output, "reality-private-key"))
+	importedObfs, _ := os.ReadFile(filepath.Join(output, "obfs-password"))
+	if string(importedReality) != string(realityPrivateKey) || string(importedObfs) != string(obfsPassword) {
+		t.Fatal("legacy environment credentials were not preserved")
+	}
+	certPEM, _ := os.ReadFile(filepath.Join(output, "hysteria2.crt"))
+	keyPEM, _ := os.ReadFile(filepath.Join(output, "hysteria2.key"))
+	if _, err := contracts.InspectCertificate(certPEM, keyPEM, "www.example.com", time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := importLegacyProduction([]string{"--legacy-users", legacyUsers, "--legacy-env", legacyEnvironment, "--output-dir", output, "--sni", "www.example.com", "--rename-user", "KYSON=USA"}); err == nil {
+		t.Fatal("production import overwrote an existing bundle")
+	}
+}
+
+func TestImportLegacyProductionRejectsUnsafeInputs(t *testing.T) {
+	directory := t.TempDir()
+	legacyUsers := filepath.Join(directory, "users.production.json")
+	if err := os.WriteFile(legacyUsers, []byte(`[{"name":"KYSON","vless_uuid":"00000000-0000-4000-8000-000000000001","hy2_password":"legacy-hy2","sub_token":"subscription-token-canary-123456789"}]`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(directory, "users-link.json")
+	if err := os.Symlink(legacyUsers, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := importLegacyProduction([]string{"--legacy-users", link, "--legacy-env", filepath.Join(directory, "missing.env"), "--output-dir", filepath.Join(directory, "production"), "--sni", "www.example.com", "--rename-user", "KYSON=USA"}); err == nil {
+		t.Fatal("production import accepted a symbolic-link users input")
+	}
+}
+
 func TestUserLifecycleUsesImmediateCredentialRotation(t *testing.T) {
 	directory := filepath.Join(t.TempDir(), "development")
 	if err := initEnvironment([]string{"--output-dir", directory, "--sni", "www.example.com", "--user", "alice"}); err != nil {

@@ -1,5 +1,5 @@
 environment          = "production"
-project_id           = "kyson-proxy-builder"
+project_id           = "kyson-proxy-prod"
 region               = "us-west1"
 zone                 = "us-west1-b"
 resource_prefix      = "proxy"

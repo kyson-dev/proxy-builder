@@ -7,7 +7,7 @@ output "subnetwork_self_link" {
 }
 
 output "proxy_ip_address" {
-  value = google_compute_address.proxy.address
+  value = var.existing_static_ip_name == null ? google_compute_address.proxy[0].address : data.google_compute_address.existing[0].address
 }
 
 output "proxy_network_tag" {

@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (Sing-box)
 # Sing-box 原生模式代理服务管理
 
-.PHONY: all uuid short-id password reality-key secrets-init secrets-publish subscription-url user-add user-enable user-disable user-rotate github-reset github-configure github-audit bootstrap validate infra-plan infra-apply deploy destroy help
+.PHONY: all uuid short-id password reality-key secrets-init secrets-import-production secrets-publish subscription-url user-add user-enable user-disable user-rotate github-reset github-configure github-clean-production-legacy github-audit bootstrap validate infra-plan infra-apply deploy destroy help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -14,6 +14,7 @@ help:
 	@echo "  make password          - Generate a random secure password"
 	@echo "  make reality-key       - Generate REALITY key pair (uses Docker)"
 	@echo "  make secrets-init ENV=... USER=..."
+	@echo "  make secrets-import-production"
 	@echo "  make user-add|user-enable|user-disable|user-rotate ENV=... USER=..."
 	@echo "  make secrets-publish ENV=..."
 	@echo "  make subscription-url ENV=... USER=... [FORMAT=base64|clash]"
@@ -22,6 +23,7 @@ help:
 	@echo "  make bootstrap ENV=development|production"
 	@echo "  make github-reset ENV=development CONFIRM=owner/repo:development"
 	@echo "  make github-configure ENV=development|production"
+	@echo "  make github-clean-production-legacy CONFIRM=owner/repo:production"
 	@echo "  make github-audit ENV=development|production"
 	@echo "  make validate"
 	@echo "  make infra-plan ENV=... [STACK=bootstrap|platform]"
@@ -50,6 +52,9 @@ reality-key:
 secrets-init:
 	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/init.sh
 
+secrets-import-production:
+	@./scripts/secrets/import-production.sh
+
 user-add:
 	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/manage-user.sh add
 
@@ -77,6 +82,9 @@ bootstrap:
 
 github-configure:
 	@./scripts/github/configure.sh --environment "$(ENV)"
+
+github-clean-production-legacy:
+	@./scripts/github/clear-legacy-production-secrets.sh --confirm "$(CONFIRM)"
 
 github-reset:
 	@./scripts/github/reset-environment.sh --environment "$(ENV)" --confirm "$(CONFIRM)"

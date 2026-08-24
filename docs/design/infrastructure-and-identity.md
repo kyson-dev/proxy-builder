@@ -2,7 +2,7 @@
 
 本文唯一拥有 OpenTofu 目录、stack/state 划分、模块接口、GCP 资源拓扑以及 IAM/WIF 边界。
 
-**实现状态：** development 已在 `kyson-proxy-dev` apply、部署并通过零变更 plan；production 尚未激活
+**实现状态：** development 已在 `kyson-proxy-dev` apply、部署并通过零变更 plan；production 目标为 `kyson-proxy-prod`，尚未激活。
 
 ## 目录接口
 
@@ -72,6 +72,8 @@ labels             = { application = "proxy-builder", environment = "development
 
 名称包含 `_secret`、`password`、`private_key`、`token` 或证书内容的变量禁止进入 OpenTofu 输入。
 
+`existing_static_ip_name` 是可选的 production 迁入接口。未设置时 network 创建并管理 `${resource_prefix}-ipv4`；设置时只读取同项目、同区域的现有静态 IPv4 并将 VM 指向它，不把该地址纳入 OpenTofu state。
+
 ## Stack 所有权
 
 ### bootstrap
@@ -89,7 +91,7 @@ labels             = { application = "proxy-builder", environment = "development
 
 拥有：
 
-- 专用 VPC、子网、静态外部 IPv4和防火墙；
+- 专用 VPC、子网、静态外部 IPv4 和防火墙；
 - Artifact Registry repository；
 - proxy VM 与 runtime Service Account；
 - `proxy-users`、`obfs-password` Secret Manager 容器与 Cloud Run runtime Service Account；

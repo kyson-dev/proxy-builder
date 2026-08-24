@@ -7,13 +7,23 @@ on:
       - config/environments/**
       - scripts/infra/**
       - .github/workflows/infra-plan.yml
+  workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        type: choice
+        options: [development, production]
+      stack:
+        required: true
+        type: choice
+        options: [bootstrap, platform]
 
 permissions:
   contents: read
 
 jobs:
   plan:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
       id-token: write
@@ -41,8 +51,24 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select requested plan
+        id: selected
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_ENVIRONMENT: ${{ inputs.environment }}
+          REQUESTED_STACK: ${{ inputs.stack }}
+          MATRIX_ENVIRONMENT: ${{ matrix.environment }}
+          MATRIX_STACK: ${{ matrix.stack }}
+        run: |
+          if [[ "$EVENT_NAME" != workflow_dispatch ]] || [[ "$MATRIX_ENVIRONMENT" == "$REQUESTED_ENVIRONMENT" && "$MATRIX_STACK" == "$REQUESTED_STACK" ]]; then
+            echo 'selected=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'selected=false' >> "$GITHUB_OUTPUT"
+            echo 'Plan matrix entry skipped because it was not selected by workflow_dispatch.' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Check plan identity configuration
         id: configured
+        if: steps.selected.outputs.selected == 'true'
         env:
           WIF_PROVIDER: ${{ vars[matrix.provider] }}
           PLAN_SERVICE_ACCOUNT: ${{ vars[matrix.service_account] }}
@@ -54,27 +80,29 @@ jobs:
             echo 'Plan skipped because required repository variables are absent.' >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        if: steps.selected.outputs.selected == 'true'
         with:
           tofu_version: 1.12.1
       - name: Validate infrastructure without credentials
+        if: steps.selected.outputs.selected == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install --yes ripgrep shellcheck
           scripts/infra/validate.sh
       - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
-        if: steps.configured.outputs.ready == 'true'
+        if: steps.selected.outputs.selected == 'true' && steps.configured.outputs.ready == 'true'
         with:
           workload_identity_provider: ${{ vars[matrix.provider] }}
           service_account: ${{ vars[matrix.service_account] }}
       - name: Create read-only plan
-        if: steps.configured.outputs.ready == 'true'
+        if: steps.selected.outputs.selected == 'true' && steps.configured.outputs.ready == 'true'
         env:
           ENV: ${{ matrix.environment }}
           STACK: ${{ matrix.stack }}
           PLAN_OUTPUT: ${{ runner.temp }}/plan.txt
         run: make infra-plan ENV="$ENV" STACK="$STACK"
       - name: Add plan result to summary
-        if: steps.configured.outputs.ready == 'true'
+        if: steps.selected.outputs.selected == 'true' && steps.configured.outputs.ready == 'true'
         env:
           PLAN_OUTPUT: ${{ runner.temp }}/plan.txt
         run: |
@@ -84,7 +112,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        if: steps.configured.outputs.ready == 'true'
+        if: steps.selected.outputs.selected == 'true' && steps.configured.outputs.ready == 'true'
         with:
           name: plan-${{ matrix.environment }}-${{ matrix.stack }}
           path: ${{ runner.temp }}/plan.txt

@@ -15,12 +15,13 @@ data "terraform_remote_state" "bootstrap" {
 module "network" {
   source = "../../modules/network"
 
-  project_id      = var.project_id
-  environment     = var.environment
-  resource_prefix = var.resource_prefix
-  region          = var.region
-  network_cidr    = var.network_cidr
-  network_tier    = var.network_tier
+  project_id              = var.project_id
+  environment             = var.environment
+  resource_prefix         = var.resource_prefix
+  region                  = var.region
+  network_cidr            = var.network_cidr
+  network_tier            = var.network_tier
+  existing_static_ip_name = var.existing_static_ip_name
 }
 
 module "artifact_registry" {

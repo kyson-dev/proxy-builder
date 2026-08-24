@@ -33,6 +33,7 @@ development_project=$(infra::read_tfvar "$development_file" project_id)
 production_project=$(infra::read_tfvar "$production_file" project_id)
 [[ "$development_project" != "$production_project" ]] || infra::die "两个环境不能共用 GCP Project"
 [[ "$development_project" == "kyson-proxy-dev" ]] || infra::die "development 必须使用 kyson-proxy-dev Project"
+[[ "$production_project" == "kyson-proxy-prod" ]] || infra::die "production 必须使用 kyson-proxy-prod Project"
 [[ "$(infra::read_tfvar "$development_file" resource_prefix)" == "proxy" ]] || infra::die "development 必须使用 proxy 完整资源名前缀"
 [[ "$(infra::read_tfvar "$production_file" resource_prefix)" == "proxy" ]] || infra::die "production 必须使用 proxy 完整资源名前缀"
 
