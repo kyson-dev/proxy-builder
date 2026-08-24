@@ -1,140 +1,89 @@
-name: Deploy to VM
+name: Deploy application
 
 on:
   workflow_dispatch:
+    inputs:
+      environment:
+        required: true
+        type: choice
+        options: [development, production]
+      git_ref:
+        required: true
+        type: string
 
 permissions:
   contents: read
-  id-token: write
 
-env:
-  IMAGE_NAME: subscription
-  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}
+concurrency:
+  group: proxy-builder-${{ inputs.environment }}
+  cancel-in-progress: false
 
 jobs:
-  # ============================================================================
-  # Job 1: 构建 sub 镜像并推送到 Artifact Registry
-  # ============================================================================
-  build-and-push:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-    outputs:
-      image: ${{ steps.meta.outputs.image }}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Configure Docker auth for Artifact Registry
-        run: gcloud auth configure-docker ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev --quiet
-
-      - name: Build and push subscription image
-        id: meta
-        env:
-          AR_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}
-        run: |
-          docker build \
-            --provenance=false \
-            --sbom=false \
-            -t "${AR_IMAGE}:${{ env.IMAGE_TAG }}" \
-            -f services/${{ env.IMAGE_NAME }}/Dockerfile \
-            services/${{ env.IMAGE_NAME }}/
-
-          docker push "${AR_IMAGE}:${{ env.IMAGE_TAG }}"
-
-          echo "image=${AR_IMAGE}:${{ env.IMAGE_TAG }}" >> "$GITHUB_OUTPUT"
-          echo "✅ 镜像已推送: ${AR_IMAGE}:${{ env.IMAGE_TAG }}"
-
-  # ============================================================================
-  # Job 2: 将精简包部署到 VM
-  # ============================================================================
   deploy:
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: build-and-push
-    environment:
-      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-
+    timeout-minutes: 35
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Authenticate to GCP
-        uses: google-github-actions/auth@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
-      - name: Setup gcloud
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          install_components: "beta"
-
-      - name: Deploy
-        timeout-minutes: 10
+          ref: ${{ inputs.git_ref }}
+          fetch-depth: 0
+      - name: Resolve immutable commit and enforce guard
+        id: revision
         env:
-          SUBSCRIPTION_IMAGE: ${{ secrets.GCP_AR_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GCP_AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          PRODUCTION_OPERATIONS_ENABLED: ${{ vars.PRODUCTION_OPERATIONS_ENABLED }}
         run: |
-          # 加载单一数据源全局路径定义
-          source scripts/lib/paths.sh
-
-          VM="${{ secrets.GCP_VM_NAME }}"
-          ZONE="${{ secrets.GCP_VM_ZONE }}"
-
-          # 1. 创建 .env 文件（注入 secrets + 镜像地址）
-          echo "📝 创建环境配置..."
-          cat > .env << EOF
-          REALITY_PRIVATE_KEY=${{ secrets.REALITY_PRIVATE_KEY }}
-          REALITY_PUBLIC_KEY=${{ secrets.REALITY_PUBLIC_KEY }}
-          REALITY_SHORT_ID=${{ secrets.REALITY_SHORT_ID }}
-          REALITY_DEST=${{ secrets.REALITY_DEST }}
-          HY2_SNI=${{ secrets.HY2_SNI }}
-          OBFS_PASSWORD=${{ secrets.OBFS_PASSWORD }}
-          SUBSCRIPTION_IMAGE=${SUBSCRIPTION_IMAGE}
-          EOF
-
-          # 将 users secret 写为 json 文件
-          echo "📝 生成用户配置 users.json..."
-          cat > users.json << 'USERS_EOF'
-          ${{ secrets.USERS_JSON }}
-          USERS_EOF
-
-          # 2. 打包精简包（白名单：仅包含运行所需文件，排除源码与开发产物）
-          echo "📦 打包文件..."
-          tar -czf /tmp/app.tar.gz \
-              .env \
-              users.json \
-              docker-compose.yml \
-              scripts/ \
-              config/
-
-          # 3. 上传到虚拟机家目录暂存区
-          echo "📤 上传文件..."
-          gcloud beta compute scp /tmp/app.tar.gz ${VM}:~/app.tar.gz --zone=${ZONE} --quiet
-
-          # 4. 在 VM 上解压暂存区并调用部署脚本
-          echo "🚀 开始主机供给与应用部署..."
-          gcloud beta compute ssh ${VM} --zone=${ZONE} --quiet --command="
-            set -e
-
-            # 解压新版本到虚拟机家目录暂存区
-            echo '📦 解压新版本到暂存区...'
-            rm -rf ~/app
-            mkdir -p ~/app
-            tar -xzf ~/app.tar.gz -C ~/app
-            rm -f ~/app.tar.gz
-
-            # 委托 VM 端部署脚本执行全流程（含回滚）
-            chmod +x ~/app/scripts/deploy/deploy-on-host.sh
-            ~/app/scripts/deploy/deploy-on-host.sh
-          "
-
-          echo "✅ 部署完成"
+          sha="$(git rev-parse HEAD)"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          scripts/delivery/guard-operation.sh "${{ inputs.environment }}" "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ inputs.environment == 'production' && vars.PROD_GCP_WIF_PROVIDER || vars.DEV_GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.12.1
+      - name: Read platform deployment context
+        id: platform
+        env:
+          ENV: ${{ inputs.environment }}
+        run: scripts/delivery/platform-context.sh
+      - name: Configure registry authentication
+        run: gcloud auth configure-docker "${{ steps.platform.outputs.artifact_location }}-docker.pkg.dev" --quiet
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Build and push subscription image
+        id: image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: services/subscription/Dockerfile
+          push: true
+          tags: ${{ steps.platform.outputs.artifact_repository_url }}/subscription:${{ steps.revision.outputs.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          provenance: false
+          sbom: false
+      - name: Deploy VM then Cloud Run
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          GIT_SHA: ${{ steps.revision.outputs.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          IMAGE_DIGEST: ${{ steps.platform.outputs.artifact_repository_url }}/subscription@${{ steps.image.outputs.digest }}
+          GCP_PROJECT_ID: ${{ steps.platform.outputs.project_id }}
+          GCP_REGION: ${{ steps.platform.outputs.region }}
+          GCP_VM_NAME: ${{ steps.platform.outputs.proxy_vm_name }}
+          GCP_VM_ZONE: ${{ steps.platform.outputs.proxy_vm_zone }}
+          SUBSCRIPTION_SERVICE_NAME: ${{ steps.platform.outputs.subscription_service_name }}
+          PROXY_IP: ${{ steps.platform.outputs.proxy_ip_address }}
+          PROXY_USERS_SECRET_ID: ${{ steps.platform.outputs.proxy_users_secret_id }}
+          OBFS_PASSWORD_SECRET_ID: ${{ steps.platform.outputs.obfs_password_secret_id }}
+          REALITY_PRIVATE_KEY: ${{ secrets.REALITY_PRIVATE_KEY }}
+          OBFS_PASSWORD: ${{ secrets.OBFS_PASSWORD }}
+          HY2_CERT_PEM: ${{ secrets.HY2_CERT_PEM }}
+          HY2_KEY_PEM: ${{ secrets.HY2_KEY_PEM }}
+          PROXY_USERS_JSON: ${{ secrets.PROXY_USERS_JSON }}
+        run: scripts/delivery/deploy.sh

@@ -1,0 +1,91 @@
+name: Infrastructure plan
+
+on:
+  pull_request:
+    paths:
+      - infra/**
+      - config/environments/**
+      - scripts/infra/**
+      - .github/workflows/infra-plan.yml
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: development
+            stack: bootstrap
+            provider: DEV_GCP_WIF_PROVIDER
+            service_account: DEV_GCP_PLAN_SERVICE_ACCOUNT
+          - environment: development
+            stack: platform
+            provider: DEV_GCP_WIF_PROVIDER
+            service_account: DEV_GCP_PLAN_SERVICE_ACCOUNT
+          - environment: production
+            stack: bootstrap
+            provider: PROD_GCP_WIF_PROVIDER
+            service_account: PROD_GCP_PLAN_SERVICE_ACCOUNT
+          - environment: production
+            stack: platform
+            provider: PROD_GCP_WIF_PROVIDER
+            service_account: PROD_GCP_PLAN_SERVICE_ACCOUNT
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check plan identity configuration
+        id: configured
+        env:
+          WIF_PROVIDER: ${{ vars[matrix.provider] }}
+          PLAN_SERVICE_ACCOUNT: ${{ vars[matrix.service_account] }}
+        run: |
+          if [[ -n "$WIF_PROVIDER" && -n "$PLAN_SERVICE_ACCOUNT" ]]; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Plan skipped because required repository variables are absent.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: opentofu/setup-opentofu@a1320f892987e89d278cc92dc5adc984fb93aca4 # v2.0.2
+        with:
+          tofu_version: 1.12.1
+      - name: Validate infrastructure without credentials
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ripgrep shellcheck
+          scripts/infra/validate.sh
+      - uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          workload_identity_provider: ${{ vars[matrix.provider] }}
+          service_account: ${{ vars[matrix.service_account] }}
+      - name: Create read-only plan
+        if: steps.configured.outputs.ready == 'true'
+        env:
+          ENV: ${{ matrix.environment }}
+          STACK: ${{ matrix.stack }}
+          PLAN_OUTPUT: ${{ runner.temp }}/plan.txt
+        run: make infra-plan ENV="$ENV" STACK="$STACK"
+      - name: Add plan result to summary
+        if: steps.configured.outputs.ready == 'true'
+        env:
+          PLAN_OUTPUT: ${{ runner.temp }}/plan.txt
+        run: |
+          {
+            echo '```text'
+            tail -n 8 "$PLAN_OUTPUT"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.configured.outputs.ready == 'true'
+        with:
+          name: plan-${{ matrix.environment }}-${{ matrix.stack }}
+          path: ${{ runner.temp }}/plan.txt
+          retention-days: 7

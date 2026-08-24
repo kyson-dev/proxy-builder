@@ -1,26 +1,16 @@
-# ==============================================================================
-# 多阶段构建：最终镜像仅包含静态二进制，约 10MB
-# ==============================================================================
+FROM golang:1.27.0-alpine3.23@sha256:3747dcba41c8b0db3211fda4db61638b980e17ac5bb3c94460a975a9cfe19395 AS builder
 
-# 阶段 1：编译
-FROM golang:1.22-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY cmd/subscription/ ./cmd/subscription/
+COPY internal/contracts/ ./internal/contracts/
+COPY internal/subscription/ ./internal/subscription/
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -trimpath -ldflags="-s -w" -o /out/subscription ./cmd/subscription
 
-WORKDIR /build
-COPY go.mod .
-COPY main.go .
-
-# CGO_ENABLED=0 确保静态链接，无需 glibc
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o subscription .
-
-# 阶段 2：运行时（最小化镜像）
-FROM alpine:latest
-
-# 添加 CA 证书（用于探测公网 IP 时的 HTTPS 请求）
-RUN apk add --no-cache ca-certificates
-
-WORKDIR /
-COPY --from=builder /build/subscription /subscription
-
+FROM scratch
+COPY --from=builder /out/subscription /subscription
+USER 65532:65532
 EXPOSE 8080
-
-CMD ["/subscription"]
+ENTRYPOINT ["/subscription"]

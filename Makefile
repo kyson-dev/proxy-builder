@@ -1,7 +1,7 @@
 # Makefile for Proxy Builder (Sing-box)
 # Sing-box 原生模式代理服务管理
 
-.PHONY: all uuid short-id password reality-key setup-infra setup-wif setup-vm setup-ar setup-firewall check-scripts upload-env help
+.PHONY: all uuid short-id password reality-key secrets-init secrets-publish subscription-url user-add user-enable user-disable user-rotate github-reset github-configure github-audit bootstrap validate infra-plan infra-apply deploy destroy help
 
 help:
 	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -13,25 +13,21 @@ help:
 	@echo "  make short-id          - Generate a random 8-character hex ID"
 	@echo "  make password          - Generate a random secure password"
 	@echo "  make reality-key       - Generate REALITY key pair (uses Docker)"
+	@echo "  make secrets-init ENV=... USER=..."
+	@echo "  make user-add|user-enable|user-disable|user-rotate ENV=... USER=..."
+	@echo "  make secrets-publish ENV=..."
+	@echo "  make subscription-url ENV=... USER=... [FORMAT=base64|clash]"
 	@echo ""
-	@echo "🚀 Deployment Setup:"
-	@echo "  make setup-infra      - One-click infra setup: WIF + VM + AR + Firewall (interactive or CI)"
-	@echo "  make setup-wif        - Setup WIF for an environment (interactive)"
-	@echo "  make setup-vm         - Setup GCE VM (interactive)"
-	@echo "  make setup-ar         - Setup Artifact Registry (interactive)"
-	@echo "  make upload-env       - Upload .env to GitHub Environment Secrets"
-	@echo "  make setup-firewall   - Configure firewall rules for service ports"
-	@echo "  make check-scripts    - Check all shell scripts syntax"
-	@echo ""
-	@echo "📁 Script Entrypoints:"
-	@echo "  scripts/setup/setup-infra.sh       - One-click infra setup"
-	@echo "  scripts/setup/setup-wif.sh         - Interactive WIF setup"
-	@echo "  scripts/setup/setup-vm.sh          - Interactive VM setup"
-	@echo "  scripts/setup/setup-ar.sh          - Interactive AR setup"
-	@echo "  scripts/setup/setup-env.sh         - Interactive env upload"
-	@echo "  scripts/setup/setup-firewall.sh    - Interactive firewall setup"
-	@echo "  scripts/provision/provision.sh     - Host provisioning (run on VM)"
-	@echo "  scripts/deploy/deploy.sh           - App deployment (run on VM)"
+	@echo "🏗️  OpenTofu Platform:"
+	@echo "  make bootstrap ENV=development|production"
+	@echo "  make github-reset ENV=development CONFIRM=owner/repo:development"
+	@echo "  make github-configure ENV=development|production"
+	@echo "  make github-audit ENV=development|production"
+	@echo "  make validate"
+	@echo "  make infra-plan ENV=... [STACK=bootstrap|platform]"
+	@echo "  make infra-apply ENV=... [STACK=bootstrap|platform]"
+	@echo "  make deploy ENV=... [GIT_REF=<ref>]"
+	@echo "  make destroy ENV=... STACK=platform"
 
 
 # ============================================================
@@ -51,31 +47,54 @@ reality-key:
 	@echo "Generating REALITY key pair using sing-box docker image..."
 	@docker run --rm ghcr.io/sagernet/sing-box generate reality-keypair
 
+secrets-init:
+	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/init.sh
+
+user-add:
+	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/manage-user.sh add
+
+user-enable:
+	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/manage-user.sh enable
+
+user-disable:
+	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/manage-user.sh disable
+
+user-rotate:
+	@ENV="$(ENV)" USER="$(USER)" ./scripts/secrets/manage-user.sh rotate
+
+secrets-publish:
+	@./scripts/github/publish-secrets.sh --environment "$(ENV)" --secret-dir ".secrets/$(ENV)"
+
+subscription-url:
+	@ENV="$(ENV)" USER="$(USER)" FORMAT="$(or $(FORMAT),base64)" ./scripts/secrets/subscription-url.sh
+
 # ============================================================
-# Deployment Setup
+# OpenTofu Platform
 # ============================================================
 
-setup-infra:
-	@chmod +x scripts/setup/setup-infra.sh
-	@./scripts/setup/setup-infra.sh
+bootstrap:
+	@ENV="$(ENV)" ./scripts/infra/bootstrap-state.sh
 
-setup-wif:
-	@chmod +x scripts/setup/setup-wif.sh
-	@./scripts/setup/setup-wif.sh
+github-configure:
+	@./scripts/github/configure.sh --environment "$(ENV)"
 
-upload-env:
-	@chmod +x scripts/setup/setup-env.sh
-	@./scripts/setup/setup-env.sh
+github-reset:
+	@./scripts/github/reset-environment.sh --environment "$(ENV)" --confirm "$(CONFIRM)"
 
-setup-firewall:
-	@chmod +x scripts/setup/setup-firewall.sh
-	@./scripts/setup/setup-firewall.sh
+github-audit:
+	@./scripts/github/audit.sh --environment "$(ENV)"
 
-setup-vm:
-	@chmod +x scripts/setup/setup-vm.sh
-	@./scripts/setup/setup-vm.sh
+validate:
+	@./scripts/validate.sh
 
-setup-ar:
-	@chmod +x scripts/setup/setup-ar.sh
-	@./scripts/setup/setup-ar.sh
+infra-plan:
+	@ENV="$(ENV)" STACK="$(or $(STACK),platform)" ./scripts/infra/tofu-stack.sh plan
 
+infra-apply:
+	@ENV="$(ENV)" STACK="$(or $(STACK),platform)" ./scripts/infra/tofu-stack.sh apply
+
+deploy:
+	@ENV="$(ENV)" GIT_REF="$(GIT_REF)" ./scripts/github/dispatch-deploy.sh
+
+destroy:
+	@ENV="$(ENV)" CONFIRM_PROJECT_ID="$(CONFIRM_PROJECT_ID)" ./scripts/infra/destroy-platform.sh

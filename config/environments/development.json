@@ -1,0 +1,6 @@
+{
+  "reality_dest": "www.nvidia.com:443",
+  "hy2_sni": "www.bing.com",
+  "egress_probe_url": "https://connectivitycheck.gstatic.com/generate_204",
+  "sing_box_image": "ghcr.io/sagernet/sing-box@sha256:c8b67944345dc84a226b648a71f854818606eae0813c4e6a452f192ef821b5b8"
+}
