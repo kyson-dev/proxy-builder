@@ -56,7 +56,7 @@ final_release=""
 old_target=""
 failure_stage="preflight"
 
-# shellcheck disable=SC2329 # Invoked through EXIT trap.
+# shellcheck disable=SC2317,SC2329 # Invoked through EXIT trap; rule ID differs by ShellCheck version.
 cleanup_stage() {
   if [[ -n "$stage_dir" && -d "$stage_dir" && "$stage_dir" == "${root_dir}/staging/"* ]]; then
     rm -rf -- "$stage_dir"
