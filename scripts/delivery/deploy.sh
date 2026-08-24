@@ -100,6 +100,26 @@ wait_for_public_health() {
   return 1
 }
 
+cleanup_secret_versions() {
+  local secret_id="$1" keep="$2" version
+  gcloud secrets versions list "$secret_id" --project "$GCP_PROJECT_ID" --filter='state=ENABLED' \
+    --format='value(name)' --sort-by='~createTime' | tail -n "+$((keep + 1))" |
+    while read -r version; do
+      gcloud secrets versions destroy "${version##*/}" --secret="$secret_id" --project "$GCP_PROJECT_ID" --quiet ||
+        printf 'warning: failed to destroy stale secret version %s\n' "$version" >&2
+    done
+}
+
+cleanup_cloud_run_revisions() {
+  gcloud run revisions list --service="$SUBSCRIPTION_SERVICE_NAME" --project="$GCP_PROJECT_ID" \
+    --region="$GCP_REGION" --format='value(metadata.name)' --sort-by='~metadata.creationTimestamp' |
+    tail -n +4 |
+    while read -r revision; do
+      gcloud run revisions delete "$revision" --project="$GCP_PROJECT_ID" --region="$GCP_REGION" --quiet ||
+        printf 'warning: failed to delete stale Cloud Run revision %s\n' "$revision" >&2
+    done
+}
+
 deploy_cloud_run() {
   local users_version obfs_version reality_public_key reality_short_id reality_dest
   local old_revision candidate_revision service_url revision_ready
@@ -158,6 +178,13 @@ deploy_cloud_run() {
       return 1
     fi
   done
+
+  # Traffic is confirmed healthy on the new revision; stale versions/revisions are
+  # best-effort cleanup and must never fail or roll back an already-successful deploy.
+  cleanup_secret_versions "$PROXY_USERS_SECRET_ID" 2 || true
+  cleanup_secret_versions "$OBFS_PASSWORD_SECRET_ID" 2 || true
+  cleanup_cloud_run_revisions || true
+  return 0
 }
 
 set +e

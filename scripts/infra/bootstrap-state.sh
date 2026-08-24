@@ -36,4 +36,18 @@ gcloud storage buckets update "gs://${bucket}" \
     --update-labels="application=proxy-builder,environment=${environment}" \
     --quiet
 
+lifecycle_file="$(mktemp "${TMPDIR:-/tmp}/proxy-builder-state-lifecycle.XXXXXX.json")"
+trap 'rm -f "$lifecycle_file"' EXIT
+cat >"$lifecycle_file" <<'JSON'
+{
+  "rule": [
+    {
+      "action": {"type": "Delete"},
+      "condition": {"numNewerVersions": 5, "isLive": false}
+    }
+  ]
+}
+JSON
+gcloud storage buckets update "gs://${bucket}" --lifecycle-file="$lifecycle_file" --quiet
+
 printf 'state bucket 已就绪: gs://%s\n' "$bucket"

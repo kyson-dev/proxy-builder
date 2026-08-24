@@ -136,7 +136,7 @@ startup script 不接收 OpenTofu secret 输入，也不得把应用秘密写入
 | --- | --- |
 | `github-plan` | 读取受管资源和 state；获取与释放 state lock；不能修改 GCP 资源 |
 | `github-apply` | 修改 bootstrap、platform 两个 OpenTofu stack 声明的资源；Secret Manager 使用不含 `versions.access` 的自定义 metadata/IAM 角色，不能直接读取 payload 或登录 VM |
-| `github-deploy` | 读取 platform outputs、推送镜像、增加指定 secret version、更新 Cloud Run revision、通过 IAP/OS Login 发布 VM |
+| `github-deploy` | 读取 platform outputs、推送镜像、增加与清理指定 secret version（`roles/secretmanager.secretVersionManager`，不含读取 payload 的 `secretAccessor`）、更新 Cloud Run revision、通过 IAP/OS Login 发布 VM |
 | `proxy-runtime` | 运行 VM；无 Project 级管理角色，无 Secret Manager 读取权限 |
 | `subscription-runtime` | 仅读取指定环境的 `proxy-users` 与 `obfs-password` secret |
 

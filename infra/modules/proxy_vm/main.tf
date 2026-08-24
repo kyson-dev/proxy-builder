@@ -38,7 +38,7 @@ resource "google_compute_instance" "proxy" {
     initialize_params {
       image = data.google_compute_image.debian.self_link
       size  = var.boot_disk_gb
-      type  = "pd-balanced"
+      type  = "pd-standard"
     }
   }
 

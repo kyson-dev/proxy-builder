@@ -17,9 +17,10 @@ resource "google_service_account" "runtime" {
 resource "google_secret_manager_secret" "runtime" {
   for_each = local.secrets
 
-  project   = var.project_id
-  secret_id = each.value
-  labels    = var.labels
+  project             = var.project_id
+  secret_id           = each.value
+  labels              = var.labels
+  version_destroy_ttl = "604800s"
 
   replication {
     auto {}
@@ -35,12 +36,12 @@ resource "google_secret_manager_secret_iam_member" "runtime_accessor" {
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
-resource "google_secret_manager_secret_iam_member" "deploy_version_adder" {
+resource "google_secret_manager_secret_iam_member" "deploy_version_manager" {
   for_each = google_secret_manager_secret.runtime
 
   project   = var.project_id
   secret_id = each.value.secret_id
-  role      = "roles/secretmanager.secretVersionAdder"
+  role      = "roles/secretmanager.secretVersionManager"
   member    = "serviceAccount:${var.deploy_service_account_email}"
 }
 
