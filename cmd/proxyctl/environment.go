@@ -45,25 +45,6 @@ func initEnvironment(args []string) error {
 	if *outputDirectory == "" || *sni == "" || *name == "" || flags.NArg() != 0 {
 		return errors.New("init-environment requires --output-dir, --sni and --user")
 	}
-	if _, err := os.Lstat(*outputDirectory); !errors.Is(err, os.ErrNotExist) {
-		if err == nil {
-			return errors.New("secret output directory already exists")
-		}
-		return errors.New("secret output directory cannot be inspected")
-	}
-	if err := os.MkdirAll(filepath.Dir(*outputDirectory), 0o700); err != nil {
-		return errors.New("secret output parent cannot be created")
-	}
-	if err := os.Mkdir(*outputDirectory, 0o700); err != nil {
-		return errors.New("secret output directory cannot be created")
-	}
-	committed := false
-	defer func() {
-		if !committed {
-			_ = os.RemoveAll(*outputDirectory)
-		}
-	}()
-
 	user, err := newUser(*name)
 	if err != nil {
 		return err
@@ -91,15 +72,36 @@ func initEnvironment(args []string) error {
 	if _, err := contracts.InspectCertificate(certificate, certificateKey, *sni, time.Now()); err != nil {
 		return err
 	}
-	files := map[string][]byte{
+	return writeSecretBundle(*outputDirectory, map[string][]byte{
 		"users.json":          append(usersJSON, '\n'),
 		"reality-private-key": []byte(realityPrivateKey),
 		"obfs-password":       []byte(obfsPassword),
 		"hysteria2.crt":       certificate,
 		"hysteria2.key":       certificateKey,
+	})
+}
+
+func writeSecretBundle(outputDirectory string, files map[string][]byte) error {
+	if _, err := os.Lstat(outputDirectory); !errors.Is(err, os.ErrNotExist) {
+		if err == nil {
+			return errors.New("secret output directory already exists")
+		}
+		return errors.New("secret output directory cannot be inspected")
 	}
+	if err := os.MkdirAll(filepath.Dir(outputDirectory), 0o700); err != nil {
+		return errors.New("secret output parent cannot be created")
+	}
+	if err := os.Mkdir(outputDirectory, 0o700); err != nil {
+		return errors.New("secret output directory cannot be created")
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.RemoveAll(outputDirectory)
+		}
+	}()
 	for filename, data := range files {
-		if err := writeExclusive(filepath.Join(*outputDirectory, filename), data); err != nil {
+		if err := writeExclusive(filepath.Join(outputDirectory, filename), data); err != nil {
 			return err
 		}
 	}

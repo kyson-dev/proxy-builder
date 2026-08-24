@@ -19,7 +19,17 @@ resource "google_compute_subnetwork" "proxy" {
   private_ip_google_access = true
 }
 
+data "google_compute_address" "existing" {
+  count = var.existing_static_ip_name == null ? 0 : 1
+
+  project = var.project_id
+  name    = var.existing_static_ip_name
+  region  = var.region
+}
+
 resource "google_compute_address" "proxy" {
+  count = var.existing_static_ip_name == null ? 1 : 0
+
   project      = var.project_id
   name         = "${local.name_prefix}-ipv4"
   region       = var.region

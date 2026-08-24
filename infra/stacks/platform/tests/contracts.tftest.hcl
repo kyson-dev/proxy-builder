@@ -1,4 +1,16 @@
 mock_provider "google" {
+  mock_data "google_compute_address" {
+    defaults = {
+      address = "198.51.100.20"
+    }
+  }
+
+  mock_resource "google_compute_address" {
+    defaults = {
+      address = "198.51.100.10"
+    }
+  }
+
   mock_resource "google_service_account" {
     defaults = {
       email = "mocksa@example-project.iam.gserviceaccount.com"
@@ -56,5 +68,18 @@ run "platform_contract" {
   assert {
     condition     = output.subscription_request_log_exclusion_name == "${var.resource_prefix}-subscription-request-logs"
     error_message = "platform 必须公开从完整 resource_prefix 派生的 subscription 请求日志排除名称。"
+  }
+}
+
+run "platform_uses_supplied_static_ip" {
+  command = plan
+
+  variables {
+    existing_static_ip_name = "legacy-ipv4"
+  }
+
+  assert {
+    condition     = output.proxy_ip_address == "198.51.100.20"
+    error_message = "指定 existing_static_ip_name 时 VM 必须使用读取到的静态 IP。"
   }
 }

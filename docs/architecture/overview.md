@@ -61,7 +61,7 @@ VM startup metadata 只负责幂等主机供给。应用部署生成不可变 re
 
 - `development` 已迁移到专用的 `kyson-proxy-dev` Project，并以 `proxy-*` 资源名完成正式发布和双协议 E2E。
 - `development` 的 bootstrap/platform plan 当前为零变更，GitHub 配置审计通过。
-- `production` 资源与秘密尚未激活，任何写操作仍需显式审批。
+- `production` 目标为独立的 `kyson-proxy-prod` Project；资源与秘密尚未激活，任何写操作仍需显式审批。
 - Cloud Run request log 按精确服务名排除，避免 query token 被平台日志持久化；应用仅记录脱敏事件。
 
 改变这些边界的原因见 [ADR-0001](../adr/0001-manage-gcp-with-opentofu.md)、[ADR-0002](../adr/0002-separate-proxy-and-subscription-runtimes.md) 和 [ADR-0003](../adr/0003-own-and-deliver-application-secrets.md)。
