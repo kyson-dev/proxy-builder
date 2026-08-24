@@ -88,6 +88,17 @@ fetch_and_validate_subscription() {
   done
 }
 
+wait_for_public_health() {
+  local service_url="$1"
+  for _ in {1..30}; do
+    if curl --silent --show-error --fail --max-time 10 "${service_url}/healthz" >/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
 deploy_cloud_run() {
   local users_version obfs_version reality_public_key reality_short_id reality_dest
   local old_revision candidate_revision service_url revision_ready
@@ -131,7 +142,7 @@ deploy_cloud_run() {
     gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
     return 1
   fi
-  if [[ -z "$service_url" ]] || ! curl -fsS "${service_url}/healthz" >/dev/null || ! fetch_and_validate_subscription "$service_url" public; then
+  if [[ -z "$service_url" ]] || ! wait_for_public_health "$service_url" || ! fetch_and_validate_subscription "$service_url" public; then
     gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
     return 1
   fi

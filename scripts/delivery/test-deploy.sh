@@ -39,9 +39,14 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'output=""; write_out=""; args="$*"; while (($#)); do case "$1" in --output) output="$2"; shift 2 ;; --write-out) write_out="$2"; shift 2 ;; *) shift ;; esac; done' \
-  'if [[ "$args" == *"https://service.example/healthz"* && "${FAKE_PUBLIC_HEALTH_FAIL:-0}" == "1" ]]; then exit 22; fi' \
+  'if [[ "$args" == *"https://service.example/healthz"* ]]; then' \
+  '  count="$(cat "$FAKE_HEALTH_COUNT_FILE")"; count=$((count + 1)); printf %s "$count" >"$FAKE_HEALTH_COUNT_FILE"' \
+  '  if [[ "${FAKE_PUBLIC_HEALTH_FAIL:-0}" == "1" || "$count" -le "${FAKE_PUBLIC_HEALTH_FAILURES:-0}" ]]; then exit 22; fi' \
+  'fi' \
   'if [[ -n "$output" ]]; then cat >/dev/null || true; printf '\''validated-response'\'' >"$output"; fi' \
   'if [[ -n "$write_out" ]]; then if [[ "${FAKE_E2E_FAIL:-0}" == "1" ]]; then printf 500; else printf 204; fi; fi' >"${fake_bin}/curl"
+
+printf '%s\n' '#!/usr/bin/env bash' 'exit 0' >"${fake_bin}/sleep"
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'printf '\''docker %s\n'\'' "$*" >>"$FAKE_COMMAND_LOG"' \
@@ -49,9 +54,11 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
 chmod 0755 "${fake_bin}"/*
 
 run_deploy() {
+  printf '0' >"${test_root}/health-count"
   PATH="${fake_bin}:$PATH" FAKE_PROXYCTL="${test_root}/proxyctl" FAKE_COMMAND_LOG="$command_log" FAKE_VM_STATUS="${1:-0}" FAKE_REMOTE_CERT="${2:-}" \
     FAKE_VM_ROLLBACK_STATUS="${FAKE_VM_ROLLBACK_STATUS:-0}" FAKE_CLOUD_ROLLBACK_STATUS="${FAKE_CLOUD_ROLLBACK_STATUS:-0}" \
-    FAKE_PUBLIC_HEALTH_FAIL="${FAKE_PUBLIC_HEALTH_FAIL:-0}" FAKE_E2E_FAIL="${FAKE_E2E_FAIL:-0}" \
+    FAKE_PUBLIC_HEALTH_FAIL="${FAKE_PUBLIC_HEALTH_FAIL:-0}" FAKE_PUBLIC_HEALTH_FAILURES="${FAKE_PUBLIC_HEALTH_FAILURES:-0}" \
+    FAKE_HEALTH_COUNT_FILE="${test_root}/health-count" FAKE_E2E_FAIL="${FAKE_E2E_FAIL:-0}" \
     ENVIRONMENT=development GIT_SHA=0123456789abcdef0123456789abcdef01234567 RUN_ID=123 RUN_ATTEMPT=1 \
     IMAGE_DIGEST=us-west1-docker.pkg.dev/project/repo/subscription@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
     GCP_PROJECT_ID=project GCP_REGION=us-west1 GCP_VM_NAME=proxy-dev GCP_VM_ZONE=us-west1-b \
@@ -91,6 +98,14 @@ if rg -q 'CANARY|subscription_token|REALITY_PRIVATE' "$command_log" "${test_root
 fi
 if ! rg 'gcloud compute scp' "$command_log" | rg -q 'hysteria2\.crt.*hysteria2\.key'; then
   printf '%s\n' 'first deployment did not upload the certificate pair' >&2
+  exit 1
+fi
+
+: >"$command_log"
+FAKE_PUBLIC_HEALTH_FAILURES=2 run_deploy 0 >"${test_root}/public-health-retry.log" 2>&1
+[[ "$(cat "${test_root}/health-count")" == "3" ]] || { printf '%s\n' 'public health propagation was not retried to success' >&2; exit 1; }
+if rg -q -- '--to-revisions old-revision=100' "$command_log"; then
+  printf '%s\n' 'transient public health propagation triggered rollback' >&2
   exit 1
 fi
 

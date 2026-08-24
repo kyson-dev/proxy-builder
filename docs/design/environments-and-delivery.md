@@ -151,7 +151,7 @@ Secret version 创建成功但 revision 失败时允许保留该 version 供审�
 
 候选 revision 必须以 `--no-traffic` 创建。Cloud Run 拥有的 `/healthz` startup probe 是切流前门禁；deploy 必须读取 `latestCreatedRevisionName`，确认它非空且不同于旧 revision，再直接轮询该 revision 的 Ready condition，最后按该不可变名称切换 100% 流量。部署不得依赖可能滞后的 `latestReadyRevisionName` 或 traffic-tag URL。
 
-切流后必须通过公网 `/healthz`、Base64 与 Clash 正文校验，再从 runner 分别通过订阅中的 VLESS Reality 和 Hysteria2 连接 VM，并访问环境固定的 HTTPS 204 URL。部署是 VM 与 Cloud Run 的协调事务：切流前任一步骤失败，旧 Cloud Run 不变并显式回滚本次 VM release；切流后的公网复验或任一 E2E 失败，先恢复旧 Cloud Run revision 的 100% 流量，再回滚 VM。两侧恢复都成功时退出 `20`；任一恢复失败时退出 `21` 并要求人工介入。失败 revision 与 secret version 保留供审计。
+切流后必须在有界时间内等待公网 `/healthz` 成功，以吸收 Cloud Run 边缘流量传播延迟；随后校验 Base64 与 Clash 正文，再从 runner 分别通过订阅中的 VLESS Reality 和 Hysteria2 连接 VM，并访问环境固定的 HTTPS 204 URL。部署是 VM 与 Cloud Run 的协调事务：切流前任一步骤失败，旧 Cloud Run 不变并显式回滚本次 VM release；等待超时、公网复验或任一 E2E 失败，先恢复旧 Cloud Run revision 的 100% 流量，再回滚 VM。两侧恢复都成功时退出 `20`；任一恢复失败时退出 `21` 并要求人工介入。失败 revision 与 secret version 保留供审计。
 
 ## 公共命令
 
