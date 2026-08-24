@@ -43,6 +43,17 @@ run "identity_contract" {
   }
 
   assert {
+    condition = (
+      toset(module.github_identity.state_iam_permissions.reader) == toset(["storage.buckets.getIamPolicy"]) &&
+      toset(module.github_identity.state_iam_permissions.admin) == toset([
+        "storage.buckets.getIamPolicy",
+        "storage.buckets.setIamPolicy",
+      ])
+    )
+    error_message = "plan 只能读取 state bucket IAM；apply 只能读取和修改该 IAM policy。"
+  }
+
+  assert {
     condition     = module.github_identity.plan_wif_member == "principal://iam.googleapis.com/projects/123456789/locations/global/workloadIdentityPools/mock-pool/subject/repo:${var.github_repository}:pull_request"
     error_message = "plan 身份必须只允许当前仓库的 pull_request subject。"
   }

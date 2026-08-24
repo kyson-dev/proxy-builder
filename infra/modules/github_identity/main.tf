@@ -111,6 +111,25 @@ resource "google_project_iam_custom_role" "secret_metadata_admin" {
   depends_on = [google_project_service.required]
 }
 
+resource "google_project_iam_custom_role" "state_iam" {
+  for_each = {
+    reader = ["storage.buckets.getIamPolicy"]
+    admin = [
+      "storage.buckets.getIamPolicy",
+      "storage.buckets.setIamPolicy",
+    ]
+  }
+
+  project     = var.project_id
+  role_id     = "${replace(title(var.resource_prefix), "-", "")}${title(local.environment_short)}StateIam${title(each.key)}"
+  title       = "Proxy state IAM ${each.key} (${var.environment})"
+  description = "Read or manage the proxy-builder state bucket IAM policy"
+  stage       = "GA"
+  permissions = each.value
+
+  depends_on = [google_project_service.required]
+}
+
 resource "google_iam_workload_identity_pool" "github" {
   project                   = var.project_id
   workload_identity_pool_id = "${local.name_prefix}-github"
@@ -175,4 +194,15 @@ resource "google_storage_bucket_iam_member" "state_reader" {
   bucket = var.state_bucket_name
   role   = "roles/storage.objectViewer"
   member = "serviceAccount:${google_service_account.github["deploy"].email}"
+}
+
+resource "google_storage_bucket_iam_member" "state_iam" {
+  for_each = {
+    plan  = "reader"
+    apply = "admin"
+  }
+
+  bucket = var.state_bucket_name
+  role   = google_project_iam_custom_role.state_iam[each.value].name
+  member = "serviceAccount:${google_service_account.github[each.key].email}"
 }
