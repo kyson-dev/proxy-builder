@@ -25,6 +25,7 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'fi' \
   'if [[ "$1" == "api" && "$*" == *"environments/development/variables"* ]]; then printf '\''{"variables":[{"name":"GCP_APPLY_SERVICE_ACCOUNT","value":"apply@example.iam.gserviceaccount.com"},{"name":"GCP_DEPLOY_SERVICE_ACCOUNT","value":"deploy@example.iam.gserviceaccount.com"}]}\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"environments/development/secrets"* ]]; then printf '\''{"secrets":[{"name":"REALITY_PRIVATE_KEY"},{"name":"OBFS_PASSWORD"},{"name":"HY2_CERT_PEM"},{"name":"HY2_KEY_PEM"},{"name":"PROXY_USERS_JSON"}]}\n'\''; exit 0; fi' \
+  'if [[ "$1" == "api" && "$2" == "user" && "$*" == *"--jq .id"* ]]; then printf '\''123456\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"repos/kyson-dev/proxy-builder"* && "$*" == *"--jq .id"* ]]; then printf '\''986343343\n'\''; exit 0; fi' \
   'if [[ "$1" == "api" && "$*" == *"environments/development"* && "$*" != *"--method DELETE"* ]]; then printf '\''{}\n'\''; exit 0; fi' \
   'if [[ "$1 $2" == "secret set" ]]; then cat >/dev/null; exit 0; fi' >"${fake_bin}/gh"
