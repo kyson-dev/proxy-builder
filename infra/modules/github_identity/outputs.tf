@@ -27,7 +27,7 @@ output "required_services" {
 }
 
 output "apply_project_roles" {
-  value = local.project_roles.apply
+  value = toset(values(local.project_roles.apply))
 }
 
 output "environment_isolation_contract" {
