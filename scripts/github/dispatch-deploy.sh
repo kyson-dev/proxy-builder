@@ -9,4 +9,3 @@ command -v gh >/dev/null 2>&1 || { printf '%s\n' 'missing command: gh' >&2; exit
 workflow_ref="$(git symbolic-ref --quiet --short HEAD || printf '%s' main)"
 gh workflow run deploy.yml --ref "$workflow_ref" -f "environment=${environment}" -f "git_ref=${git_ref}"
 printf 'deploy workflow dispatched for %s at %s\n' "$environment" "$git_ref"
-

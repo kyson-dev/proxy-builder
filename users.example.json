@@ -4,6 +4,7 @@
     {
       "name": "example-user",
       "enabled": true,
+      "protocols": { "vless": true, "hysteria2": true },
       "vless_uuid": "00000000-0000-4000-8000-000000000001",
       "hy2_password": "replace-with-at-least-24-bytes",
       "subscription_token": "replace-with-at-least-24-bytes"

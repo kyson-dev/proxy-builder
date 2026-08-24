@@ -165,6 +165,7 @@ make github-clean-production-legacy CONFIRM=<owner/repo>:production
 make github-audit ENV=<environment>
 make secrets-publish ENV=<environment>
 make user-add|user-enable|user-disable|user-rotate ENV=<environment> USER=<name>
+make user-protocol-enable|user-protocol-disable ENV=<environment> USER=<name> PROTOCOL=vless|hysteria2
 make subscription-url ENV=<environment> USER=<name> [FORMAT=base64|clash]
 make validate
 make infra-plan ENV=<environment> [STACK=bootstrap|platform]

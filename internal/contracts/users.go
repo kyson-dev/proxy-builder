@@ -15,11 +15,17 @@ import (
 var canonicalUUID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 type User struct {
-	Name              string `json:"name"`
-	Enabled           bool   `json:"enabled"`
-	VLESSUUID         string `json:"vless_uuid"`
-	HY2Password       string `json:"hy2_password"`
-	SubscriptionToken string `json:"subscription_token"`
+	Name              string    `json:"name"`
+	Enabled           bool      `json:"enabled"`
+	Protocols         Protocols `json:"protocols"`
+	VLESSUUID         string    `json:"vless_uuid"`
+	HY2Password       string    `json:"hy2_password"`
+	SubscriptionToken string    `json:"subscription_token"`
+}
+
+type Protocols struct {
+	VLESS     bool `json:"vless"`
+	Hysteria2 bool `json:"hysteria2"`
 }
 
 type UsersDocument struct {
@@ -29,8 +35,12 @@ type UsersDocument struct {
 
 func ParseUsers(data []byte) (UsersDocument, error) {
 	type userWire struct {
-		Name              *string `json:"name"`
-		Enabled           *bool   `json:"enabled"`
+		Name      *string `json:"name"`
+		Enabled   *bool   `json:"enabled"`
+		Protocols *struct {
+			VLESS     *bool `json:"vless"`
+			Hysteria2 *bool `json:"hysteria2"`
+		} `json:"protocols"`
 		VLESSUUID         *string `json:"vless_uuid"`
 		HY2Password       *string `json:"hy2_password"`
 		SubscriptionToken *string `json:"subscription_token"`
@@ -73,9 +83,20 @@ func ParseUsers(data []byte) (UsersDocument, error) {
 		if user.SubscriptionToken == nil {
 			return UsersDocument{}, fmt.Errorf("%s.subscription_token is required", prefix)
 		}
+		protocols := Protocols{VLESS: true, Hysteria2: true}
+		if user.Protocols != nil {
+			if user.Protocols.VLESS == nil {
+				return UsersDocument{}, fmt.Errorf("%s.protocols.vless is required", prefix)
+			}
+			if user.Protocols.Hysteria2 == nil {
+				return UsersDocument{}, fmt.Errorf("%s.protocols.hysteria2 is required", prefix)
+			}
+			protocols = Protocols{VLESS: *user.Protocols.VLESS, Hysteria2: *user.Protocols.Hysteria2}
+		}
 		document.Users = append(document.Users, User{
 			Name:              *user.Name,
 			Enabled:           *user.Enabled,
+			Protocols:         protocols,
 			VLESSUUID:         *user.VLESSUUID,
 			HY2Password:       *user.HY2Password,
 			SubscriptionToken: *user.SubscriptionToken,
@@ -138,6 +159,9 @@ func (document UsersDocument) Validate() error {
 		}
 		if len([]byte(user.SubscriptionToken)) < 24 {
 			return fmt.Errorf("%s.subscription_token must be at least 24 UTF-8 bytes", prefix)
+		}
+		if !user.Protocols.VLESS && !user.Protocols.Hysteria2 {
+			return fmt.Errorf("%s.protocols must enable at least one protocol", prefix)
 		}
 
 		if err := unique(names, user.Name, prefix+".name"); err != nil {

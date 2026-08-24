@@ -12,7 +12,13 @@ import (
 )
 
 func RenderBase64(user contracts.User, config Config) (string, error) {
-	links := []string{renderVLESSURI(user, config), renderHY2URI(user, config)}
+	links := make([]string, 0, 2)
+	if user.Protocols.VLESS {
+		links = append(links, renderVLESSURI(user, config))
+	}
+	if user.Protocols.Hysteria2 {
+		links = append(links, renderHY2URI(user, config))
+	}
 	return base64.StdEncoding.EncodeToString([]byte(strings.Join(links, "\n"))), nil
 }
 
@@ -103,42 +109,50 @@ type clashGroup struct {
 func RenderClash(user contracts.User, config Config) (string, error) {
 	vlessName := user.Name + "-VLESS"
 	hy2Name := user.Name + "-HY2"
+	proxies := make([]any, 0, 2)
+	proxyNames := make([]string, 0, 3)
+	if user.Protocols.VLESS {
+		proxies = append(proxies, clashVLESS{
+			Name:              vlessName,
+			Type:              "vless",
+			Server:            config.ProxyIP,
+			Port:              443,
+			UUID:              user.VLESSUUID,
+			Network:           "tcp",
+			TLS:               true,
+			UDP:               true,
+			Flow:              "xtls-rprx-vision",
+			ServerName:        config.RealitySNI,
+			ClientFingerprint: "chrome",
+			RealityOptions: realityClash{
+				PublicKey: config.RealityPublicKey,
+				ShortID:   config.RealityShortID,
+			},
+		})
+		proxyNames = append(proxyNames, vlessName)
+	}
+	if user.Protocols.Hysteria2 {
+		proxies = append(proxies, clashHY2{
+			Name:           hy2Name,
+			Type:           "hysteria2",
+			Server:         config.ProxyIP,
+			Port:           443,
+			Password:       user.HY2Password,
+			SNI:            config.HY2SNI,
+			SkipCertVerify: false,
+			Fingerprint:    config.HY2CertSHA256,
+			Obfs:           "salamander",
+			ObfsPassword:   config.ObfsPassword,
+		})
+		proxyNames = append(proxyNames, hy2Name)
+	}
+	proxyNames = append(proxyNames, "DIRECT")
 	document := clashConfig{
-		Proxies: []any{
-			clashVLESS{
-				Name:              vlessName,
-				Type:              "vless",
-				Server:            config.ProxyIP,
-				Port:              443,
-				UUID:              user.VLESSUUID,
-				Network:           "tcp",
-				TLS:               true,
-				UDP:               true,
-				Flow:              "xtls-rprx-vision",
-				ServerName:        config.RealitySNI,
-				ClientFingerprint: "chrome",
-				RealityOptions: realityClash{
-					PublicKey: config.RealityPublicKey,
-					ShortID:   config.RealityShortID,
-				},
-			},
-			clashHY2{
-				Name:           hy2Name,
-				Type:           "hysteria2",
-				Server:         config.ProxyIP,
-				Port:           443,
-				Password:       user.HY2Password,
-				SNI:            config.HY2SNI,
-				SkipCertVerify: false,
-				Fingerprint:    config.HY2CertSHA256,
-				Obfs:           "salamander",
-				ObfsPassword:   config.ObfsPassword,
-			},
-		},
+		Proxies: proxies,
 		ProxyGroups: []clashGroup{{
 			Name:    "Auto",
 			Type:    "select",
-			Proxies: []string{vlessName, hy2Name, "DIRECT"},
+			Proxies: proxyNames,
 		}},
 		Rules: []string{"MATCH,Auto"},
 	}

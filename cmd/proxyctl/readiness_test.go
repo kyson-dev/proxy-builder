@@ -21,7 +21,7 @@ import (
 )
 
 func TestValidateSubscriptionAcceptsRenderedFormats(t *testing.T) {
-	user := contracts.User{Name: "alice", Enabled: true, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
+	user := contracts.User{Name: "alice", Enabled: true, Protocols: contracts.Protocols{VLESS: true, Hysteria2: true}, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
 	config := subscription.Config{
 		ProxyIP: "203.0.113.10", RealityPublicKey: "public-key", RealityShortID: "0123456789abcdef",
 		RealitySNI: "example.com", HY2SNI: "example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", ObfsPassword: "obfs-password-1234567890",
@@ -60,7 +60,7 @@ func TestValidateSubscriptionRejectsNonstandardHY2Parameter(t *testing.T) {
 }
 
 func TestRenderProbeConfigUsesSubscriptionCredentials(t *testing.T) {
-	user := contracts.User{Name: "alice", Enabled: true, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
+	user := contracts.User{Name: "alice", Enabled: true, Protocols: contracts.Protocols{VLESS: true, Hysteria2: true}, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
 	config := subscription.Config{
 		ProxyIP: "203.0.113.10", RealityPublicKey: "public-key", RealityShortID: "0123456789abcdef",
 		RealitySNI: "www.example.com", HY2SNI: "hy2.example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", ObfsPassword: "obfs-password-1234567890",

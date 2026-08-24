@@ -15,6 +15,7 @@
     {
       "name": "alice",
       "enabled": true,
+      "protocols": { "vless": true, "hysteria2": true },
       "vless_uuid": "00000000-0000-4000-8000-000000000000",
       "hy2_password": "high-entropy password",
       "subscription_token": "high-entropy token"
@@ -26,12 +27,13 @@
 规则：
 
 - 顶层只允许 `version` 与 `users`；`version` 当前只能为整数 `1`。
-- 用户对象五个字段都必需，不允许未知字段。
+- 用户对象字段均必需且不允许未知字段；为兼容既有 users Secret，缺少整个 `protocols` 对象时等同于两种协议均为 `true`。
+- `protocols.vless` 与 `protocols.hysteria2` 为布尔值，显式提供 `protocols` 时两者都必须存在，且至少一项为 `true`。
 - `name` 为 1–64 个 Unicode code point；每个字符必须可打印，且首尾不得为空白。
 - `vless_uuid` 必须是规范小写 UUID。
 - `hy2_password` 与 `subscription_token` 的 UTF-8 编码至少 24 bytes。
 - name、UUID、HY2 password 与 subscription token 在同一环境内分别唯一，包括 disabled 用户。
-- `enabled=false` 的用户不进入 sing-box 配置；匹配其 token 的订阅请求返回 `403`。
+- `enabled=false` 的用户不进入 sing-box 配置；匹配其 token 的订阅请求返回 `403`。已启用用户只会进入其获授权协议的 inbound，订阅也只返回这些协议。
 - 至少有一个 enabled 用户才能发布或启动 subscription 服务。
 - 解码必须拒绝尾随第二个 JSON value，而不是只读取第一个对象。
 
@@ -69,6 +71,7 @@ private key 的字符串表示不参与 short ID 计算。实现必须用固定�
 ```text
 proxyctl init-environment --output-dir <path> --sni <host> --user <name>
 proxyctl add-user|enable-user|disable-user|rotate-user --users <path> --name <name>
+proxyctl enable-user-protocol|disable-user-protocol --users <path> --name <name> --protocol vless|hysteria2
 proxyctl validate-users --input <path>
 proxyctl validate-release --input <path>
 proxyctl derive-reality --private-key-file <path> --output <path>

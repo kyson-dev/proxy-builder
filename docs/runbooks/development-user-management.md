@@ -16,9 +16,10 @@
    ```bash
    make user-add ENV=development USER=<name>
    # 或 user-enable、user-disable、user-rotate
+   make user-protocol-disable ENV=development USER=<name> PROTOCOL=hysteria2
    ```
 
-   `rotate` 会立即替换 UUID、HY2 password 和 subscription token，没有重叠窗口；不得禁用最后一个 enabled 用户。
+   `rotate` 会立即替换 UUID、HY2 password 和 subscription token，没有重叠窗口，并保留总开关与协议权限；不得禁用最后一个 enabled 用户，也不得关闭某用户最后一个协议。
 
 2. 检查文件权限和变更对象后发布并部署：
 
@@ -37,7 +38,7 @@
 
 ## 成功标准
 
-- 部署的双协议 E2E 与公网复验成功。
+- 部署会验证每种仍有已启用获授权用户的协议与公网订阅；对所有用户关闭的协议会跳过 E2E。
 - 新增/启用用户可用；禁用用户收到 `403`；轮换后旧三项凭据立即失效。
 - 本地 `users.json` 与 GitHub Secret 是同一次发布的版本。
 

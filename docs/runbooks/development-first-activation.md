@@ -9,7 +9,7 @@
 
 - [ ] 重构 PR 已通过验证并合入 `main`；记录待部署的 main commit SHA，工作区干净。
 - [ ] `gcloud` 活动账号可管理 development Project，ADC 可供 OpenTofu 使用；`gh auth status` 成功。
-- [ ] OpenTofu 1.12.1、Go、Docker、jq、ShellCheck 和 Actionlint 1.7.12 可用。
+- [ ] OpenTofu 1.12.6、Go、Docker、jq、ShellCheck 和 Actionlint 1.7.12 可用。
 - [ ] `infra/environments/development.tfvars` 与 `config/environments/development.json` 已复核。
 
 禁止选择 production、设置 `PRODUCTION_OPERATIONS_ENABLED`，或删除 bootstrap/state bucket。任一步结果不符立即停止。

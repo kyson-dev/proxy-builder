@@ -34,6 +34,9 @@ func TestParseUsers(t *testing.T) {
 	if len(document.Users) != 2 || !document.Users[0].Enabled || document.Users[1].Enabled {
 		t.Fatalf("unexpected users document: %#v", document)
 	}
+	if !document.Users[0].Protocols.VLESS || !document.Users[0].Protocols.Hysteria2 {
+		t.Fatal("legacy users without protocols must default to both protocols")
+	}
 }
 
 func TestRepositoryUsersExampleUsesV1Schema(t *testing.T) {
@@ -58,6 +61,8 @@ func TestParseUsersRejectsInvalidDocuments(t *testing.T) {
 		"uppercase uuid":     strings.Replace(validUsersJSON, "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-00000000000A", 1),
 		"short password":     strings.Replace(validUsersJSON, "hy2-password-123456789012", "too-short", 1),
 		"trimmed name":       strings.Replace(validUsersJSON, `"name": "alice"`, `"name": " alice"`, 1),
+		"partial protocols":  strings.Replace(validUsersJSON, `"enabled": true`, `"enabled": true, "protocols": {"vless": true}`, 1),
+		"no protocols":       strings.Replace(validUsersJSON, `"enabled": true`, `"enabled": true, "protocols": {"vless": false, "hysteria2": false}`, 1),
 	}
 	for name, input := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -65,5 +70,16 @@ func TestParseUsersRejectsInvalidDocuments(t *testing.T) {
 				t.Fatal("ParseUsers() unexpectedly succeeded")
 			}
 		})
+	}
+}
+
+func TestParseUsersHonorsExplicitProtocolPermissions(t *testing.T) {
+	input := strings.Replace(validUsersJSON, `"enabled": true`, `"enabled": true, "protocols": {"vless": true, "hysteria2": false}`, 1)
+	document, err := ParseUsers([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !document.Users[0].Protocols.VLESS || document.Users[0].Protocols.Hysteria2 {
+		t.Fatalf("explicit protocol permissions were not preserved: %#v", document.Users[0].Protocols)
 	}
 }

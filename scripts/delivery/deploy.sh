@@ -80,7 +80,8 @@ rollback_vm() {
 }
 
 fetch_and_validate_subscription() {
-  local service_url="$1" suffix="$2" format
+  local service_url="$1" suffix="$2" token="$3" format token_encoded
+  token_encoded="$(jq -nr --arg value "$token" '$value | @uri')"
   for format in base64 clash; do
     printf 'url = "%s/v1/subscription?token=%s&format=%s"\nsilent\nshow-error\nfail\n' "$service_url" "$token_encoded" "$format" | \
       curl --config - --output "${work_dir}/${format}.${suffix}.response" || return 1
@@ -142,19 +143,23 @@ deploy_cloud_run() {
     gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
     return 1
   fi
-  if [[ -z "$service_url" ]] || ! wait_for_public_health "$service_url" || ! fetch_and_validate_subscription "$service_url" public; then
+  if [[ -z "$service_url" ]] || ! wait_for_public_health "$service_url"; then
     gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
     return 1
   fi
-  if ! "${script_dir}/e2e-proxy.sh" --subscription "${work_dir}/base64.public.response" \
-    --image "$sing_box_image" --probe-url "$egress_probe_url" --proxyctl "${work_dir}/proxyctl"; then
-    gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
-    return 1
-  fi
+  local protocol token
+  for protocol in vless hysteria2; do
+    token="$(jq -r --arg protocol "$protocol" '[.users[] | select(.enabled == true and (if has("protocols") then .protocols[$protocol] == true else true end)) | .subscription_token][0] // empty' "${inputs_dir}/proxy-users.json")"
+    [[ -n "$token" ]] || continue
+    if ! fetch_and_validate_subscription "$service_url" "$protocol" "$token" || ! "${script_dir}/e2e-proxy.sh" \
+      --subscription "${work_dir}/base64.${protocol}.response" --protocol "$protocol" \
+      --image "$sing_box_image" --probe-url "$egress_probe_url" --proxyctl "${work_dir}/proxyctl"; then
+      gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
+      return 1
+    fi
+  done
 }
 
-token="$(jq -er '.users[] | select(.enabled) | .subscription_token' "${inputs_dir}/proxy-users.json" | head -n1)"
-token_encoded="$(jq -nr --arg value "$token" '$value | @uri')"
 set +e
 deploy_cloud_run
 cloud_status=$?

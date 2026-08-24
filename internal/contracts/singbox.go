@@ -56,7 +56,7 @@ func RenderSingBox(templateData []byte, users UsersDocument, release Release, pr
 			vlessCount++
 			vlessUsers := make([]any, 0, len(users.Users))
 			for _, user := range users.Users {
-				if user.Enabled {
+				if user.Enabled && user.Protocols.VLESS {
 					vlessUsers = append(vlessUsers, map[string]any{
 						"name": user.Name,
 						"uuid": user.VLESSUUID,
@@ -86,7 +86,7 @@ func RenderSingBox(templateData []byte, users UsersDocument, release Release, pr
 			hy2Count++
 			hy2Users := make([]any, 0, len(users.Users))
 			for _, user := range users.Users {
-				if user.Enabled {
+				if user.Enabled && user.Protocols.Hysteria2 {
 					hy2Users = append(hy2Users, map[string]any{
 						"name":     user.Name,
 						"password": user.HY2Password,

@@ -34,4 +34,3 @@ done
     printf '%s=%s\n' "$name" "$(jq -r --arg name "$name" '.[$name].value' <<<"$outputs")"
   done
 } >>"$output_file"
-

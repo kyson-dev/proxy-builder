@@ -55,6 +55,8 @@ chmod 0755 "${fake_bin}"/*
 
 run_deploy() {
   printf '0' >"${test_root}/health-count"
+  default_users_json='{"version":1,"users":[{"name":"alice","enabled":true,"vless_uuid":"00000000-0000-4000-8000-000000000001","hy2_password":"HY2_PASSWORD_CANARY_123456789","subscription_token":"SUB_TOKEN_CANARY_123456789012"}]}'
+  users_json="${FAKE_USERS_JSON:-$default_users_json}"
   PATH="${fake_bin}:$PATH" FAKE_PROXYCTL="${test_root}/proxyctl" FAKE_COMMAND_LOG="$command_log" FAKE_VM_STATUS="${1:-0}" FAKE_REMOTE_CERT="${2:-}" \
     FAKE_VM_ROLLBACK_STATUS="${FAKE_VM_ROLLBACK_STATUS:-0}" FAKE_CLOUD_ROLLBACK_STATUS="${FAKE_CLOUD_ROLLBACK_STATUS:-0}" \
     FAKE_PUBLIC_HEALTH_FAIL="${FAKE_PUBLIC_HEALTH_FAIL:-0}" FAKE_PUBLIC_HEALTH_FAILURES="${FAKE_PUBLIC_HEALTH_FAILURES:-0}" \
@@ -66,7 +68,7 @@ run_deploy() {
     PROXY_USERS_SECRET_ID=proxy-dev-users OBFS_PASSWORD_SECRET_ID=proxy-dev-obfs \
     REALITY_PRIVATE_KEY=REALITY_PRIVATE_CANARY_1234567890 OBFS_PASSWORD=OBFS_CANARY_12345678901234567890 \
     HY2_CERT_PEM=HY2_CERT_CANARY HY2_KEY_PEM=HY2_KEY_CANARY \
-    PROXY_USERS_JSON='{"version":1,"users":[{"name":"alice","enabled":true,"vless_uuid":"00000000-0000-4000-8000-000000000001","hy2_password":"HY2_PASSWORD_CANARY_123456789","subscription_token":"SUB_TOKEN_CANARY_123456789012"}]}' \
+    PROXY_USERS_JSON="$users_json" \
     "$script_dir/deploy.sh"
 }
 
@@ -152,4 +154,13 @@ status=$?
 set -e
 [[ "$status" == "21" ]] || { printf 'expected intervention status 21 after Cloud Run rollback failure, got %s\n' "$status" >&2; exit 1; }
 rg -q -- '--rollback '\''0123456789abcdef0123456789abcdef01234567-123-1'\''' "$command_log" || { printf '%s\n' 'VM rollback was skipped after Cloud Run rollback failure' >&2; exit 1; }
+
+: >"$command_log"
+FAKE_USERS_JSON='{"version":1,"users":[{"name":"alice","enabled":true,"protocols":{"vless":true,"hysteria2":false},"vless_uuid":"00000000-0000-4000-8000-000000000001","hy2_password":"HY2_PASSWORD_CANARY_123456789","subscription_token":"SUB_TOKEN_CANARY_123456789012"}]}' \
+  run_deploy 0 >"${test_root}/vless-only.log" 2>&1
+rg -q 'vless\.json' "$command_log" || { printf '%s\n' 'VLESS-authorized user was not probed' >&2; exit 1; }
+if rg -q 'hysteria2\.json' "$command_log"; then
+  printf '%s\n' 'disabled Hysteria2 protocol was still probed' >&2
+  exit 1
+fi
 printf '%s\n' 'delivery isolation tests passed'
