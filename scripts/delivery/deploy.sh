@@ -90,7 +90,7 @@ fetch_and_validate_subscription() {
 
 deploy_cloud_run() {
   local users_version obfs_version reality_public_key reality_short_id reality_dest
-  local old_revision candidate_revision service_url
+  local old_revision candidate_revision service_url revision_ready
   users_version="$(gcloud secrets versions add "$PROXY_USERS_SECRET_ID" --project "$GCP_PROJECT_ID" --data-file="${inputs_dir}/proxy-users.json" --format='value(name)')" || return 1
   obfs_version="$(gcloud secrets versions add "$OBFS_PASSWORD_SECRET_ID" --project "$GCP_PROJECT_ID" --data-file="${inputs_dir}/obfs-password" --format='value(name)')" || return 1
   users_version="${users_version##*/}"
@@ -98,14 +98,28 @@ deploy_cloud_run() {
   reality_public_key="$(jq -er '.reality_public_key' "${work_dir}/public.json")" || return 1
   reality_short_id="$(jq -er '.reality_short_id' "${work_dir}/public.json")" || return 1
   reality_dest="$(jq -er '.reality_dest' "${repo_root}/config/environments/${ENVIRONMENT}.json")" || return 1
-  old_revision="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.traffic[percent=100].revisionName)' | head -n1)" || return 1
+  old_revision="$(
+    gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format=json |
+      jq -er '[.status.traffic[] | select(.percent == 100 and (.revisionName | length > 0)) | .revisionName][0]'
+  )" || return 1
+  [[ -n "$old_revision" ]] || return 1
 
   gcloud run deploy "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" \
     --image "$IMAGE_DIGEST" --no-traffic \
     --set-env-vars "PROXY_IP=${PROXY_IP},REALITY_PUBLIC_KEY=${reality_public_key},REALITY_SHORT_ID=${reality_short_id},REALITY_DEST=${reality_dest},HY2_SNI=${hy2_sni},HY2_CERT_SHA256=${local_cert_sha256}" \
     --set-secrets "PROXY_USERS_JSON=${PROXY_USERS_SECRET_ID}:${users_version},OBFS_PASSWORD=${OBFS_PASSWORD_SECRET_ID}:${obfs_version}" || return 1
-  candidate_revision="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.latestReadyRevisionName)')" || return 1
+  candidate_revision="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.latestCreatedRevisionName)')" || return 1
   [[ -n "$candidate_revision" && "$candidate_revision" != "$old_revision" ]] || return 1
+  revision_ready=false
+  for _ in {1..20}; do
+    if gcloud run revisions describe "$candidate_revision" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format=json |
+      jq -e 'any(.status.conditions[]?; .type == "Ready" and .status == "True")' >/dev/null; then
+      revision_ready=true
+      break
+    fi
+    sleep 3
+  done
+  [[ "$revision_ready" == true ]] || return 1
 
   # From this point onward a failed command may have changed public traffic. Every
   # failure path must restore the previously serving revision before VM rollback.
