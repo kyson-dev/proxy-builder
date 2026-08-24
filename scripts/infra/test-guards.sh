@@ -20,6 +20,9 @@ if ENV=development CONFIRM_PROJECT_ID=wrong "${SCRIPT_DIR}/destroy-platform.sh" 
 fi
 rg -q '确认值不匹配' "$destroy_guard_log" || infra::die "destroy 拒绝原因不明确"
 
+rg -q -- '-auto-approve' "${SCRIPT_DIR}/destroy-platform.sh" || infra::die "GitHub destroy 必须显式非交互批准"
+rg -q -- '-input=false' "${SCRIPT_DIR}/destroy-platform.sh" || infra::die "GitHub destroy 不得等待交互输入"
+
 development_file=$(infra::require_environment development)
 production_file=$(infra::require_environment production)
 development_project=$(infra::read_tfvar "$development_file" project_id)
