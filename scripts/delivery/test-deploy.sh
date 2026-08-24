@@ -39,7 +39,7 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'output=""; write_out=""; args="$*"; while (($#)); do case "$1" in --output) output="$2"; shift 2 ;; --write-out) write_out="$2"; shift 2 ;; *) shift ;; esac; done' \
-  'if [[ "$args" == *"https://service.example/healthz"* ]]; then' \
+  'if [[ "$args" == *"https://service.example/v1/health"* ]]; then' \
   '  count="$(cat "$FAKE_HEALTH_COUNT_FILE")"; count=$((count + 1)); printf %s "$count" >"$FAKE_HEALTH_COUNT_FILE"' \
   '  if [[ "${FAKE_PUBLIC_HEALTH_FAIL:-0}" == "1" || "$count" -le "${FAKE_PUBLIC_HEALTH_FAILURES:-0}" ]]; then exit 22; fi' \
   'fi' \

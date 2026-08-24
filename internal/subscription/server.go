@@ -85,7 +85,7 @@ func (server *Server) serve(writer http.ResponseWriter, request *http.Request) r
 	}
 
 	switch request.URL.Path {
-	case "/healthz":
+	case "/v1/health":
 		writeJSON(writer, http.StatusOK, []byte(`{"status":"ok"}`))
 		result.Status = http.StatusOK
 		return result
@@ -189,8 +189,8 @@ func randomRequestID() string {
 
 func pathType(path string) string {
 	switch path {
-	case "/healthz":
-		return "healthz"
+	case "/v1/health":
+		return "health"
 	case "/v1/subscription":
 		return "subscription"
 	default:

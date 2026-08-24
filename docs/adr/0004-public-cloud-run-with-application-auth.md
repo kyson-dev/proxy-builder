@@ -14,7 +14,7 @@ GitHub WIF 和 Cloud Run runtime Service Account 分别保护部署与 GCP 资�
 
 Cloud Run subscription 服务使用公开 ingress、启用默认 `run.app` URL，并设置 `invoker_iam_disabled = true`。不再为 `allUsers` 维护 `roles/run.invoker` binding。
 
-`/healthz` 公开；`/v1/subscription` 由应用按用户的高熵 `subscription_token` 认证。token 继续放在 query parameter 以兼容订阅客户端。
+`/v1/health` 公开；`/v1/subscription` 由应用按用户的高熵 `subscription_token` 认证。token 继续放在 query parameter 以兼容订阅客户端。`/healthz` 不作为应用接口，因为 Cloud Run 公网前端可能截获该路径。
 
 ## 理由
 
@@ -31,7 +31,7 @@ Cloud Run subscription 服务使用公开 ingress、启用默认 `run.app` URL�
 
 ## 后果
 
-- 网络上的任何调用者都能访问 `/healthz` 并向订阅路径发送请求。
+- 网络上的任何调用者都能访问 `/v1/health` 并向订阅路径发送请求。
 - 缺少、无效或已禁用用户的 token 必须继续分别被应用拒绝。
 - Cloud Run 自动 request log 必须按精确服务名排除，避免 query token 持久化；应用日志保留脱敏事件。
 - 若未来要求 Cloud Run IAM，必须先设计客户端身份获取与刷新流程，并用新 ADR 取代本决定。
