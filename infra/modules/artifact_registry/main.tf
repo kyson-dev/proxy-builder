@@ -1,6 +1,5 @@
 locals {
-  environment_short = var.environment == "production" ? "prod" : "dev"
-  repository_id     = "${var.resource_prefix}-${local.environment_short}-images"
+  repository_id = "${var.resource_prefix}-images"
 }
 
 resource "google_artifact_registry_repository" "images" {

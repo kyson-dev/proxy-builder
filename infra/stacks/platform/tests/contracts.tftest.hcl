@@ -20,13 +20,13 @@ run "platform_contract" {
   command = plan
 
   assert {
-    condition     = module.network.proxy_network_tag == "${var.resource_prefix}-${var.environment == "production" ? "prod" : "dev"}-proxy"
-    error_message = "proxy network tag 必须包含环境缩写。"
+    condition     = module.network.proxy_network_tag == "${var.resource_prefix}-vm"
+    error_message = "proxy network tag 必须从完整 resource_prefix 派生。"
   }
 
   assert {
-    condition     = module.artifact_registry.repository_id == "${var.resource_prefix}-${var.environment == "production" ? "prod" : "dev"}-images"
-    error_message = "Artifact Registry 名称必须包含环境缩写。"
+    condition     = module.artifact_registry.repository_id == "${var.resource_prefix}-images"
+    error_message = "Artifact Registry 名称必须从完整 resource_prefix 派生。"
   }
 
   assert {
@@ -54,7 +54,7 @@ run "platform_contract" {
 
 
   assert {
-    condition     = output.subscription_request_log_exclusion_name == "${var.resource_prefix}-${var.environment == "production" ? "prod" : "dev"}-subscription-request-logs"
-    error_message = "platform 必须公开环境隔离的 subscription 请求日志排除名称。"
+    condition     = output.subscription_request_log_exclusion_name == "${var.resource_prefix}-subscription-request-logs"
+    error_message = "platform 必须公开从完整 resource_prefix 派生的 subscription 请求日志排除名称。"
   }
 }

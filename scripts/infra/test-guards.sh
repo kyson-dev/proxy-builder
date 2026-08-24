@@ -32,5 +32,12 @@ production_file=$(infra::require_environment production)
 development_project=$(infra::read_tfvar "$development_file" project_id)
 production_project=$(infra::read_tfvar "$production_file" project_id)
 [[ "$development_project" != "$production_project" ]] || infra::die "两个环境不能共用 GCP Project"
+[[ "$development_project" == "kyson-proxy-dev" ]] || infra::die "development 必须使用 kyson-proxy-dev Project"
+[[ "$(infra::read_tfvar "$development_file" resource_prefix)" == "proxy" ]] || infra::die "development 必须使用 proxy 完整资源名前缀"
+[[ "$(infra::read_tfvar "$production_file" resource_prefix)" == "proxy" ]] || infra::die "production 必须使用 proxy 完整资源名前缀"
+
+if rg -q 'environment_short' "${INFRA_ROOT}/infra/modules"; then
+    infra::die "资源模块不得从 environment 自动追加资源名后缀"
+fi
 
 printf '基础设施保护条件测试通过\n'

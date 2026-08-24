@@ -1,8 +1,7 @@
 locals {
-  environment_short = var.environment == "production" ? "prod" : "dev"
-  name_prefix       = "${var.resource_prefix}-${local.environment_short}"
-  environment_sub   = "repo:${var.github_repository}:environment:${var.environment}"
-  pull_request_sub  = "repo:${var.github_repository}:pull_request"
+  name_prefix      = var.resource_prefix
+  environment_sub  = "repo:${var.github_repository}:environment:${var.environment}"
+  pull_request_sub = "repo:${var.github_repository}:pull_request"
 
   required_services = toset([
     "artifactregistry.googleapis.com",
@@ -90,7 +89,7 @@ resource "google_service_account" "github" {
 
 resource "google_project_iam_custom_role" "secret_metadata_admin" {
   project     = var.project_id
-  role_id     = "${replace(title(var.resource_prefix), "-", "")}${title(local.environment_short)}SecretMetadataAdmin"
+  role_id     = "${replace(title(var.resource_prefix), "-", "")}SecretMetadataAdmin"
   title       = "Proxy secret metadata admin (${var.environment})"
   description = "Manage Secret Manager containers and IAM without reading payloads"
   stage       = "GA"
@@ -121,7 +120,7 @@ resource "google_project_iam_custom_role" "state_iam" {
   }
 
   project     = var.project_id
-  role_id     = "${replace(title(var.resource_prefix), "-", "")}${title(local.environment_short)}StateIam${title(each.key)}"
+  role_id     = "${replace(title(var.resource_prefix), "-", "")}StateIam${title(each.key)}"
   title       = "Proxy state IAM ${each.key} (${var.environment})"
   description = "Read or manage the proxy-builder state bucket IAM policy"
   stage       = "GA"

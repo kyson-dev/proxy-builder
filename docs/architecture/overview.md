@@ -59,7 +59,7 @@ VM startup metadata 只负责幂等主机供给。应用部署生成不可变 re
 
 ## 当前约束
 
-- `development` 已真实部署并通过 destroy/rebuild、正式发布、回滚和双协议 E2E。
+- `development` 已迁移到专用的 `kyson-proxy-dev` Project，并以 `proxy-*` 资源名完成正式发布和双协议 E2E。
 - `development` 的 bootstrap/platform plan 当前为零变更，GitHub 配置审计通过。
 - `production` 资源与秘密尚未激活，任何写操作仍需显式审批。
 - Cloud Run request log 按精确服务名排除，避免 query token 被平台日志持久化；应用仅记录脱敏事件。

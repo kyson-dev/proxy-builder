@@ -24,11 +24,11 @@ run "startup_metadata_contract" {
     machine_type                 = "e2-micro"
     boot_disk_gb                 = 10
     network_tier                 = "STANDARD"
-    subnetwork_self_link         = "projects/example-project/regions/us-west1/subnetworks/proxy-dev"
+    subnetwork_self_link         = "projects/example-project/regions/us-west1/subnetworks/proxy-subnet"
     external_ip_address          = "203.0.113.10"
-    network_tag                  = "proxy-dev-proxy"
+    network_tag                  = "proxy-vm"
     labels                       = { application = "proxy-builder", environment = "development" }
-    deploy_service_account_email = "proxy-dev-gh-deploy@example-project.iam.gserviceaccount.com"
+    deploy_service_account_email = "proxy-gh-deploy@example-project.iam.gserviceaccount.com"
   }
 
   assert {
@@ -47,5 +47,10 @@ run "startup_metadata_contract" {
       google_service_account_iam_member.deploy_act_as.member == "serviceAccount:${var.deploy_service_account_email}"
     )
     error_message = "deploy 身份必须只能 actAs 当前环境的 VM runtime service account。"
+  }
+
+  assert {
+    condition     = google_service_account.runtime.account_id == "proxy-vm-sa"
+    error_message = "VM runtime service account 必须使用完整 resource_prefix 的 proxy-vm-sa 命名。"
   }
 }

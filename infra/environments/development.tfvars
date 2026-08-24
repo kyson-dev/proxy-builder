@@ -1,5 +1,5 @@
 environment          = "development"
-project_id           = "kyson-lab"
+project_id           = "kyson-proxy-dev"
 region               = "us-west1"
 zone                 = "us-west1-b"
 resource_prefix      = "proxy"

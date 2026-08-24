@@ -1,7 +1,6 @@
 locals {
-  environment_short = var.environment == "production" ? "prod" : "dev"
-  name_prefix       = "${var.resource_prefix}-${local.environment_short}"
-  proxy_tag         = "${local.name_prefix}-proxy"
+  name_prefix = var.resource_prefix
+  proxy_tag   = "${local.name_prefix}-vm"
 }
 
 resource "google_compute_network" "proxy" {

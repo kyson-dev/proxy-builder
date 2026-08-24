@@ -34,7 +34,7 @@ variable "resource_prefix" {
 
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{1,12}[a-z0-9]$", var.resource_prefix))
-    error_message = "resource_prefix 必须是 3-14 位小写字母、数字或连字符。"
+    error_message = "resource_prefix 必须是完整资源名前缀，且为 3-14 位小写字母、数字或连字符。"
   }
 }
 

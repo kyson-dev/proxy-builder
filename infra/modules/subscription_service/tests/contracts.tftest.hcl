@@ -34,14 +34,14 @@ run "startup_probe_contract" {
   }
 
   assert {
-    condition     = google_logging_project_exclusion.subscription_requests.name == "proxy-dev-subscription-request-logs"
-    error_message = "日志排除名称必须隔离环境。"
+    condition     = google_logging_project_exclusion.subscription_requests.name == "proxy-subscription-request-logs"
+    error_message = "日志排除名称必须从完整 resource_prefix 推导。"
   }
 
   assert {
     condition = alltrue([
       strcontains(google_logging_project_exclusion.subscription_requests.filter, "cloud_run_revision"),
-      strcontains(google_logging_project_exclusion.subscription_requests.filter, "proxy-dev-subscription"),
+      strcontains(google_logging_project_exclusion.subscription_requests.filter, "proxy-subscription"),
       strcontains(google_logging_project_exclusion.subscription_requests.filter, "run.googleapis.com/requests"),
     ])
     error_message = "日志排除必须只匹配当前 subscription 服务的 Cloud Run request log。"

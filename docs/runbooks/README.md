@@ -5,6 +5,7 @@
 | 需求 | 文档 |
 | --- | --- |
 | 首次创建并激活 development 新平台 | [development 首次激活](development-first-activation.md) |
+| 迁移 development 到新的 GCP Project 并复用秘密 | [development 项目迁移](development-project-migration.md) |
 | 新增、启停或轮换 development 用户 | [development 用户管理](development-user-management.md) |
 | 保留 bootstrap 与秘密，重建 development platform | [development platform 重建](development-platform-rebuild.md) |
 

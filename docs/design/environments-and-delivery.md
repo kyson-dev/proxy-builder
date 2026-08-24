@@ -2,7 +2,7 @@
 
 本文唯一拥有环境配置归属、GitHub Variables/Secrets 名称、工作流接口以及 VM 与 Cloud Run 的发布协议。
 
-**实现状态：** development GitHub/GCP 已配置，并通过正式部署、协调回滚与双协议 E2E；production 尚未激活。
+**实现状态：** development 已在 `kyson-proxy-dev` 配置 GitHub/GCP，并通过正式部署、协调回滚与双协议 E2E；production 尚未激活。
 
 ## 环境模型
 
@@ -171,7 +171,7 @@ make deploy ENV=<environment> [GIT_REF=<ref>]
 make destroy ENV=<environment> STACK=platform
 ```
 
-命令只作为稳定入口；首次 development 激活步骤见 [Runbook](../runbooks/development-first-activation.md)。
+命令只作为稳定入口；空 development 的首次激活见 [Runbook](../runbooks/development-first-activation.md)，迁移到新的 GCP Project 且复用秘密时见 [项目迁移 Runbook](../runbooks/development-project-migration.md)。
 
 `secrets-init` 只在本地新建五项随机秘密，不发布或调用 GCP；已有目录时拒绝覆盖。用户变更也只改本地 `users.json`，必须随后显式执行 `secrets-publish` 和 `deploy`。`subscription-url` 从 platform state 读取公开服务 URL，从本地文件读取已启用用户 token，并只向终端输出最终 URL。
 
