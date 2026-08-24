@@ -20,60 +20,6 @@ import (
 	"github.com/kyson-dev/proxy-builder/internal/subscription"
 )
 
-func TestMigrateUsersProducesV1Document(t *testing.T) {
-	directory := t.TempDir()
-	input := filepath.Join(directory, "legacy.json")
-	output := filepath.Join(directory, "users.json")
-	legacy := `[{
-  "name":"alice",
-  "vless_uuid":"00000000-0000-4000-8000-000000000001",
-  "hy2_password":"hy2-password-123456789012",
-  "sub_token":"subscription-token-123456"
-}]`
-	if err := os.WriteFile(input, []byte(legacy), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := migrateUsers([]string{"--input", input, "--output", output}); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	document, err := contracts.ParseUsers(data)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !document.Users[0].Enabled || document.Users[0].SubscriptionToken != "subscription-token-123456" {
-		t.Fatalf("unexpected migrated document: %#v", document)
-	}
-	info, err := os.Stat(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Fatalf("output mode = %o, want 600", info.Mode().Perm())
-	}
-}
-
-func TestMigrateUsersRejectsUnknownAndTrailingFields(t *testing.T) {
-	for name, input := range map[string]string{
-		"unknown":  `[{"name":"alice","vless_uuid":"00000000-0000-4000-8000-000000000001","hy2_password":"hy2-password-123456789012","sub_token":"subscription-token-123456","enabled":true}]`,
-		"trailing": `[] {}`,
-	} {
-		t.Run(name, func(t *testing.T) {
-			directory := t.TempDir()
-			path := filepath.Join(directory, "input.json")
-			if err := os.WriteFile(path, []byte(input), 0o600); err != nil {
-				t.Fatal(err)
-			}
-			if err := migrateUsers([]string{"--input", path, "--output", filepath.Join(directory, "output.json")}); err == nil {
-				t.Fatal("migrateUsers unexpectedly succeeded")
-			}
-		})
-	}
-}
-
 func TestValidateSubscriptionAcceptsRenderedFormats(t *testing.T) {
 	user := contracts.User{Name: "alice", Enabled: true, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
 	config := subscription.Config{
@@ -110,6 +56,51 @@ func TestValidateSubscriptionRejectsNonstandardHY2Parameter(t *testing.T) {
 	}
 	if err := validateSubscription([]string{"--input", path, "--format", "base64"}); err == nil {
 		t.Fatal("validateSubscription unexpectedly succeeded")
+	}
+}
+
+func TestRenderProbeConfigUsesSubscriptionCredentials(t *testing.T) {
+	user := contracts.User{Name: "alice", Enabled: true, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
+	config := subscription.Config{
+		ProxyIP: "203.0.113.10", RealityPublicKey: "public-key", RealityShortID: "0123456789abcdef",
+		RealitySNI: "www.example.com", HY2SNI: "hy2.example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", ObfsPassword: "obfs-password-1234567890",
+	}
+	body, err := subscription.RenderBase64(user, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := filepath.Join(t.TempDir(), "subscription")
+	if err := os.WriteFile(input, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for protocol, expectedSecret := range map[string]string{"vless": user.VLESSUUID, "hysteria2": user.HY2Password} {
+		t.Run(protocol, func(t *testing.T) {
+			output := filepath.Join(t.TempDir(), protocol+".json")
+			if err := renderProbeConfig([]string{"--input", input, "--protocol", protocol, "--listen-port", "18080", "--output", output}); err != nil {
+				t.Fatal(err)
+			}
+			data, err := os.ReadFile(output)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var rendered struct {
+				Inbounds  []map[string]any `json:"inbounds"`
+				Outbounds []map[string]any `json:"outbounds"`
+			}
+			if err := json.Unmarshal(data, &rendered); err != nil {
+				t.Fatal(err)
+			}
+			if len(rendered.Inbounds) != 1 || rendered.Inbounds[0]["listen_port"] != float64(18080) || len(rendered.Outbounds) != 1 || rendered.Outbounds[0]["type"] != protocol {
+				t.Fatalf("unexpected %s probe config: %#v", protocol, rendered)
+			}
+			secretKey := "password"
+			if protocol == "vless" {
+				secretKey = "uuid"
+			}
+			if rendered.Outbounds[0][secretKey] != expectedSecret {
+				t.Fatalf("%s probe config does not use the subscription credential", protocol)
+			}
+		})
 	}
 }
 

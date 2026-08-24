@@ -17,17 +17,28 @@ root_dir="$(cd "$root_dir" && pwd -P)"
 
 bundle_dir=""
 inputs_dir=""
+rollback=0
+expected_current=""
 while (($#)); do
   case "$1" in
     --bundle) bundle_dir="${2:-}"; shift 2 ;;
     --inputs) inputs_dir="${2:-}"; shift 2 ;;
-    *) printf '%s\n' 'usage: deploy-release --bundle <directory> --inputs <directory>' >&2; exit 10 ;;
+    --rollback) rollback=1; shift ;;
+    --expected-current) expected_current="${2:-}"; shift 2 ;;
+    *) printf '%s\n' 'usage: deploy-release --bundle <directory> --inputs <directory> | --rollback --expected-current <release-id>' >&2; exit 10 ;;
   esac
 done
-[[ -n "$bundle_dir" && -n "$inputs_dir" ]] || {
-  printf '%s\n' 'usage: deploy-release --bundle <directory> --inputs <directory>' >&2
-  exit 10
-}
+if [[ "$rollback" == "1" ]]; then
+  [[ -z "$bundle_dir" && -z "$inputs_dir" && "$expected_current" =~ ^[0-9a-f]{40}-[1-9][0-9]*-[1-9][0-9]*$ ]] || {
+    printf '%s\n' 'rollback requires only --expected-current <release-id>' >&2
+    exit 10
+  }
+else
+  [[ -n "$bundle_dir" && -n "$inputs_dir" && -z "$expected_current" ]] || {
+    printf '%s\n' 'deployment requires --bundle and --inputs' >&2
+    exit 10
+  }
+fi
 
 log() { printf 'proxy release: %s\n' "$1"; }
 fail() { printf 'proxy release rejected at %s\n' "$1" >&2; return 1; }
@@ -42,10 +53,7 @@ release_id=""
 stage_dir=""
 temporary_release=""
 final_release=""
-candidate_secrets=""
 old_target=""
-old_secrets_backup=""
-certificate_changed=0
 failure_stage="preflight"
 
 # shellcheck disable=SC2329 # Invoked through EXIT trap.
@@ -147,8 +155,6 @@ preflight() {
   validate_inputs_allowlist || return 1
   final_release="${root_dir}/releases/${release_id}"
   temporary_release="${stage_dir}/release"
-  candidate_secrets="${stage_dir}/secrets-candidate"
-  old_secrets_backup="${stage_dir}/secrets-rollback"
   [[ ! -e "$final_release" ]] || { fail "release_exists"; return 1; }
 
   for name in reality-private-key obfs-password proxy-users.json; do
@@ -161,7 +167,7 @@ preflight() {
   if [[ "$cert_exists" == "1" ]]; then
     validate_secret_file "${inputs_dir}/hysteria2.crt" || { fail "secret_file_permissions"; return 1; }
     validate_secret_file "${inputs_dir}/hysteria2.key" || { fail "secret_file_permissions"; return 1; }
-  elif [[ ! -f "${root_dir}/secrets/hysteria2.crt" || ! -f "${root_dir}/secrets/hysteria2.key" ]]; then
+  elif [[ ! -f "${root_dir}/current/cert/hysteria2.crt" || ! -f "${root_dir}/current/cert/hysteria2.key" ]]; then
     fail "certificate_required"; return 1
   fi
 }
@@ -176,17 +182,17 @@ prepare_release() {
 
   local sni cert_dir image
   sni="$(jq -er '.hy2_sni' "${bundle_dir}/release.json")" || { fail "release_manifest"; return 1; }
+  cert_dir="${temporary_release}/cert"
+  mkdir -p "$cert_dir" || { fail "certificate_directory"; return 1; }
+  chmod 0700 "$cert_dir" || { fail "certificate_directory_permissions"; return 1; }
   if [[ -f "${inputs_dir}/hysteria2.crt" ]]; then
-    mkdir -p "$candidate_secrets" || { fail "certificate_directory"; return 1; }
-    chmod 0700 "$candidate_secrets" || { fail "certificate_directory_permissions"; return 1; }
-    cp "${inputs_dir}/hysteria2.crt" "${candidate_secrets}/hysteria2.crt" || { fail "certificate_copy"; return 1; }
-    cp "${inputs_dir}/hysteria2.key" "${candidate_secrets}/hysteria2.key" || { fail "certificate_key_copy"; return 1; }
-    chmod 0600 "${candidate_secrets}/hysteria2.crt" "${candidate_secrets}/hysteria2.key" || { fail "certificate_permissions"; return 1; }
-    cert_dir="$candidate_secrets"
-    certificate_changed=1
+    cp "${inputs_dir}/hysteria2.crt" "${cert_dir}/hysteria2.crt" || { fail "certificate_copy"; return 1; }
+    cp "${inputs_dir}/hysteria2.key" "${cert_dir}/hysteria2.key" || { fail "certificate_key_copy"; return 1; }
   else
-    cert_dir="${root_dir}/secrets"
+    cp "${root_dir}/current/cert/hysteria2.crt" "${cert_dir}/hysteria2.crt" || { fail "certificate_copy"; return 1; }
+    cp "${root_dir}/current/cert/hysteria2.key" "${cert_dir}/hysteria2.key" || { fail "certificate_key_copy"; return 1; }
   fi
+  chmod 0600 "${cert_dir}/hysteria2.crt" "${cert_dir}/hysteria2.key" || { fail "certificate_permissions"; return 1; }
   "${bundle_dir}/bin/proxyctl" inspect-certificate \
     --cert "${cert_dir}/hysteria2.crt" --key "${cert_dir}/hysteria2.key" \
     --sni "$sni" --output "${stage_dir}/certificate.json" || { fail "certificate_validation"; return 1; }
@@ -246,10 +252,6 @@ activate_release() {
   fi
 
   mv "$temporary_release" "$final_release" || { fail "release_commit"; return 1; }
-  if [[ "$certificate_changed" == "1" ]]; then
-    mv "${root_dir}/secrets" "$old_secrets_backup" || { fail "certificate_backup"; return 1; }
-    mv "$candidate_secrets" "${root_dir}/secrets" || { fail "certificate_commit"; return 1; }
-  fi
   atomic_link "releases/${release_id}" current || { fail "current_switch"; return 1; }
   compose_up "$final_release" || return 1
   healthy
@@ -257,10 +259,6 @@ activate_release() {
 
 restore_previous() {
   failure_stage="rollback"
-  if [[ "$certificate_changed" == "1" && -d "$old_secrets_backup" ]]; then
-    rm -rf -- "${root_dir}/secrets" || return 1
-    mv "$old_secrets_backup" "${root_dir}/secrets" || return 1
-  fi
   if [[ -n "$old_target" ]]; then
     atomic_link "$old_target" current || return 1
     compose_up "${root_dir}/${old_target}" || return 1
@@ -273,6 +271,35 @@ restore_previous() {
       docker compose --project-name proxy-builder --file "${final_release}/docker-compose.yml" down >/dev/null 2>&1 || true
     return 1
   fi
+}
+
+rollback_committed_release() {
+  local current_target previous_target candidate_dir failed_dir
+  acquire_lock || return 10
+  [[ -L "${root_dir}/current" && -L "${root_dir}/previous" ]] || { fail "rollback_release_missing"; return 21; }
+  current_target="$(readlink "${root_dir}/current")" || return 21
+  previous_target="$(readlink "${root_dir}/previous")" || return 21
+  [[ "$current_target" == "releases/${expected_current}" ]] || { fail "rollback_current_mismatch"; return 10; }
+  [[ "$previous_target" == releases/* && -d "${root_dir}/${previous_target}" ]] || { fail "rollback_previous_missing"; return 21; }
+  [[ -f "${root_dir}/${previous_target}/release.json" && -f "${root_dir}/${previous_target}/cert/hysteria2.crt" && -f "${root_dir}/${previous_target}/cert/hysteria2.key" ]] || { fail "rollback_previous_incomplete"; return 21; }
+  candidate_dir="${root_dir}/${current_target}"
+  atomic_link "$previous_target" current || return 21
+  if ! compose_up "${root_dir}/${previous_target}" || ! healthy; then
+    atomic_link "$current_target" current || true
+    compose_up "$candidate_dir" || true
+    return 21
+  fi
+  failed_dir="${root_dir}/failed/${expected_current}"
+  find "${root_dir}/failed" -mindepth 1 -maxdepth 1 -type d -exec rm -rf -- {} +
+  mkdir -p "$failed_dir"
+  chmod 0700 "$failed_dir"
+  cp "${candidate_dir}/release.json" "${failed_dir}/release.json"
+  jq -n --arg failed_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" '{stage:"post_activation",code:20,failed_at:$failed_at}' >"${failed_dir}/failure.json"
+  chmod 0600 "${failed_dir}/release.json" "${failed_dir}/failure.json"
+  rm -f -- "${root_dir}/previous"
+  rm -rf -- "$candidate_dir"
+  log "committed release ${expected_current} rolled back"
+  return 0
 }
 
 record_failure() {
@@ -333,4 +360,11 @@ main() {
   exit 21
 }
 
+if [[ "$rollback" == "1" ]]; then
+  set +e
+  rollback_committed_release
+  rollback_status=$?
+  set -e
+  exit "$rollback_status"
+fi
 main

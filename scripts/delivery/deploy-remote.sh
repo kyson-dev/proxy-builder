@@ -9,12 +9,20 @@ if [[ "${1:-}" == "--inspect-certificate" ]]; then
   sni="${2:-}"
   temporary="$(mktemp)"
   trap 'rm -f -- "$temporary" "$0"' EXIT
-  [[ -x /opt/proxy-builder/current/bin/proxyctl && -f /opt/proxy-builder/secrets/hysteria2.crt && -f /opt/proxy-builder/secrets/hysteria2.key ]] || exit 0
+  [[ -x /opt/proxy-builder/current/bin/proxyctl && -f /opt/proxy-builder/current/cert/hysteria2.crt && -f /opt/proxy-builder/current/cert/hysteria2.key ]] || exit 0
   /opt/proxy-builder/current/bin/proxyctl inspect-certificate \
-    --cert /opt/proxy-builder/secrets/hysteria2.crt --key /opt/proxy-builder/secrets/hysteria2.key \
+    --cert /opt/proxy-builder/current/cert/hysteria2.crt --key /opt/proxy-builder/current/cert/hysteria2.key \
     --sni "$sni" --output "$temporary" >/dev/null
   jq -r '.hy2_cert_sha256' "$temporary"
   exit 0
+fi
+
+if [[ "${1:-}" == "--rollback" ]]; then
+  expected_current="${2:-}"
+  trap 'rm -f -- "$0"' EXIT
+  [[ -x /opt/proxy-builder/current/bin/deploy-release ]] || exit 21
+  /opt/proxy-builder/current/bin/deploy-release --rollback --expected-current "$expected_current"
+  exit $?
 fi
 
 release_id="${1:-}"

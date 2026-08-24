@@ -80,7 +80,6 @@ systemctl restart systemd-journald
 install -d -o root -g root -m 0700 \
   "${proxy_root}" \
   "${proxy_root}/releases" \
-  "${proxy_root}/secrets" \
   "${proxy_root}/staging" \
   "${proxy_root}/failed"
 

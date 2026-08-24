@@ -22,13 +22,14 @@ Git 分支只标识版本，不隐式选择环境。所有可写工作流必须�
 | 数据 | 权威来源 | 是否秘密 |
 | --- | --- | --- |
 | Project、region/zone、规格、资源名、网络 | `infra/environments/<environment>.tfvars` | 否 |
-| Reality 伪装目标、HY2 SNI、sing-box image digest | `config/environments/<environment>.json` | 否 |
+| Reality 伪装目标、HY2 SNI、sing-box image digest、E2E 目标 | `config/environments/<environment>.json` | 否 |
 | WIF provider 和 plan/apply/deploy SA 地址 | GitHub Variables | 否 |
 | 应用私钥、密码、证书、用户 | GitHub Environment Secrets | 是 |
+| 应用秘密的灾难恢复副本 | `.secrets/<environment>/` | 是，本地且 Git ignored |
 | Cloud Run 当前用户与混淆密码 secret version | Secret Manager | 是，运行时副本 |
 | VM 当前运行秘密 | VM 限权目录 | 是，运行时副本 |
 
-同一个值不得同时由本地 `.env`、GitHub 和版本库手工维护。被忽略的 `.env.<environment>` 与 `users.<environment>.json` 只作为尚未切换环境的迁移源；对应环境首次部署成功后删除。
+`.env` 与仓库根目录的 users 文件不是配置接口。应用秘密只由本地 `.secrets/<environment>/` 生成和维护，再显式发布到 GitHub；本地副本长期保留用于灾难恢复，不参与运行时读取。
 
 `config/environments/<environment>.json` 格式为：
 
@@ -36,6 +37,7 @@ Git 分支只标识版本，不隐式选择环境。所有可写工作流必须�
 {
   "reality_dest": "www.example.com:443",
   "hy2_sni": "www.example.com",
+  "egress_probe_url": "https://example.com/generate_204",
   "sing_box_image": "ghcr.io/sagernet/sing-box@sha256:<digest>"
 }
 ```
@@ -72,6 +74,10 @@ PROXY_USERS_JSON
 
 Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID、SNI 和伪装目标不得保存为 Secret。
 
+`make github-configure ENV=<environment>` 从已 apply 的 bootstrap state 读取 WIF provider 与三个 service account，并写入以上 GitHub Variables；它不创建身份、不上传应用秘密，也不使用 service-account key。
+
+`make github-reset ENV=development CONFIRM=<owner/repo>:development` 只允许 development：校验不可变 repository ID 后，删除 development Environment 及两项受管 `DEV_` Repository Variables。production 必须拒绝。重建后的 audit 要求对应环境的 Variable/Secret 名称与上述清单精确相等，且四项非秘密 Variable 值与 bootstrap outputs 相等。
+
 ## 工作流接口
 
 ### `infra-plan.yml`
@@ -94,7 +100,7 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 - 触发：`workflow_dispatch`。
 - 输入：`environment` 与 `git_ref`；production 的 `git_ref` 必须解析为 `main` 可达 commit。
 - 构建 subscription 镜像并以 commit SHA 标记，推送后只使用 registry 返回的 digest。
-- 顺序：验证输入 → 发布并验证 proxy VM → 写入用户与混淆密码 secret version → 更新并验证 Cloud Run revision。
+- 顺序：验证输入 → 发布 proxy VM → 创建并验证无流量 Cloud Run 候选 → 真实双协议 E2E → 切流 → 公网复验。
 - 使用 `github-deploy`；不得创建或修改 OpenTofu 拥有的网络、IAM、VM 或 secret 容器。
 
 ### `destroy.yml`
@@ -141,14 +147,23 @@ PROXY_USERS_JSON = Secret Manager version 引用
 
 以上全部字段由部署 job 拥有，platform 的 OpenTofu 定义必须对它们声明 `lifecycle { ignore_changes }`，详见[基础设施与身份](infrastructure-and-identity.md)；platform apply 不得覆盖这些字段。
 
-Cloud Run 健康检查失败时，不把流量迁移到新 revision；VM 已发布版本保持有效。Secret version 创建成功但 revision 失败时允许保留该 version 供审计和重试。
+Secret version 创建成功但 revision 失败时允许保留该 version 供审计和重试。
 
-候选 revision 必须以 `--no-traffic --tag` 创建并验证 `/healthz`、Base64 和 Clash 实际响应。切流后再次检查 service URL；失败时将 100% 流量恢复到旧 revision。成功时移除候选 tag，失败 revision 与已创建 secret version 保留供审计。
+候选 revision 必须以 `--no-traffic --tag` 创建，验证 `/healthz`、Base64 与 Clash 正文，再从 runner 分别通过候选订阅中的 VLESS Reality 和 Hysteria2 连接 VM，并访问环境固定的 HTTPS 204 URL。两条真实出站都成功后才允许切流。
+
+部署是 VM 与 Cloud Run 的协调事务：切流前任一步骤失败，旧 Cloud Run 不变并显式回滚本次 VM release；切流后公网复验失败，先恢复旧 Cloud Run revision 的 100% 流量，再回滚 VM。两侧恢复都成功时退出 `20`；任一恢复失败时退出 `21` 并要求人工介入。成功后移除候选 tag；tag 清理失败只告警，不逆转已验证部署。失败 revision 与 secret version 保留供审计。
 
 ## 公共命令
 
 ```text
 make bootstrap ENV=development|production
+make secrets-init ENV=<environment> USER=<name>
+make github-reset ENV=development CONFIRM=<owner/repo>:development
+make github-configure ENV=<environment>
+make github-audit ENV=<environment>
+make secrets-publish ENV=<environment>
+make user-add|user-enable|user-disable|user-rotate ENV=<environment> USER=<name>
+make subscription-url ENV=<environment> USER=<name> [FORMAT=base64|clash]
 make validate
 make infra-plan ENV=<environment> [STACK=bootstrap|platform]
 make infra-apply ENV=<environment> [STACK=bootstrap|platform]
@@ -158,7 +173,9 @@ make destroy ENV=<environment> STACK=platform
 
 命令只作为稳定入口；首次 development 激活步骤见 [Runbook](../runbooks/development-first-activation.md)。
 
-就绪工具固定为：`proxyctl migrate-users` 将旧数组 schema 转换为 v1；`proxyctl inspect-environment` 校验五项秘密且只输出 Reality 公钥、short ID 与证书指纹；`proxyctl validate-subscription` 严格验证候选服务的 Base64/Clash 正文。`scripts/github/configure.sh`、`audit.sh` 与 `publish-secrets.sh` 分别拥有 GitHub 名称配置、只读保护审计和五项秘密发布。
+`secrets-init` 只在本地新建五项随机秘密，不发布或调用 GCP；已有目录时拒绝覆盖。用户变更也只改本地 `users.json`，必须随后显式执行 `secrets-publish` 和 `deploy`。`subscription-url` 从 platform state 读取公开服务 URL，从本地文件读取已启用用户 token，并只向终端输出最终 URL。
+
+就绪工具中，`proxyctl inspect-environment` 校验五项秘密且只输出公开派生值；`validate-subscription` 严格验证 Base64/Clash；`render-probe-config` 只为部署期真实 E2E 生成临时 sing-box 客户端配置。GitHub 的配置、只读保护审计和五项秘密发布分别由 `configure.sh`、`audit.sh` 与 `publish-secrets.sh` 拥有。
 
 ## 关联
 

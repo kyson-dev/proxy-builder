@@ -43,9 +43,10 @@ done
 
 for environment in development production; do
     jq -e '
-      (keys | sort) == ["hy2_sni", "reality_dest", "sing_box_image"] and
+      (keys | sort) == ["egress_probe_url", "hy2_sni", "reality_dest", "sing_box_image"] and
       (.reality_dest | test("^[^:]+:[0-9]+$")) and
       (.hy2_sni | length > 0) and
+      (.egress_probe_url | test("^https://[^?#]+$")) and
       (.sing_box_image | test("@sha256:[0-9a-f]{64}$"))
     ' "${INFRA_ROOT}/config/environments/${environment}.json" >/dev/null
 done

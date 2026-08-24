@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -81,56 +80,6 @@ func inspectEnvironment(args []string) error {
 	})
 }
 
-func migrateUsers(args []string) error {
-	flags := flag.NewFlagSet("migrate-users", flag.ContinueOnError)
-	flags.SetOutput(os.Stderr)
-	input := flags.String("input", "", "legacy users JSON path")
-	output := flags.String("output", "", "v1 users JSON path")
-	if err := flags.Parse(args); err != nil {
-		return errors.New("migrate-users arguments are invalid")
-	}
-	if *input == "" || *output == "" || flags.NArg() != 0 {
-		return errors.New("migrate-users requires --input and --output")
-	}
-	data, err := os.ReadFile(*input)
-	if err != nil {
-		return errors.New("legacy users input cannot be read")
-	}
-	type legacyUser struct {
-		Name        *string `json:"name"`
-		VLESSUUID   *string `json:"vless_uuid"`
-		HY2Password *string `json:"hy2_password"`
-		SubToken    *string `json:"sub_token"`
-	}
-	var legacy []legacyUser
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&legacy); err != nil {
-		return errors.New("legacy users document is invalid")
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		return errors.New("legacy users document contains a trailing JSON value")
-	}
-	document := contracts.UsersDocument{Version: 1, Users: make([]contracts.User, 0, len(legacy))}
-	for index, user := range legacy {
-		if user.Name == nil || user.VLESSUUID == nil || user.HY2Password == nil || user.SubToken == nil {
-			return fmt.Errorf("legacy users[%d] is missing a required field", index)
-		}
-		document.Users = append(document.Users, contracts.User{
-			Name:              *user.Name,
-			Enabled:           true,
-			VLESSUUID:         *user.VLESSUUID,
-			HY2Password:       *user.HY2Password,
-			SubscriptionToken: *user.SubToken,
-		})
-	}
-	if err := document.Validate(); err != nil {
-		return err
-	}
-	return writeJSON(*output, document)
-}
-
 func validateSubscription(args []string) error {
 	flags := flag.NewFlagSet("validate-subscription", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
@@ -153,29 +102,87 @@ func validateSubscription(args []string) error {
 }
 
 func validateBase64Subscription(data []byte) error {
+	_, err := parseBase64Subscription(data)
+	return err
+}
+
+func parseBase64Subscription(data []byte) ([]*url.URL, error) {
 	decoded, err := base64.StdEncoding.Strict().DecodeString(strings.TrimSpace(string(data)))
 	if err != nil {
-		return errors.New("base64 subscription is not strict standard Base64")
+		return nil, errors.New("base64 subscription is not strict standard Base64")
 	}
 	lines := strings.Split(string(decoded), "\n")
 	if len(lines) != 2 || lines[0] == "" || lines[1] == "" {
-		return errors.New("base64 subscription must contain exactly two non-empty links")
+		return nil, errors.New("base64 subscription must contain exactly two non-empty links")
 	}
 	if err := validateSubscriptionURL(lines[0], "vless", map[string]string{
 		"encryption": "none", "flow": "xtls-rprx-vision", "fp": "chrome", "headerType": "none",
 		"pbk": "", "security": "reality", "sid": "", "sni": "", "type": "tcp",
 	}); err != nil {
-		return err
+		return nil, err
 	}
 	if err := validateSubscriptionURL(lines[1], "hysteria2", map[string]string{
 		"insecure": "1", "obfs": "salamander", "obfs-password": "", "pinSHA256": "", "sni": "",
 	}); err != nil {
-		return err
+		return nil, err
 	}
 	if strings.Contains(string(decoded), "pubKeySHA256") {
-		return errors.New("base64 subscription contains the unsupported pubKeySHA256 parameter")
+		return nil, errors.New("base64 subscription contains the unsupported pubKeySHA256 parameter")
 	}
-	return nil
+	vless, _ := url.Parse(lines[0])
+	hy2, _ := url.Parse(lines[1])
+	return []*url.URL{vless, hy2}, nil
+}
+
+func renderProbeConfig(args []string) error {
+	flags := flag.NewFlagSet("render-probe-config", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	input := flags.String("input", "", "Base64 subscription path")
+	protocol := flags.String("protocol", "", "vless or hysteria2")
+	listenPort := flags.Int("listen-port", 0, "local SOCKS port")
+	output := flags.String("output", "", "client config path")
+	if err := flags.Parse(args); err != nil {
+		return errors.New("render-probe-config arguments are invalid")
+	}
+	if *input == "" || (*protocol != "vless" && *protocol != "hysteria2") || *listenPort < 1024 || *listenPort > 65535 || *output == "" || flags.NArg() != 0 {
+		return errors.New("render-probe-config requires --input, --protocol=vless|hysteria2, --listen-port and --output")
+	}
+	data, err := os.ReadFile(*input)
+	if err != nil {
+		return errors.New("subscription response cannot be read")
+	}
+	links, err := parseBase64Subscription(data)
+	if err != nil {
+		return err
+	}
+	link := links[0]
+	if *protocol == "hysteria2" {
+		link = links[1]
+	}
+	query := link.Query()
+	outbound := map[string]any{
+		"type": link.Scheme, "tag": "probe-out", "server": link.Hostname(), "server_port": 443,
+	}
+	if *protocol == "vless" {
+		outbound["uuid"] = link.User.Username()
+		outbound["flow"] = query.Get("flow")
+		outbound["tls"] = map[string]any{
+			"enabled": true, "server_name": query.Get("sni"),
+			"utls":    map[string]any{"enabled": true, "fingerprint": query.Get("fp")},
+			"reality": map[string]any{"enabled": true, "public_key": query.Get("pbk"), "short_id": query.Get("sid")},
+		}
+	} else {
+		outbound["password"] = link.User.Username()
+		outbound["obfs"] = map[string]any{"type": query.Get("obfs"), "password": query.Get("obfs-password")}
+		outbound["tls"] = map[string]any{"enabled": true, "server_name": query.Get("sni"), "insecure": true}
+	}
+	config := map[string]any{
+		"log":       map[string]any{"level": "warn"},
+		"inbounds":  []any{map[string]any{"type": "socks", "tag": "probe-in", "listen": "127.0.0.1", "listen_port": *listenPort}},
+		"outbounds": []any{outbound},
+		"route":     map[string]any{"final": "probe-out"},
+	}
+	return writeJSON(*output, config)
 }
 
 func validateSubscriptionURL(raw, scheme string, expected map[string]string) error {

@@ -8,9 +8,6 @@ source "${SCRIPT_DIR}/common.sh"
 
 environment="${ENV:-}"
 tfvars=$(infra::require_environment "$environment")
-tofu_bin=$(infra::tofu_bin)
-infra::require_tofu_version "$tofu_bin"
-
 project_id=$(infra::read_tfvar "$tfvars" project_id)
 confirmation="${CONFIRM_PROJECT_ID:-}"
 
@@ -21,6 +18,8 @@ fi
 
 [[ "$confirmation" == "$project_id" ]] || infra::die "确认值不匹配；未执行 destroy"
 
+tofu_bin=$(infra::tofu_bin)
+infra::require_tofu_version "$tofu_bin"
 bucket="${project_id}-proxy-builder-tfstate"
 stack_dir="${INFRA_ROOT}/infra/stacks/platform"
 

@@ -34,10 +34,20 @@ func run(args []string) error {
 		return inspectCertificate(args[1:])
 	case "inspect-environment":
 		return inspectEnvironment(args[1:])
-	case "migrate-users":
-		return migrateUsers(args[1:])
+	case "init-environment":
+		return initEnvironment(args[1:])
+	case "add-user":
+		return mutateUser(args[1:], userMutationAdd)
+	case "enable-user":
+		return mutateUser(args[1:], userMutationEnable)
+	case "disable-user":
+		return mutateUser(args[1:], userMutationDisable)
+	case "rotate-user":
+		return mutateUser(args[1:], userMutationRotate)
 	case "validate-subscription":
 		return validateSubscription(args[1:])
+	case "render-probe-config":
+		return renderProbeConfig(args[1:])
 	case "render-sing-box":
 		return renderSingBox(args[1:])
 	default:
@@ -205,6 +215,11 @@ func writeJSON(path string, value any) error {
 }
 
 func writeFile(path string, data []byte) error {
+	if info, err := os.Lstat(path); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("output path must not be a symbolic link")
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return errors.New("output path cannot be inspected")
+	}
 	directory := filepath.Dir(path)
 	if err := os.MkdirAll(directory, 0o700); err != nil {
 		return errors.New("output directory cannot be created")

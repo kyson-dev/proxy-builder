@@ -19,24 +19,36 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'if [[ "$command_name" == "inspect-environment" ]]; then' \
   '  output=""; while (($#)); do if [[ "$1" == "--output" ]]; then output="$2"; shift 2; else shift; fi; done' \
   '  printf %s '\''{"reality_public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","reality_short_id":"0123456789abcdef","hy2_cert_sha256":"AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA"}'\'' >"$output"' \
+  'elif [[ "$command_name" == "render-probe-config" ]]; then' \
+  '  output=""; while (($#)); do if [[ "$1" == "--output" ]]; then output="$2"; shift 2; else shift; fi; done' \
+  '  printf %s '\''{}'\'' >"$output"' \
   'fi' 'exit 0' >"${test_root}/proxyctl"
 chmod 0755 "${test_root}/proxyctl"
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'printf '\''gcloud %s\n'\'' "$*" >>"$FAKE_COMMAND_LOG"' \
-  'if [[ "$1 $2 $3" == "compute ssh --tunnel-through-iap" ]]; then if [[ "$*" == *"--inspect-certificate"* ]]; then printf '\''%s'\'' "${FAKE_REMOTE_CERT:-}"; exit 0; else exit "${FAKE_VM_STATUS:-0}"; fi; fi' \
+  'if [[ "$1 $2 $3" == "compute ssh --tunnel-through-iap" ]]; then if [[ "$*" == *"--inspect-certificate"* ]]; then printf '\''%s'\'' "${FAKE_REMOTE_CERT:-}"; exit 0; elif [[ "$*" == *"--rollback"* ]]; then exit "${FAKE_VM_ROLLBACK_STATUS:-0}"; else exit "${FAKE_VM_STATUS:-0}"; fi; fi' \
   'if [[ "$1 $2 $3" == "secrets versions add" ]]; then printf '\''projects/p/secrets/s/versions/1\n'\''; fi' \
+  'if [[ "$1 $2 $3" == "run services update-traffic" && "$*" == *"--to-revisions"* ]]; then exit "${FAKE_CLOUD_ROLLBACK_STATUS:-0}"; fi' \
   'if [[ "$1 $2 $3" == "run services describe" ]]; then' \
   '  case "$*" in *"traffic[tag="*) printf '\''https://candidate.example\n'\'' ;; *"status.url"*) printf '\''https://service.example\n'\'' ;; *) printf '\''old-revision\n'\'' ;; esac' \
   'fi' >"${fake_bin}/gcloud"
 
 printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
-  'output=""; while (($#)); do if [[ "$1" == "--output" ]]; then output="$2"; shift 2; else shift; fi; done' \
-  'if [[ -n "$output" ]]; then cat >/dev/null; printf '\''validated-response'\'' >"$output"; fi' >"${fake_bin}/curl"
+  'output=""; write_out=""; args="$*"; while (($#)); do case "$1" in --output) output="$2"; shift 2 ;; --write-out) write_out="$2"; shift 2 ;; *) shift ;; esac; done' \
+  'if [[ "$args" == *"https://service.example/healthz"* && "${FAKE_PUBLIC_HEALTH_FAIL:-0}" == "1" ]]; then exit 22; fi' \
+  'if [[ -n "$output" ]]; then cat >/dev/null || true; printf '\''validated-response'\'' >"$output"; fi' \
+  'if [[ -n "$write_out" ]]; then if [[ "${FAKE_E2E_FAIL:-0}" == "1" ]]; then printf 500; else printf 204; fi; fi' >"${fake_bin}/curl"
+
+printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
+  'printf '\''docker %s\n'\'' "$*" >>"$FAKE_COMMAND_LOG"' \
+  'if [[ "${1:-}" == "run" && "$*" == *"--detach"* ]]; then printf '\''container-id\n'\''; fi' >"${fake_bin}/docker"
 chmod 0755 "${fake_bin}"/*
 
 run_deploy() {
   PATH="${fake_bin}:$PATH" FAKE_PROXYCTL="${test_root}/proxyctl" FAKE_COMMAND_LOG="$command_log" FAKE_VM_STATUS="${1:-0}" FAKE_REMOTE_CERT="${2:-}" \
+    FAKE_VM_ROLLBACK_STATUS="${FAKE_VM_ROLLBACK_STATUS:-0}" FAKE_CLOUD_ROLLBACK_STATUS="${FAKE_CLOUD_ROLLBACK_STATUS:-0}" \
+    FAKE_PUBLIC_HEALTH_FAIL="${FAKE_PUBLIC_HEALTH_FAIL:-0}" FAKE_E2E_FAIL="${FAKE_E2E_FAIL:-0}" \
     ENVIRONMENT=development GIT_SHA=0123456789abcdef0123456789abcdef01234567 RUN_ID=123 RUN_ATTEMPT=1 \
     IMAGE_DIGEST=us-west1-docker.pkg.dev/project/repo/subscription@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
     GCP_PROJECT_ID=project GCP_REGION=us-west1 GCP_VM_NAME=proxy-dev GCP_VM_ZONE=us-west1-b \
@@ -80,4 +92,34 @@ if rg 'gcloud compute scp' "$command_log" | rg -q 'hysteria2\.(crt|key)'; then
   printf '%s\n' 'unchanged certificate was uploaded again' >&2
   exit 1
 fi
+
+: >"$command_log"
+set +e
+FAKE_E2E_FAIL=1 run_deploy 0 >"${test_root}/e2e-failure.log" 2>&1
+status=$?
+set -e
+[[ "$status" == "20" ]] || { printf 'expected coordinated rollback status 20 after E2E failure, got %s\n' "$status" >&2; exit 1; }
+rg -q -- '--rollback '\''0123456789abcdef0123456789abcdef01234567-123-1'\''' "$command_log" || { printf '%s\n' 'E2E failure did not request VM rollback' >&2; exit 1; }
+if rg -q -- '--to-tags candidate-123-1=100' "$command_log"; then
+  printf '%s\n' 'traffic switched after candidate E2E failure' >&2
+  exit 1
+fi
+
+: >"$command_log"
+set +e
+FAKE_PUBLIC_HEALTH_FAIL=1 run_deploy 0 >"${test_root}/public-failure.log" 2>&1
+status=$?
+set -e
+[[ "$status" == "20" ]] || { printf 'expected coordinated rollback status 20 after public failure, got %s\n' "$status" >&2; exit 1; }
+cloud_rollback_line="$(rg -n -- '--to-revisions old-revision=100' "$command_log" | cut -d: -f1 | head -n1)"
+vm_rollback_line="$(rg -n -- '--rollback '\''0123456789abcdef0123456789abcdef01234567-123-1'\''' "$command_log" | cut -d: -f1 | head -n1)"
+[[ -n "$cloud_rollback_line" && -n "$vm_rollback_line" && "$cloud_rollback_line" -lt "$vm_rollback_line" ]] || { printf '%s\n' 'post-cutover rollback ordering contract failed' >&2; exit 1; }
+
+: >"$command_log"
+set +e
+FAKE_PUBLIC_HEALTH_FAIL=1 FAKE_CLOUD_ROLLBACK_STATUS=1 run_deploy 0 >"${test_root}/cloud-rollback-failure.log" 2>&1
+status=$?
+set -e
+[[ "$status" == "21" ]] || { printf 'expected intervention status 21 after Cloud Run rollback failure, got %s\n' "$status" >&2; exit 1; }
+rg -q -- '--rollback '\''0123456789abcdef0123456789abcdef01234567-123-1'\''' "$command_log" || { printf '%s\n' 'VM rollback was skipped after Cloud Run rollback failure' >&2; exit 1; }
 printf '%s\n' 'delivery isolation tests passed'

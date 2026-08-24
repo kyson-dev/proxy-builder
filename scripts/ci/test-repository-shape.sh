@@ -18,4 +18,13 @@ if rg -n 'scripts/(setup|deploy|provision|lib)/' \
   printf '%s\n' 'executable code references a removed legacy script' >&2
   exit 1
 fi
+if rg -n 'migrate-users' "${repo_root}/cmd" "${repo_root}/scripts/delivery" "${repo_root}/scripts/host" \
+  "${repo_root}/scripts/secrets" "${repo_root}/docs/design" "${repo_root}/docs/runbooks"; then
+  printf '%s\n' 'legacy user migration interface must stay removed' >&2
+  exit 1
+fi
+rg -qx '\.secrets/' "${repo_root}/.gitignore" || { printf '%s\n' '.secrets/ must stay Git ignored' >&2; exit 1; }
+for path in init.sh manage-user.sh subscription-url.sh test-tools.sh; do
+  [[ -x "${repo_root}/scripts/secrets/${path}" ]] || { printf 'secret tool must stay executable: %s\n' "$path" >&2; exit 1; }
+done
 printf '%s\n' 'repository shape tests passed'

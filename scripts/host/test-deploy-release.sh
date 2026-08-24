@@ -8,8 +8,8 @@ trap 'rm -rf "$test_dir"' EXIT
 
 root_dir="${test_dir}/root"
 fake_bin="${test_dir}/bin"
-mkdir -p "$fake_bin" "${root_dir}/releases" "${root_dir}/secrets" "${root_dir}/staging" "${root_dir}/failed"
-chmod 0700 "$root_dir" "${root_dir}/releases" "${root_dir}/secrets" "${root_dir}/staging" "${root_dir}/failed"
+mkdir -p "$fake_bin" "${root_dir}/releases" "${root_dir}/staging" "${root_dir}/failed"
+chmod 0700 "$root_dir" "${root_dir}/releases" "${root_dir}/staging" "${root_dir}/failed"
 
 cat >"${fake_bin}/flock" <<'EOF'
 #!/usr/bin/env bash
@@ -62,12 +62,8 @@ EOF
 cat >"${fake_bin}/mv" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-root_real="$(cd "${PROXY_BUILDER_ROOT}" && pwd -P)"
-if [[ "${1:-}" == *'/secrets-candidate' && "${2:-}" == "${root_real}/secrets" && -f "${root_real}/fail-certificate-commit" ]]; then
-  rm -f "${PROXY_BUILDER_ROOT}/fail-certificate-commit"
-  exit 1
-fi
 if [[ "${1:-}" == "-Tf" ]]; then
+  /bin/rm -f "$3"
   /bin/mv -f "$2" "$3"
 else
   /bin/mv "$@"
@@ -138,7 +134,7 @@ run_deploy "$first_stage" "$bootstrap_sha"
 first_target="$(readlink "${root_dir}/current")"
 [[ "$first_target" == "releases/${first_sha}-100-1" ]]
 [[ ! -d "$first_stage" ]]
-first_cert_hash="$(shasum -a 256 "${root_dir}/secrets/hysteria2.crt" | awk '{print $1}')"
+first_cert_hash="$(shasum -a 256 "${root_dir}/current/cert/hysteria2.crt" | awk '{print $1}')"
 
 concurrent_sha="$(printf 'b%.0s' {1..40})"
 concurrent_stage="$(make_stage "$concurrent_sha" 104 1 concurrent)"
@@ -171,7 +167,7 @@ rollback_status=$?
 set -e
 [[ "$rollback_status" -eq 20 ]]
 [[ "$(readlink "${root_dir}/current")" == "$first_target" ]]
-[[ "$(shasum -a 256 "${root_dir}/secrets/hysteria2.crt" | awk '{print $1}')" == "$first_cert_hash" ]]
+[[ "$(shasum -a 256 "${root_dir}/current/cert/hysteria2.crt" | awk '{print $1}')" == "$first_cert_hash" ]]
 [[ ! -d "$second_stage" ]]
 [[ -f "${root_dir}/failed/${second_sha}-102-1/failure.json" ]]
 if rg -n 'canary|PRIVATE KEY|subscription-token|hy2-password|obfs-password' "${root_dir}/failed"; then
@@ -180,16 +176,30 @@ if rg -n 'canary|PRIVATE KEY|subscription-token|hy2-password|obfs-password' "${r
 fi
 
 third_sha="$(printf 'e%.0s' {1..40})"
-third_stage="$(make_stage "$third_sha" 103 1 commit-failure)"
-touch "${root_dir}/fail-certificate-commit"
+third_stage="$(make_stage "$third_sha" 103 1 committed)"
+run_deploy "$third_stage" "$bootstrap_sha"
+third_target="$(readlink "${root_dir}/current")"
+[[ "$third_target" == "releases/${third_sha}-103-1" ]]
+[[ "$(readlink "${root_dir}/previous")" == "$first_target" ]]
+[[ "$(shasum -a 256 "${root_dir}/current/cert/hysteria2.crt" | awk '{print $1}')" != "$first_cert_hash" ]]
+
 set +e
-run_deploy "$third_stage" "$bootstrap_sha" >/dev/null 2>&1
-commit_status=$?
+PROXY_BUILDER_TESTING=1 PROXY_BUILDER_ROOT="$root_dir" PROXY_BOOTSTRAP_EXPECTED_SHA="$bootstrap_sha" \
+  PATH="${fake_bin}:${PATH}" "${repo_root}/scripts/host/deploy-release.sh" --rollback \
+  --expected-current "$(printf 'f%.0s' {1..40})-103-1" >/dev/null 2>&1
+mismatch_status=$?
 set -e
-[[ "$commit_status" -eq 20 ]]
+[[ "$mismatch_status" -eq 10 ]]
+[[ "$(readlink "${root_dir}/current")" == "$third_target" ]]
+
+PROXY_BUILDER_TESTING=1 PROXY_BUILDER_ROOT="$root_dir" PROXY_BOOTSTRAP_EXPECTED_SHA="$bootstrap_sha" \
+  PATH="${fake_bin}:${PATH}" "${repo_root}/scripts/host/deploy-release.sh" --rollback \
+  --expected-current "${third_sha}-103-1"
 [[ "$(readlink "${root_dir}/current")" == "$first_target" ]]
-[[ "$(shasum -a 256 "${root_dir}/secrets/hysteria2.crt" | awk '{print $1}')" == "$first_cert_hash" ]]
-[[ ! -d "$third_stage" ]]
+[[ "$(shasum -a 256 "${root_dir}/current/cert/hysteria2.crt" | awk '{print $1}')" == "$first_cert_hash" ]]
+[[ ! -e "${root_dir}/previous" ]]
+[[ ! -d "${root_dir}/releases/${third_sha}-103-1" ]]
+[[ -f "${root_dir}/failed/${third_sha}-103-1/failure.json" ]]
 
 rg -q 'flock -n' "${repo_root}/scripts/host/deploy-release.sh"
 printf '%s\n' 'VM release guard and rollback tests passed'

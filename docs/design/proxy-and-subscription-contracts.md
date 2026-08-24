@@ -67,6 +67,8 @@ private key 的字符串表示不参与 short ID 计算。实现必须用固定�
 仓库构建一个静态 Linux amd64 CLI，子命令固定为：
 
 ```text
+proxyctl init-environment --output-dir <path> --sni <host> --user <name>
+proxyctl add-user|enable-user|disable-user|rotate-user --users <path> --name <name>
 proxyctl validate-users --input <path>
 proxyctl validate-release --input <path>
 proxyctl derive-reality --private-key-file <path> --output <path>
@@ -74,7 +76,14 @@ proxyctl inspect-certificate --cert <path> --key <path> --sni <host> --output <p
 proxyctl render-sing-box --template <path> --users <path> \
   --private-key-file <path> --obfs-password-file <path> \
   --release <release.json> --output <path>
+proxyctl inspect-environment --users <path> --private-key-file <path> \
+  --obfs-password-file <path> --cert <path> --key <path> --sni <host> --output <path>
+proxyctl validate-subscription --input <path> --format base64|clash
+proxyctl render-probe-config --input <path> --protocol vless|hysteria2 \
+  --listen-port <port> --output <path>
 ```
+
+初始化只接受首个用户名，生成随机 UUID、HY2 password、subscription token、Reality private key、obfs password 和有效期 3650 天的 P-256 自签名 HY2 证书；目标目录必须不存在，目录/文件权限为 `0700`/`0600`。add 为新用户生成三项凭据；rotate 立即同时替换三项凭据；enable/disable 不改凭据，且不得禁用最后一个 enabled 用户。所有修改原子写入并拒绝符号链接。
 
 `derive-reality` 输出：
 

@@ -30,6 +30,8 @@ printf '%s' "$PROXY_USERS_JSON" >"${inputs_dir}/proxy-users.json"
 chmod 0600 "${inputs_dir}"/*
 
 hy2_sni="$(jq -er '.hy2_sni' "${repo_root}/config/environments/${ENVIRONMENT}.json")"
+egress_probe_url="$(jq -er '.egress_probe_url' "${repo_root}/config/environments/${ENVIRONMENT}.json")"
+sing_box_image="$(jq -er '.sing_box_image' "${repo_root}/config/environments/${ENVIRONMENT}.json")"
 "${repo_root}/scripts/release/build-vm-bundle.sh" \
   --environment "$ENVIRONMENT" --git-sha "$GIT_SHA" --run-id "$RUN_ID" --run-attempt "$RUN_ATTEMPT" \
   --created-at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" --output "${work_dir}/bundle.tar.gz"
@@ -70,37 +72,77 @@ case "$vm_status" in
   *) printf 'VM deployment failed before activation (exit %d)\n' "$vm_status" >&2; exit "$vm_status" ;;
 esac
 
-users_version="$(gcloud secrets versions add "$PROXY_USERS_SECRET_ID" --project "$GCP_PROJECT_ID" --data-file="${inputs_dir}/proxy-users.json" --format='value(name)')"
-obfs_version="$(gcloud secrets versions add "$OBFS_PASSWORD_SECRET_ID" --project "$GCP_PROJECT_ID" --data-file="${inputs_dir}/obfs-password" --format='value(name)')"
-users_version="${users_version##*/}"
-obfs_version="${obfs_version##*/}"
-reality_public_key="$(jq -er '.reality_public_key' "${work_dir}/public.json")"
-reality_short_id="$(jq -er '.reality_short_id' "${work_dir}/public.json")"
-hy2_cert_sha256="$local_cert_sha256"
-reality_dest="$(jq -er '.reality_dest' "${repo_root}/config/environments/${ENVIRONMENT}.json")"
-candidate_tag="candidate-${RUN_ID}-${RUN_ATTEMPT}"
-old_revision="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.traffic[percent=100].revisionName)' | head -n1)"
+rollback_vm() {
+  gcloud compute scp --tunnel-through-iap --quiet --project "$GCP_PROJECT_ID" --zone "$GCP_VM_ZONE" \
+    "${script_dir}/deploy-remote.sh" "${GCP_VM_NAME}:~/" || return 21
+  gcloud compute ssh --tunnel-through-iap --quiet --project "$GCP_PROJECT_ID" --zone "$GCP_VM_ZONE" "$GCP_VM_NAME" --command \
+    "sudo bash ~/deploy-remote.sh --rollback '${release_id}'" || return 21
+}
 
-gcloud run deploy "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" \
-  --image "$IMAGE_DIGEST" --no-traffic --tag "$candidate_tag" \
-  --set-env-vars "PROXY_IP=${PROXY_IP},REALITY_PUBLIC_KEY=${reality_public_key},REALITY_SHORT_ID=${reality_short_id},REALITY_DEST=${reality_dest},HY2_SNI=${hy2_sni},HY2_CERT_SHA256=${hy2_cert_sha256}" \
-  --set-secrets "PROXY_USERS_JSON=${PROXY_USERS_SECRET_ID}:${users_version},OBFS_PASSWORD=${OBFS_PASSWORD_SECRET_ID}:${obfs_version}"
-candidate_url="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format="value(status.traffic[tag=${candidate_tag}].url)")"
-curl -fsS "${candidate_url}/healthz" >/dev/null
+fetch_and_validate_subscription() {
+  local service_url="$1" suffix="$2" format
+  for format in base64 clash; do
+    printf 'url = "%s/v1/subscription?token=%s&format=%s"\nsilent\nshow-error\nfail\n' "$service_url" "$token_encoded" "$format" | \
+      curl --config - --output "${work_dir}/${format}.${suffix}.response" || return 1
+    "${work_dir}/proxyctl" validate-subscription --input "${work_dir}/${format}.${suffix}.response" --format "$format" || return 1
+  done
+}
+
+deploy_cloud_run() {
+  local users_version obfs_version reality_public_key reality_short_id reality_dest candidate_tag
+  local old_revision candidate_url service_url
+  users_version="$(gcloud secrets versions add "$PROXY_USERS_SECRET_ID" --project "$GCP_PROJECT_ID" --data-file="${inputs_dir}/proxy-users.json" --format='value(name)')" || return 1
+  obfs_version="$(gcloud secrets versions add "$OBFS_PASSWORD_SECRET_ID" --project "$GCP_PROJECT_ID" --data-file="${inputs_dir}/obfs-password" --format='value(name)')" || return 1
+  users_version="${users_version##*/}"
+  obfs_version="${obfs_version##*/}"
+  reality_public_key="$(jq -er '.reality_public_key' "${work_dir}/public.json")" || return 1
+  reality_short_id="$(jq -er '.reality_short_id' "${work_dir}/public.json")" || return 1
+  reality_dest="$(jq -er '.reality_dest' "${repo_root}/config/environments/${ENVIRONMENT}.json")" || return 1
+  candidate_tag="candidate-${RUN_ID}-${RUN_ATTEMPT}"
+  old_revision="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.traffic[percent=100].revisionName)' | head -n1)" || return 1
+
+  gcloud run deploy "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" \
+    --image "$IMAGE_DIGEST" --no-traffic --tag "$candidate_tag" \
+    --set-env-vars "PROXY_IP=${PROXY_IP},REALITY_PUBLIC_KEY=${reality_public_key},REALITY_SHORT_ID=${reality_short_id},REALITY_DEST=${reality_dest},HY2_SNI=${hy2_sni},HY2_CERT_SHA256=${local_cert_sha256}" \
+    --set-secrets "PROXY_USERS_JSON=${PROXY_USERS_SECRET_ID}:${users_version},OBFS_PASSWORD=${OBFS_PASSWORD_SECRET_ID}:${obfs_version}" || return 1
+  candidate_url="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format="value(status.traffic[tag=${candidate_tag}].url)")" || return 1
+  [[ -n "$candidate_url" ]] || return 1
+  curl -fsS "${candidate_url}/healthz" >/dev/null || return 1
+  fetch_and_validate_subscription "$candidate_url" candidate || return 1
+  "${script_dir}/e2e-proxy.sh" --subscription "${work_dir}/base64.candidate.response" \
+    --image "$sing_box_image" --probe-url "$egress_probe_url" --proxyctl "${work_dir}/proxyctl" || return 1
+
+  # From this point onward a failed command may have changed public traffic. Every
+  # failure path must restore the previously serving revision before VM rollback.
+  if ! gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-tags "${candidate_tag}=100"; then
+    gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
+    return 1
+  fi
+  if ! service_url="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.url)')"; then
+    gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
+    return 1
+  fi
+  if [[ -z "$service_url" ]] || ! curl -fsS "${service_url}/healthz" >/dev/null || ! fetch_and_validate_subscription "$service_url" public; then
+    gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100" || return 21
+    return 1
+  fi
+  if ! gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --remove-tags "$candidate_tag"; then
+    printf 'warning: deployment succeeded but candidate tag cleanup failed: %s\n' "$candidate_tag" >&2
+  fi
+}
+
 token="$(jq -er '.users[] | select(.enabled) | .subscription_token' "${inputs_dir}/proxy-users.json" | head -n1)"
 token_encoded="$(jq -nr --arg value "$token" '$value | @uri')"
-for format in base64 clash; do
-  printf 'url = "%s/v1/subscription?token=%s&format=%s"\nsilent\nshow-error\nfail\n' "$candidate_url" "$token_encoded" "$format" | curl --config - --output "${work_dir}/${format}.response"
-  "${work_dir}/proxyctl" validate-subscription --input "${work_dir}/${format}.response" --format "$format"
-done
-
-gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-tags "${candidate_tag}=100"
-if ! curl -fsS "$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.url)')/healthz" >/dev/null; then
-  if [[ -n "$old_revision" ]]; then
-    gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --to-revisions "${old_revision}=100"
+set +e
+deploy_cloud_run
+cloud_status=$?
+set -e
+if [[ "$cloud_status" -ne 0 ]]; then
+  printf '%s\n' 'Cloud Run deployment or end-to-end validation failed; rolling back VM' >&2
+  if rollback_vm && [[ "$cloud_status" -ne 21 ]]; then
+    exit 20
   fi
-  printf '%s\n' 'Cloud Run post-cutover health check failed; previous revision restored' >&2
-  exit 1
+  printf '%s\n' 'Cloud Run or VM rollback did not recover the environment' >&2
+  exit 21
 fi
-gcloud run services update-traffic "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --remove-tags "$candidate_tag"
 printf 'deployment succeeded: %s %s\n' "$ENVIRONMENT" "$GIT_SHA"

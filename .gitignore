@@ -13,6 +13,7 @@ data/
 users.json
 users.development.json
 users.production.json
+.secrets/
 
 # macOS
 .DS_Store
@@ -20,6 +21,7 @@ users.production.json
 # 临时文件
 *.tmp
 *.swp
+temporary.md
 
 # OpenTofu 本地产物与临时凭证
 **/.terraform/
