@@ -19,8 +19,8 @@ func TestServerHTTPContract(t *testing.T) {
 		code        string
 		contentType string
 	}{
-		{"health", http.MethodGet, "/healthz", 200, "", "application/json"},
-		{"health method", http.MethodPost, "/healthz", 405, "method_not_allowed", "application/json"},
+		{"health", http.MethodGet, "/v1/health", 200, "", "application/json"},
+		{"health method", http.MethodPost, "/v1/health", 405, "method_not_allowed", "application/json"},
 		{"missing token", http.MethodGet, "/v1/subscription?format=base64", 400, "missing_token", "application/json"},
 		{"invalid format", http.MethodGet, "/v1/subscription?token=" + testToken, 400, "invalid_format", "application/json"},
 		{"invalid token", http.MethodGet, "/v1/subscription?token=invalid-token-value-123456&format=base64", 401, "invalid_token", "application/json"},
@@ -75,7 +75,7 @@ func TestServerPanicIsSanitized(t *testing.T) {
 	server.requestID = func() string { return "request-id" }
 	server.beforeServe = func(*http.Request) { panic(testToken) }
 	response := httptest.NewRecorder()
-	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	server.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/v1/health", nil))
 	if response.Code != http.StatusInternalServerError || !strings.Contains(response.Body.String(), "internal_error") {
 		t.Fatalf("panic response = %d %s", response.Code, response.Body.String())
 	}

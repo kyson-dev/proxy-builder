@@ -91,7 +91,7 @@ fetch_and_validate_subscription() {
 wait_for_public_health() {
   local service_url="$1"
   for _ in {1..30}; do
-    if curl --silent --show-error --fail --max-time 10 "${service_url}/healthz" >/dev/null; then
+    if curl --silent --show-error --fail --max-time 10 "${service_url}/v1/health" >/dev/null; then
       return 0
     fi
     sleep 2

@@ -98,7 +98,7 @@
 ## 成功标准
 
 - GitHub audit 成功且名称/Variable 值精确，日志/artifact 无秘密原文；platform 第二次 plan 为零变更。
-- VM TCP/UDP 443、Cloud Run `/healthz` 与双协议真实出站均通过。
+- VM TCP/UDP 443、Cloud Run `/v1/health` 与双协议真实出站均通过。
 - `.secrets/development/` 继续以 `0700/0600` 保留为灾难恢复副本。
 
 ## 背景

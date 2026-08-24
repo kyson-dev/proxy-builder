@@ -38,7 +38,7 @@ Cloud Run 默认 HTTPS URL 公开且不执行 Invoker IAM 检查。Google 身份
 ### 健康检查
 
 ```http
-GET /healthz
+GET /v1/health
 ```
 
 返回 `200 application/json`：
@@ -113,7 +113,7 @@ Cloud Run 自动 request log 的 `requestUrl` 会包含 query token，因此 pla
 
 ## Cloud Run Revision
 
-OpenTofu 拥有 `/healthz` startup probe。部署工作流后续只拥有 image 与上述普通/secret 环境变量，并以 no-traffic revision 发布；流量迁移属于[环境与交付](environments-and-delivery.md)。
+OpenTofu 拥有 `/v1/health` startup probe。部署工作流后续只拥有 image 与上述普通/secret 环境变量，并以 no-traffic revision 发布；流量迁移属于[环境与交付](environments-and-delivery.md)。公网验证不得使用会被 Cloud Run 前端截获的 `/healthz`。
 
 ## 关联
 

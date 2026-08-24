@@ -15,8 +15,8 @@ run "startup_probe_contract" {
   }
 
   assert {
-    condition     = google_cloud_run_v2_service.subscription.template[0].containers[0].startup_probe[0].http_get[0].path == "/healthz"
-    error_message = "Cloud Run startup probe 必须使用 subscription 的 /healthz 契约。"
+    condition     = google_cloud_run_v2_service.subscription.template[0].containers[0].startup_probe[0].http_get[0].path == "/v1/health"
+    error_message = "Cloud Run startup probe 必须使用 subscription 的 /v1/health 契约。"
   }
 
   assert {
