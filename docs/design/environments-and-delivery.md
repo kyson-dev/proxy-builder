@@ -44,7 +44,7 @@ Git 分支只标识版本，不隐式选择环境。所有可写工作流必须�
 
 ## GitHub 配置
 
-Repository Variables 为 PR plan 提供非秘密只读接入标识：
+Repository Variables 为 PR 与 main 手动 plan 提供非秘密只读接入标识：
 
 ```text
 DEV_GCP_WIF_PROVIDER

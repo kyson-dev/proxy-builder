@@ -2,6 +2,7 @@ locals {
   name_prefix      = var.resource_prefix
   environment_sub  = "repo:${var.github_repository}:environment:${var.environment}"
   pull_request_sub = "repo:${var.github_repository}:pull_request"
+  main_ref_sub     = "repo:${var.github_repository}:ref:refs/heads/main"
 
   required_services = toset([
     "artifactregistry.googleapis.com",
@@ -163,6 +164,12 @@ resource "google_service_account_iam_member" "plan_wif" {
   service_account_id = google_service_account.github["plan"].name
   role               = "roles/iam.workloadIdentityUser"
   member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${local.pull_request_sub}"
+}
+
+resource "google_service_account_iam_member" "plan_main_wif" {
+  service_account_id = google_service_account.github["plan"].name
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principal://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/subject/${local.main_ref_sub}"
 }
 
 resource "google_service_account_iam_member" "environment_wif" {
