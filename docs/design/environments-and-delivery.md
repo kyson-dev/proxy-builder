@@ -100,7 +100,7 @@ Project ID、region、zone、VM 名、Artifact Registry 名、公钥、short ID�
 - 触发：`workflow_dispatch`。
 - 输入：`environment` 与 `git_ref`；production 的 `git_ref` 必须解析为 `main` 可达 commit。
 - 构建 subscription 镜像并以 commit SHA 标记，推送后只使用 registry 返回的 digest。
-- 顺序：验证输入 → 发布 proxy VM → 创建并验证无流量 Cloud Run 候选 → 真实双协议 E2E → 切流 → 公网复验。
+- 顺序：验证输入 → 发布 proxy VM → 创建无流量 Cloud Run revision 并等待 startup probe → 按不可变 revision name 切流 → 公网 health/订阅复验 → 真实双协议 E2E。
 - 使用 `github-deploy`；不得创建或修改 OpenTofu 拥有的网络、IAM、VM 或 secret 容器。
 
 ### `destroy.yml`
@@ -149,9 +149,9 @@ PROXY_USERS_JSON = Secret Manager version 引用
 
 Secret version 创建成功但 revision 失败时允许保留该 version 供审计和重试。
 
-候选 revision 必须以 `--no-traffic --tag` 创建，验证 `/healthz`、Base64 与 Clash 正文，再从 runner 分别通过候选订阅中的 VLESS Reality 和 Hysteria2 连接 VM，并访问环境固定的 HTTPS 204 URL。两条真实出站都成功后才允许切流。
+候选 revision 必须以 `--no-traffic` 创建。Cloud Run 拥有的 `/healthz` startup probe 是切流前门禁；deploy 必须读取 `latestReadyRevisionName`，确认它非空且不同于旧 revision，再按该不可变名称切换 100% 流量。部署不得把 traffic-tag URL 作为正确性依赖。
 
-部署是 VM 与 Cloud Run 的协调事务：切流前任一步骤失败，旧 Cloud Run 不变并显式回滚本次 VM release；切流后公网复验失败，先恢复旧 Cloud Run revision 的 100% 流量，再回滚 VM。两侧恢复都成功时退出 `20`；任一恢复失败时退出 `21` 并要求人工介入。成功后移除候选 tag；tag 清理失败只告警，不逆转已验证部署。失败 revision 与 secret version 保留供审计。
+切流后必须通过公网 `/healthz`、Base64 与 Clash 正文校验，再从 runner 分别通过订阅中的 VLESS Reality 和 Hysteria2 连接 VM，并访问环境固定的 HTTPS 204 URL。部署是 VM 与 Cloud Run 的协调事务：切流前任一步骤失败，旧 Cloud Run 不变并显式回滚本次 VM release；切流后的公网复验或任一 E2E 失败，先恢复旧 Cloud Run revision 的 100% 流量，再回滚 VM。两侧恢复都成功时退出 `20`；任一恢复失败时退出 `21` 并要求人工介入。失败 revision 与 secret version 保留供审计。
 
 ## 公共命令
 
