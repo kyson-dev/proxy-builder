@@ -25,7 +25,7 @@ token_encoded="$(jq -nr --arg value "$token" '$value | @uri')"
 tofu_bin="$(infra::tofu_bin)"
 infra::require_tofu_version "$tofu_bin"
 project_id="$(infra::read_tfvar "$tfvars" project_id)"
-bucket="${project_id}-proxy-builder-tfstate"
+bucket="$(infra::state_bucket_name "$project_id")"
 stack_dir="${repo_root}/infra/stacks/platform"
 "$tofu_bin" -chdir="$stack_dir" init -reconfigure -input=false \
   -backend-config="bucket=${bucket}" -backend-config="prefix=platform" >/dev/null

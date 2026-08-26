@@ -14,6 +14,8 @@ case "$environment" in development|production) ;; *) exit 2 ;; esac
 for command_name in gh jq; do command -v "$command_name" >/dev/null 2>&1 || { printf 'missing command: %s\n' "$command_name" >&2; exit 1; }; done
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=../infra/common.sh
+source "${repo_root}/scripts/infra/common.sh"
 tfvars="${repo_root}/infra/environments/${environment}.tfvars"
 expected_repo="$(sed -nE 's/^github_repository[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$tfvars")"
 expected_repo_id="$(sed -nE 's/^github_repository_id[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$tfvars")"
@@ -24,11 +26,12 @@ actual_repo_id="$(gh api "repos/${repo}" --jq '.id')"
 if [[ -z "$bootstrap_output" ]]; then
   command -v tofu >/dev/null 2>&1 || { printf '%s\n' 'missing command: tofu' >&2; exit 1; }
   project_id="$(sed -nE 's/^project_id[[:space:]]*=[[:space:]]*"([^"]+)"/\1/p' "$tfvars")"
+  state_bucket="$(infra::state_bucket_name "$project_id")"
   work_dir="$(mktemp -d "${TMPDIR:-/tmp}/proxy-builder-bootstrap-audit.XXXXXX")"
   trap 'rm -rf "$work_dir"' EXIT
   bootstrap_output="${work_dir}/bootstrap.json"
   tofu -chdir="${repo_root}/infra/stacks/bootstrap" init -reconfigure -input=false \
-    -backend-config="bucket=${project_id}-proxy-builder-tfstate" -backend-config="prefix=bootstrap" >/dev/null
+    -backend-config="bucket=${state_bucket}" -backend-config="prefix=bootstrap" >/dev/null
   tofu -chdir="${repo_root}/infra/stacks/bootstrap" output -json >"$bootstrap_output"
 fi
 [[ -f "$bootstrap_output" ]] || { printf '%s\n' 'bootstrap output file is required' >&2; exit 2; }

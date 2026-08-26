@@ -15,10 +15,11 @@ infra::require_tofu_version "$tofu_bin"
 project_id="$(infra::read_tfvar "$tfvars" project_id)"
 region="$(infra::read_tfvar "$tfvars" region)"
 artifact_location="$(infra::read_tfvar "$tfvars" artifact_location)"
+state_bucket="$(infra::state_bucket_name "$project_id")"
 stack_dir="${repo_root}/infra/stacks/platform"
 
 "$tofu_bin" -chdir="$stack_dir" init -reconfigure -input=false \
-  -backend-config="bucket=${project_id}-proxy-builder-tfstate" \
+  -backend-config="bucket=${state_bucket}" \
   -backend-config="prefix=platform" >/dev/null
 outputs="$($tofu_bin -chdir="$stack_dir" output -json)"
 

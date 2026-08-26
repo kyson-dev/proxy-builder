@@ -12,7 +12,7 @@ infra::require_command gcloud
 
 project_id=$(infra::read_tfvar "$tfvars" project_id)
 region=$(infra::read_tfvar "$tfvars" region)
-bucket="${project_id}-proxy-builder-tfstate"
+bucket=$(infra::state_bucket_name "$project_id")
 
 active_account=$(gcloud auth list --filter=status:ACTIVE --format='value(account)' | head -n 1)
 [[ -n "$active_account" ]] || infra::die "gcloud 没有活动账号，请先完成本地登录"
