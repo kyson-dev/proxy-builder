@@ -102,7 +102,10 @@ wait_for_public_health() {
 
 cleanup_secret_versions() {
   local secret_id="$1" keep="$2" version
-  gcloud secrets versions list "$secret_id" --project "$GCP_PROJECT_ID" --filter='state=ENABLED' \
+  # Disabled versions still retain their payload and count as active Secret Manager
+  # versions. Keep the newest rollback window across both enabled and disabled
+  # versions; already-destroyed versions are immutable and need no action.
+  gcloud secrets versions list "$secret_id" --project "$GCP_PROJECT_ID" --filter='state!=DESTROYED' \
     --format='value(name)' --sort-by='~createTime' | tail -n "+$((keep + 1))" |
     while read -r version; do
       gcloud secrets versions destroy "${version##*/}" --secret="$secret_id" --project "$GCP_PROJECT_ID" --quiet ||
