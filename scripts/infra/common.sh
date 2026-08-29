@@ -43,6 +43,12 @@ infra::read_tfvar() {
     printf '%s\n' "$value"
 }
 
+infra::state_bucket_name() {
+    local project_id="${1:-}"
+    [[ -n "$project_id" ]] || infra::die "state bucket 缺少 project_id"
+    printf '%s-proxy-builder-tfstate\n' "$project_id"
+}
+
 infra::tofu_bin() {
     local tofu_bin="${TOFU_BIN:-tofu}"
     command -v "$tofu_bin" >/dev/null 2>&1 || infra::die "缺少 OpenTofu；安装 1.12.6 或设置 TOFU_BIN"

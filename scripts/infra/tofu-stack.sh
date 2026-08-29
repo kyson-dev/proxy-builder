@@ -21,7 +21,7 @@ tofu_bin=$(infra::tofu_bin)
 infra::require_tofu_version "$tofu_bin"
 
 project_id=$(infra::read_tfvar "$tfvars" project_id)
-bucket="${project_id}-proxy-builder-tfstate"
+bucket=$(infra::state_bucket_name "$project_id")
 stack_dir="${INFRA_ROOT}/infra/stacks/${stack}"
 
 "$tofu_bin" -chdir="$stack_dir" init -reconfigure \
