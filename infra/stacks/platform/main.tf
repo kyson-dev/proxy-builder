@@ -30,7 +30,7 @@ module "artifact_registry" {
   project_id      = var.project_id
   environment     = var.environment
   resource_prefix = var.resource_prefix
-  location        = var.artifact_location
+  location        = var.region
   labels          = var.labels
 
   deploy_service_account_email = data.terraform_remote_state.bootstrap.outputs.deploy_service_account_email

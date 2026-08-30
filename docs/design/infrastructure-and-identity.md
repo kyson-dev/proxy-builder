@@ -61,7 +61,6 @@ network_tier       = "STANDARD"
 vm_machine_type    = "e2-micro"
 vm_boot_disk_gb    = 10
 vm_source_image    = "projects/debian-cloud/global/images/debian-12-bookworm-vYYYYMMDD"
-artifact_location  = "asia-northeast3"
 github_repository  = "owner/repository"
 github_repository_id = "immutable numeric repository ID"
 labels             = { application = "proxy-builder", environment = "development" }

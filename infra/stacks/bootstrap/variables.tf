@@ -78,10 +78,6 @@ variable "vm_source_image" {
   }
 }
 
-variable "artifact_location" {
-  type = string
-}
-
 variable "github_repository" {
   type = string
 
