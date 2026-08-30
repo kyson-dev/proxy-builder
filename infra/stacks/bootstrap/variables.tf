@@ -69,6 +69,15 @@ variable "vm_boot_disk_gb" {
   }
 }
 
+variable "vm_source_image" {
+  type = string
+
+  validation {
+    condition     = can(regex("^projects/debian-cloud/global/images/debian-12-bookworm-v[0-9]{8}$", var.vm_source_image))
+    error_message = "vm_source_image 必须是 projects/debian-cloud/global/images/debian-12-bookworm-vYYYYMMDD 格式的不可变镜像。"
+  }
+}
+
 variable "artifact_location" {
   type = string
 }

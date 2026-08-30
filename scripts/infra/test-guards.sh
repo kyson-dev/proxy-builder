@@ -40,6 +40,14 @@ production_project=$(infra::read_tfvar "$production_file" project_id)
 [[ "$(infra::state_bucket_name "$production_project")" == "${production_project}-proxy-builder-tfstate" ]] || infra::die "production state bucket 命名不正确"
 [[ "$(infra::read_tfvar "$development_file" resource_prefix)" == "proxy" ]] || infra::die "development 必须使用 proxy 完整资源名前缀"
 [[ "$(infra::read_tfvar "$production_file" resource_prefix)" == "proxy" ]] || infra::die "production 必须使用 proxy 完整资源名前缀"
+for environment_file in "$development_file" "$production_file"; do
+    vm_source_image=$(infra::read_tfvar "$environment_file" vm_source_image)
+    [[ "$vm_source_image" =~ ^projects/debian-cloud/global/images/debian-12-bookworm-v[0-9]{8}$ ]] ||
+        infra::die "每个环境必须固定具体的 Debian 12 Bookworm 镜像"
+done
+if rg -n 'vm_source_image[[:space:]]*=[[:space:]]*".*(latest|/family/)' "$development_file" "$production_file"; then
+    infra::die "VM 镜像不得使用 latest 或 image family"
+fi
 
 if rg -q 'environment_short' "${INFRA_ROOT}/infra/modules"; then
     infra::die "资源模块不得从 environment 自动追加资源名后缀"

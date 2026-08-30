@@ -45,6 +45,7 @@ module "proxy_vm" {
   zone                 = var.zone
   machine_type         = var.vm_machine_type
   boot_disk_gb         = var.vm_boot_disk_gb
+  vm_source_image      = var.vm_source_image
   network_tier         = var.network_tier
   subnetwork_self_link = module.network.subnetwork_self_link
   external_ip_address  = module.network.proxy_ip_address
