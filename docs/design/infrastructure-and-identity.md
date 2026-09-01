@@ -60,13 +60,15 @@ network_cidr       = "10.20.0.0/24"
 network_tier       = "STANDARD"
 vm_machine_type    = "e2-micro"
 vm_boot_disk_gb    = 10
-artifact_location  = "asia-northeast3"
+vm_source_image    = "projects/debian-cloud/global/images/debian-12-bookworm-vYYYYMMDD"
 github_repository  = "owner/repository"
 github_repository_id = "immutable numeric repository ID"
 labels             = { application = "proxy-builder", environment = "development" }
 ```
 
 `environment` 只能是 `development` 或 `production`。`labels.application` 与 `labels.environment` 必须应用于支持 label 的所有资源，作为旧资源清理时的归属条件。
+
+`vm_source_image` 必须引用 `debian-cloud` 中带日期的具体 Debian 12 Bookworm 镜像；禁止 image family、`latest`、短名称或动态 data source。修改它会替换单 VM，并因启动盘 `auto_delete` 清除主机上的 current/previous release 与运行秘密。镜像升级必须按 [VM OS 镜像升级](../runbooks/vm-os-image-upgrade.md) 先 development、后 production 独立执行。
 
 `resource_prefix` 是资源 ID 的完整前缀，环境名不参与资源 ID 派生。当前两个环境均为 `proxy`，因此新资源命名为 `proxy-network`、`proxy-vm`、`proxy-subscription`、`proxy-github` 和 `proxy-images`。GitHub 身份为 `proxy-gh-plan`、`proxy-gh-apply`、`proxy-gh-deploy`；运行身份为 `proxy-vm-sa` 与 `proxy-subscription-sa`。Project、GitHub Environment 与 labels 继续承担环境隔离。
 
@@ -94,7 +96,7 @@ labels             = { application = "proxy-builder", environment = "development
 - 专用 VPC、子网、静态外部 IPv4 和防火墙；
 - Artifact Registry repository；
 - proxy VM 与 runtime Service Account；
-- `proxy-users`、`obfs-password` Secret Manager 容器与 Cloud Run runtime Service Account；
+- 仅 `proxy-users`、`obfs-password` 两个 Secret Manager 容器与 Cloud Run runtime Service Account；
 - Cloud Run subscription 服务的区域、公开默认 URL、Invoker IAM 关闭状态和资源限制。
 
 部署工作流拥有 Cloud Run revision 的运行时字段（清单见[环境与交付](environments-and-delivery.md)的 Cloud Run 发布协议）：这些字段来自派生计算或 Secret Manager version，不作为 OpenTofu 变量存在，platform 的 Cloud Run resource 必须对全部这些字段声明 `lifecycle { ignore_changes }`，platform apply 不得覆盖它们。platform 仍然收敛 region、ingress、资源限制、Service Account 和 Secret Manager IAM；Secret 引用随第一个可运行 revision 由 deploy 建立，避免在 secret 尚无 version 时创建无效 revision。

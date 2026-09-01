@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"flag"
@@ -20,6 +21,7 @@ type environmentInspection struct {
 	RealityPublicKey string `json:"reality_public_key"`
 	RealityShortID   string `json:"reality_short_id"`
 	HY2CertSHA256    string `json:"hy2_cert_sha256"`
+	HY2SPKISHA256    string `json:"hy2_spki_sha256"`
 }
 
 func inspectEnvironment(args []string) error {
@@ -77,6 +79,7 @@ func inspectEnvironment(args []string) error {
 		RealityPublicKey: reality.PublicKey,
 		RealityShortID:   reality.ShortID,
 		HY2CertSHA256:    certificate.SHA256,
+		HY2SPKISHA256:    certificate.SPKISHA256,
 	})
 }
 
@@ -133,18 +136,22 @@ func parseBase64Subscription(data []byte) ([]*url.URL, error) {
 		case "vless":
 			expected = map[string]string{"encryption": "none", "flow": "xtls-rprx-vision", "fp": "chrome", "headerType": "none", "pbk": "", "security": "reality", "sid": "", "sni": "", "type": "tcp"}
 		case "hysteria2":
-			expected = map[string]string{"insecure": "1", "obfs": "salamander", "obfs-password": "", "pinSHA256": "", "sni": ""}
+			expected = map[string]string{"insecure": "1", "obfs": "salamander", "obfs-password": "", "pinSHA256": "", "pubKeySHA256": "", "sni": ""}
 		default:
 			return nil, errors.New("base64 subscription contains an unsupported protocol")
 		}
 		if err := validateSubscriptionURL(line, parsed.Scheme, expected); err != nil {
 			return nil, err
 		}
+		if parsed.Scheme == "hysteria2" {
+			encodedPublicKeyHash := parsed.Query().Get("pubKeySHA256")
+			publicKeyHash, err := base64.StdEncoding.Strict().DecodeString(encodedPublicKeyHash)
+			if err != nil || len(publicKeyHash) != sha256.Size || base64.StdEncoding.EncodeToString(publicKeyHash) != encodedPublicKeyHash {
+				return nil, errors.New("hysteria2 subscription link has invalid pubKeySHA256")
+			}
+		}
 		seen[parsed.Scheme] = struct{}{}
 		links = append(links, parsed)
-	}
-	if strings.Contains(string(decoded), "pubKeySHA256") {
-		return nil, errors.New("base64 subscription contains the unsupported pubKeySHA256 parameter")
 	}
 	return links, nil
 }
@@ -195,7 +202,10 @@ func renderProbeConfig(args []string) error {
 	} else {
 		outbound["password"] = link.User.Username()
 		outbound["obfs"] = map[string]any{"type": query.Get("obfs"), "password": query.Get("obfs-password")}
-		outbound["tls"] = map[string]any{"enabled": true, "server_name": query.Get("sni"), "insecure": true}
+		outbound["tls"] = map[string]any{
+			"enabled": true, "server_name": query.Get("sni"),
+			"certificate_public_key_sha256": []string{query.Get("pubKeySHA256")},
+		}
 	}
 	config := map[string]any{
 		"log":       map[string]any{"level": "warn"},
@@ -216,10 +226,11 @@ func validateSubscriptionURL(raw, scheme string, expected map[string]string) err
 		return fmt.Errorf("%s subscription link has unexpected query parameters", scheme)
 	}
 	for key, wanted := range expected {
-		if query.Get(key) == "" {
+		values := query[key]
+		if len(values) != 1 || values[0] == "" {
 			return fmt.Errorf("%s subscription link is missing %s", scheme, key)
 		}
-		if wanted != "" && query.Get(key) != wanted {
+		if wanted != "" && values[0] != wanted {
 			return fmt.Errorf("%s subscription link has invalid %s", scheme, key)
 		}
 	}

@@ -56,6 +56,7 @@ func renderHY2URI(user contracts.User, config Config) string {
 	query.Set("obfs", "salamander")
 	query.Set("obfs-password", config.ObfsPassword)
 	query.Set("pinSHA256", config.HY2CertSHA256)
+	query.Set("pubKeySHA256", config.HY2SPKISHA256)
 	query.Set("sni", config.HY2SNI)
 	value.RawQuery = query.Encode()
 	return value.String()

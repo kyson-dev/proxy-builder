@@ -23,6 +23,7 @@ func TestServerHTTPContract(t *testing.T) {
 		{"health method", http.MethodPost, "/v1/health", 405, "method_not_allowed", "application/json"},
 		{"missing token", http.MethodGet, "/v1/subscription?format=base64", 400, "missing_token", "application/json"},
 		{"invalid format", http.MethodGet, "/v1/subscription?token=" + testToken, 400, "invalid_format", "application/json"},
+		{"unsupported sing-box format", http.MethodGet, "/v1/subscription?token=" + testToken + "&format=singbox", 400, "invalid_format", "application/json"},
 		{"invalid token", http.MethodGet, "/v1/subscription?token=invalid-token-value-123456&format=base64", 401, "invalid_token", "application/json"},
 		{"disabled", http.MethodGet, "/v1/subscription?token=subscription-token-disabled-1&format=base64", 403, "user_disabled", "application/json"},
 		{"base64", http.MethodGet, "/v1/subscription?token=" + testToken + "&format=base64", 200, "", "text/plain; charset=utf-8"},

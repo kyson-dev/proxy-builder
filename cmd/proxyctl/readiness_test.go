@@ -24,7 +24,7 @@ func TestValidateSubscriptionAcceptsRenderedFormats(t *testing.T) {
 	user := contracts.User{Name: "alice", Enabled: true, Protocols: contracts.Protocols{VLESS: true, Hysteria2: true}, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
 	config := subscription.Config{
 		ProxyIP: "203.0.113.10", RealityPublicKey: "public-key", RealityShortID: "0123456789abcdef",
-		RealitySNI: "example.com", HY2SNI: "example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", ObfsPassword: "obfs-password-1234567890",
+		RealitySNI: "example.com", HY2SNI: "example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", HY2SPKISHA256: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", ObfsPassword: "obfs-password-1234567890",
 	}
 	base64Body, err := subscription.RenderBase64(user, config)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestValidateSubscriptionAcceptsRenderedFormats(t *testing.T) {
 	}
 }
 
-func TestValidateSubscriptionRejectsNonstandardHY2Parameter(t *testing.T) {
+func TestValidateSubscriptionRejectsInvalidHY2PublicKeyPin(t *testing.T) {
 	links := "vless://id@203.0.113.10:443?encryption=none&flow=x&fp=x&headerType=none&pbk=x&security=reality&sid=x&sni=x&type=tcp\n" +
 		"hysteria2://password@203.0.113.10:443?insecure=1&obfs=salamander&obfs-password=x&pinSHA256=x&pubKeySHA256=x&sni=x"
 	path := filepath.Join(t.TempDir(), "response")
@@ -63,7 +63,7 @@ func TestRenderProbeConfigUsesSubscriptionCredentials(t *testing.T) {
 	user := contracts.User{Name: "alice", Enabled: true, Protocols: contracts.Protocols{VLESS: true, Hysteria2: true}, VLESSUUID: "00000000-0000-4000-8000-000000000001", HY2Password: "hy2-password-123456789012", SubscriptionToken: "subscription-token-123456"}
 	config := subscription.Config{
 		ProxyIP: "203.0.113.10", RealityPublicKey: "public-key", RealityShortID: "0123456789abcdef",
-		RealitySNI: "www.example.com", HY2SNI: "hy2.example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", ObfsPassword: "obfs-password-1234567890",
+		RealitySNI: "www.example.com", HY2SNI: "hy2.example.com", HY2CertSHA256: strings.Repeat("AA:", 31) + "AA", HY2SPKISHA256: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", ObfsPassword: "obfs-password-1234567890",
 	}
 	body, err := subscription.RenderBase64(user, config)
 	if err != nil {
@@ -99,6 +99,16 @@ func TestRenderProbeConfigUsesSubscriptionCredentials(t *testing.T) {
 			}
 			if rendered.Outbounds[0][secretKey] != expectedSecret {
 				t.Fatalf("%s probe config does not use the subscription credential", protocol)
+			}
+			if protocol == "hysteria2" {
+				tlsConfig, ok := rendered.Outbounds[0]["tls"].(map[string]any)
+				if !ok || tlsConfig["insecure"] != nil {
+					t.Fatalf("Hysteria2 probe still skips certificate verification: %#v", tlsConfig)
+				}
+				pins, ok := tlsConfig["certificate_public_key_sha256"].([]any)
+				if !ok || len(pins) != 1 || pins[0] != config.HY2SPKISHA256 {
+					t.Fatalf("Hysteria2 probe does not use the SPKI pin: %#v", tlsConfig)
+				}
 			}
 		})
 	}
@@ -139,7 +149,7 @@ func TestEnvironmentInspectionJSONContainsOnlyPublicFields(t *testing.T) {
 	if err := json.Unmarshal(data, &fields); err != nil {
 		t.Fatal(err)
 	}
-	if len(fields) != 3 || fields["reality_public_key"] != "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo" {
+	if len(fields) != 4 || fields["reality_public_key"] != "hSDwCYkwp1R0i33ctD73Wg2_Og0mOBr066SpjqqbTmo" || fields["hy2_spki_sha256"] == "" {
 		t.Fatalf("unexpected public inspection: %#v", fields)
 	}
 	value := string(data)

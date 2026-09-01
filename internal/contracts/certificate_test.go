@@ -4,8 +4,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"math/big"
 	"testing"
@@ -46,6 +48,15 @@ func TestInspectCertificate(t *testing.T) {
 	}
 	if len(inspection.SHA256) != 95 {
 		t.Fatalf("fingerprint length = %d", len(inspection.SHA256))
+	}
+	certificateBlock, _ := pem.Decode(cert)
+	certificate, err := x509.ParseCertificate(certificateBlock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantSPKI := sha256.Sum256(certificate.RawSubjectPublicKeyInfo)
+	if inspection.SPKISHA256 != base64.StdEncoding.EncodeToString(wantSPKI[:]) {
+		t.Fatalf("SPKI fingerprint mismatch: %q", inspection.SPKISHA256)
 	}
 }
 

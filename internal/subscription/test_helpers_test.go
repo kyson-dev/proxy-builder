@@ -21,6 +21,7 @@ func validConfig() Config {
 		RealitySNI:       "www.example.com",
 		HY2SNI:           "hy2.example.com",
 		HY2CertSHA256:    strings.TrimSuffix(strings.Repeat("AA:", 32), ":"),
+		HY2SPKISHA256:    "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
 		ObfsPassword:     testObfs,
 		Users: contracts.UsersDocument{Version: 1, Users: []contracts.User{
 			{

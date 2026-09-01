@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -13,7 +14,8 @@ import (
 )
 
 type CertificateInspection struct {
-	SHA256 string `json:"hy2_cert_sha256"`
+	SHA256     string `json:"hy2_cert_sha256"`
+	SPKISHA256 string `json:"hy2_spki_sha256"`
 }
 
 func InspectCertificate(certificatePEM, privateKeyPEM []byte, sni string, now time.Time) (CertificateInspection, error) {
@@ -44,12 +46,16 @@ func InspectCertificate(certificatePEM, privateKeyPEM []byte, sni string, now ti
 	}
 
 	sum := sha256.Sum256(certificate.Raw)
+	spkiSum := sha256.Sum256(certificate.RawSubjectPublicKeyInfo)
 	encoded := strings.ToUpper(hex.EncodeToString(sum[:]))
 	parts := make([]string, 0, len(encoded)/2)
 	for index := 0; index < len(encoded); index += 2 {
 		parts = append(parts, encoded[index:index+2])
 	}
-	return CertificateInspection{SHA256: strings.Join(parts, ":")}, nil
+	return CertificateInspection{
+		SHA256:     strings.Join(parts, ":"),
+		SPKISHA256: base64.StdEncoding.EncodeToString(spkiSum[:]),
+	}, nil
 }
 
 func parsePrivateKey(data []byte) (crypto.Signer, error) {

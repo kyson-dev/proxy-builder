@@ -30,7 +30,7 @@ module "artifact_registry" {
   project_id      = var.project_id
   environment     = var.environment
   resource_prefix = var.resource_prefix
-  location        = var.artifact_location
+  location        = var.region
   labels          = var.labels
 
   deploy_service_account_email = data.terraform_remote_state.bootstrap.outputs.deploy_service_account_email
@@ -45,6 +45,7 @@ module "proxy_vm" {
   zone                 = var.zone
   machine_type         = var.vm_machine_type
   boot_disk_gb         = var.vm_boot_disk_gb
+  vm_source_image      = var.vm_source_image
   network_tier         = var.network_tier
   subnetwork_self_link = module.network.subnetwork_self_link
   external_ip_address  = module.network.proxy_ip_address

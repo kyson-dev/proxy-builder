@@ -4,11 +4,6 @@ locals {
   startup_sha256 = sha256(local.startup_script)
 }
 
-data "google_compute_image" "debian" {
-  project = "debian-cloud"
-  family  = "debian-12"
-}
-
 resource "google_service_account" "runtime" {
   project      = var.project_id
   account_id   = "${local.name_prefix}-vm-sa"
@@ -36,7 +31,7 @@ resource "google_compute_instance" "proxy" {
     auto_delete = true
 
     initialize_params {
-      image = data.google_compute_image.debian.self_link
+      image = var.vm_source_image
       size  = var.boot_disk_gb
       type  = "pd-standard"
     }
