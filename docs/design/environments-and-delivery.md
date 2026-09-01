@@ -132,7 +132,7 @@ host bootstrap 版本不一致、任何输入校验失败或 `sing-box check` �
 
 ## Cloud Run 发布协议
 
-部署 job 将经过 schema 校验的 `PROXY_USERS_JSON` 与 `OBFS_PASSWORD` 分别写为指定 secret 的新 version，然后更新 Cloud Run revision：
+GCP Secret Manager 固定且只包含 `proxy-users` 与 `obfs-password` 两个 secret。部署 job 将经过 schema 校验的 `PROXY_USERS_JSON` 与 `OBFS_PASSWORD` 分别写为这两个 secret 的新 version，然后更新 Cloud Run revision；证书指纹、SPKI 指纹和 Reality 公钥都是普通派生环境变量，不得创建 secret 或 secret version：
 
 ```text
 image = subscription image digest
@@ -142,6 +142,7 @@ REALITY_SHORT_ID = 从环境私钥稳定派生的 8-byte hex 标识
 REALITY_DEST = environment config
 HY2_SNI = environment config
 HY2_CERT_SHA256 = 从 HY2_CERT_PEM 计算
+HY2_SPKI_SHA256 = 从 HY2_CERT_PEM 的 RawSubjectPublicKeyInfo 计算
 OBFS_PASSWORD = Secret Manager version 引用
 PROXY_USERS_JSON = Secret Manager version 引用
 ```

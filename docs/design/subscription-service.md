@@ -15,6 +15,7 @@ REALITY_SHORT_ID
 REALITY_DEST
 HY2_SNI
 HY2_CERT_SHA256
+HY2_SPKI_SHA256
 PORT                    # 可选，默认 8080
 ```
 
@@ -27,7 +28,7 @@ PROXY_USERS_JSON
 
 进程不读取 VM 文件、GCE metadata 或公网 IP 探测服务。启动时一次性严格校验全部配置；失败时只记录字段级错误并退出非零，不启动 unready HTTP server。
 
-校验至少覆盖：IPv4 地址、X25519 Reality public key、16 位 lowercase hex short ID、`host:port` Reality target、hostname SNI、uppercase colon-separated certificate SHA-256、非空且至少 24-byte 的 obfs password，以及[共享用户 Schema](proxy-and-subscription-contracts.md)。
+校验至少覆盖：IPv4 地址、X25519 Reality public key、16 位 lowercase hex short ID、`host:port` Reality target、hostname SNI、uppercase colon-separated certificate SHA-256、标准 Base64 编码的 32-byte SPKI SHA-256、非空且至少 24-byte 的 obfs password，以及[共享用户 Schema](proxy-and-subscription-contracts.md)。
 
 监听地址固定为 `:<PORT>`。容器以非 root UID/GID 运行，根文件系统不需要写权限，也不需要 CA bundle 或出站网络。
 
@@ -91,17 +92,18 @@ disabled 用户仍参与 token 匹配，以稳定返回 `403`。重复 token 在
 
 VLESS URI 固定包含 TCP、`xtls-rprx-vision`、Reality、Chrome fingerprint、环境 SNI、公钥和 short ID。所有 userinfo、query 与 fragment 值必须按 URI 组件编码。
 
-HY2 URI 使用标准 `hysteria2://`，固定包含：
+HY2 URI 使用 `hysteria2://` scheme，固定包含：
 
 ```text
 sni=<HY2_SNI>
 insecure=1
 pinSHA256=<HY2_CERT_SHA256>
+pubKeySHA256=<HY2_SPKI_SHA256>
 obfs=salamander
 obfs-password=<encoded password>
 ```
 
-不得添加 `pubKeySHA256` 或其他自定义 query。Clash YAML 为每名用户生成 VLESS、Hysteria2 两个 proxy 和一个包含二者与 `DIRECT` 的 select group；所有用户值必须通过 YAML encoder 输出，不拼接未转义 scalar。
+`pubKeySHA256` 是供 sing-box 1.13+ 客户端映射到 `tls.certificate_public_key_sha256` 的扩展字段；标准 Hysteria2 客户端继续使用 `insecure=1` 与 `pinSHA256`。不得添加其他自定义 query。Clash YAML 为每名用户生成 VLESS、Hysteria2 两个 proxy 和一个包含二者与 `DIRECT` 的 select group；所有用户值必须通过 YAML encoder 输出，不拼接未转义 scalar。
 
 ## 日志
 

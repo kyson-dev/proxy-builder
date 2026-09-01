@@ -1,6 +1,8 @@
 package subscription
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -21,6 +23,7 @@ type Config struct {
 	RealitySNI       string
 	HY2SNI           string
 	HY2CertSHA256    string
+	HY2SPKISHA256    string
 	ObfsPassword     string
 	Users            contracts.UsersDocument
 	Port             int
@@ -57,6 +60,11 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 	if !certificateFingerprint.MatchString(hy2CertSHA256) {
 		return Config{}, errors.New("HY2_CERT_SHA256 must be uppercase colon-separated SHA-256")
 	}
+	hy2SPKISHA256 := getenv("HY2_SPKI_SHA256")
+	decodedSPKI, err := base64.StdEncoding.Strict().DecodeString(hy2SPKISHA256)
+	if err != nil || len(decodedSPKI) != sha256.Size || base64.StdEncoding.EncodeToString(decodedSPKI) != hy2SPKISHA256 {
+		return Config{}, errors.New("HY2_SPKI_SHA256 must be standard Base64-encoded SHA-256")
+	}
 	obfsPassword := getenv("OBFS_PASSWORD")
 	if len([]byte(obfsPassword)) < 24 {
 		return Config{}, errors.New("OBFS_PASSWORD must be at least 24 UTF-8 bytes")
@@ -80,6 +88,7 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 		RealitySNI:       realitySNI,
 		HY2SNI:           hy2SNI,
 		HY2CertSHA256:    hy2CertSHA256,
+		HY2SPKISHA256:    hy2SPKISHA256,
 		ObfsPassword:     obfsPassword,
 		Users:            users,
 		Port:             port,

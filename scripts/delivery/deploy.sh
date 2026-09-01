@@ -47,6 +47,7 @@ gcloud compute scp --tunnel-through-iap --quiet --project "$GCP_PROJECT_ID" --zo
 remote_cert_sha256="$(gcloud compute ssh --tunnel-through-iap --quiet --project "$GCP_PROJECT_ID" --zone "$GCP_VM_ZONE" "$GCP_VM_NAME" \
   --command "sudo bash ~/deploy-remote.sh --inspect-certificate '${hy2_sni}'" 2>/dev/null || true)"
 local_cert_sha256="$(jq -er '.hy2_cert_sha256' "${work_dir}/public.json")"
+local_spki_sha256="$(jq -er '.hy2_spki_sha256' "${work_dir}/public.json")"
 scp_sources=(
   "${work_dir}/bundle.tar.gz"
   "${inputs_dir}/reality-private-key"
@@ -141,7 +142,7 @@ deploy_cloud_run() {
 
   gcloud run deploy "$SUBSCRIPTION_SERVICE_NAME" --quiet --project "$GCP_PROJECT_ID" --region "$GCP_REGION" \
     --image "$IMAGE_DIGEST" --no-traffic --ingress all --no-invoker-iam-check --default-url \
-    --set-env-vars "PROXY_IP=${PROXY_IP},REALITY_PUBLIC_KEY=${reality_public_key},REALITY_SHORT_ID=${reality_short_id},REALITY_DEST=${reality_dest},HY2_SNI=${hy2_sni},HY2_CERT_SHA256=${local_cert_sha256}" \
+    --set-env-vars "PROXY_IP=${PROXY_IP},REALITY_PUBLIC_KEY=${reality_public_key},REALITY_SHORT_ID=${reality_short_id},REALITY_DEST=${reality_dest},HY2_SNI=${hy2_sni},HY2_CERT_SHA256=${local_cert_sha256},HY2_SPKI_SHA256=${local_spki_sha256}" \
     --set-secrets "PROXY_USERS_JSON=${PROXY_USERS_SECRET_ID}:${users_version},OBFS_PASSWORD=${OBFS_PASSWORD_SECRET_ID}:${obfs_version}" || return 1
   candidate_revision="$(gcloud run services describe "$SUBSCRIPTION_SERVICE_NAME" --project "$GCP_PROJECT_ID" --region "$GCP_REGION" --format='value(status.latestCreatedRevisionName)')" || return 1
   [[ -n "$candidate_revision" && "$candidate_revision" != "$old_revision" ]] || return 1

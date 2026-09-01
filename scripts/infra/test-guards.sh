@@ -27,6 +27,12 @@ subscription_module="${INFRA_ROOT}/infra/modules/subscription_service/main.tf"
 rg -q '^[[:space:]]+client,$' "$subscription_module" || infra::die "platform 必须忽略 Cloud Run deploy client 元数据"
 rg -q '^[[:space:]]+client_version,$' "$subscription_module" || infra::die "platform 必须忽略 Cloud Run deploy client version 元数据"
 
+secret_runtime_module="${INFRA_ROOT}/infra/modules/secret_runtime/main.tf"
+secret_runtime_contract="$(sed -n '/^[[:space:]]*secrets = {/,/^[[:space:]]*}/p' "$secret_runtime_module")"
+[[ "$(printf '%s\n' "$secret_runtime_contract" | rg -c '^[[:space:]]{4}[a-z_]+[[:space:]]*=')" == "2" ]] || infra::die "Secret Manager 只能包含两个 runtime secret"
+printf '%s\n' "$secret_runtime_contract" | rg -q 'proxy_users[[:space:]]*=.*proxy-users' || infra::die "Secret Manager 缺少 proxy-users"
+printf '%s\n' "$secret_runtime_contract" | rg -q 'obfs[[:space:]]*=.*obfs-password' || infra::die "Secret Manager 缺少 obfs-password"
+
 development_file=$(infra::require_environment development)
 production_file=$(infra::require_environment production)
 make -n -C "$INFRA_ROOT" infra-plan ENV=dev | rg -q 'ENV="development"'

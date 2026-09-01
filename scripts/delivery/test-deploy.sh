@@ -18,7 +18,7 @@ printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' \
   'command_name="${1:-}"' 'shift || true' \
   'if [[ "$command_name" == "inspect-environment" ]]; then' \
   '  output=""; while (($#)); do if [[ "$1" == "--output" ]]; then output="$2"; shift 2; else shift; fi; done' \
-  '  printf %s '\''{"reality_public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","reality_short_id":"0123456789abcdef","hy2_cert_sha256":"AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA"}'\'' >"$output"' \
+  '  printf %s '\''{"reality_public_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","reality_short_id":"0123456789abcdef","hy2_cert_sha256":"AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA","hy2_spki_sha256":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}'\'' >"$output"' \
   'elif [[ "$command_name" == "render-probe-config" ]]; then' \
   '  output=""; while (($#)); do if [[ "$1" == "--output" ]]; then output="$2"; shift 2; else shift; fi; done' \
   '  printf %s '\''{}'\'' >"$output"' \
@@ -88,10 +88,21 @@ ssh_line="$(rg -n 'gcloud compute ssh' "$command_log" | cut -d: -f1 | head -n1)"
 secret_line="$(rg -n 'gcloud secrets versions add' "$command_log" | cut -d: -f1 | head -n1)"
 run_line="$(rg -n 'gcloud run deploy' "$command_log" | cut -d: -f1 | head -n1)"
 [[ "$ssh_line" -lt "$secret_line" && "$secret_line" -lt "$run_line" ]] || { printf '%s\n' 'deployment ordering contract failed' >&2; exit 1; }
+[[ "$(rg -c 'gcloud secrets versions add' "$command_log")" == "2" ]] || { printf '%s\n' 'deployment must create versions for exactly two Secret Manager secrets' >&2; exit 1; }
+rg -q 'gcloud secrets versions add proxy-dev-users' "$command_log" || { printf '%s\n' 'deployment did not version the proxy-users secret' >&2; exit 1; }
+rg -q 'gcloud secrets versions add proxy-dev-obfs' "$command_log" || { printf '%s\n' 'deployment did not version the obfs-password secret' >&2; exit 1; }
+if rg 'gcloud secrets versions add' "$command_log" | rg -q 'SPKI|CERT|PUBLIC'; then
+  printf '%s\n' 'public certificate derivations were written to Secret Manager' >&2
+  exit 1
+fi
 rg -q -- '--to-revisions new-revision=100' "$command_log" || { printf '%s\n' 'healthy Cloud Run revision was not promoted by immutable revision name' >&2; exit 1; }
 rg -q 'run revisions describe new-revision' "$command_log" || { printf '%s\n' 'candidate Cloud Run revision readiness was not checked directly' >&2; exit 1; }
 rg 'gcloud run deploy' "$command_log" | rg -q -- '--ingress all.*--no-invoker-iam-check.*--default-url' || {
   printf '%s\n' 'Cloud Run deployment did not preserve the public entry contract' >&2
+  exit 1
+}
+rg 'gcloud run deploy' "$command_log" | rg -q 'HY2_SPKI_SHA256=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' || {
+  printf '%s\n' 'Cloud Run deployment did not receive the HY2 SPKI pin' >&2
   exit 1
 }
 if rg -q -- '--tag|--to-tags' "$command_log"; then

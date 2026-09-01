@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestRenderBase64UsesStandardHY2Parameters(t *testing.T) {
+func TestRenderBase64UsesCertificateAndPublicKeyPins(t *testing.T) {
 	config := validConfig()
 	encoded, err := RenderBase64(config.Users.Users[0], config)
 	if err != nil {
@@ -19,13 +19,13 @@ func TestRenderBase64UsesStandardHY2Parameters(t *testing.T) {
 		t.Fatal(err)
 	}
 	value := string(decoded)
-	for _, expected := range []string{"vless://", "hysteria2://", "insecure=1", "pinSHA256=", "obfs=salamander"} {
+	for _, expected := range []string{"vless://", "hysteria2://", "insecure=1", "pinSHA256=", "pubKeySHA256=", "obfs=salamander"} {
 		if !strings.Contains(value, expected) {
 			t.Fatalf("output does not contain %q", expected)
 		}
 	}
-	if strings.Contains(value, "pubKeySHA256") {
-		t.Fatal("output contains non-standard pubKeySHA256")
+	if !strings.Contains(value, "pubKeySHA256=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA%3D") {
+		t.Fatal("output does not URL-encode the SPKI pin")
 	}
 }
 
@@ -41,6 +41,9 @@ func TestRenderClashProducesParseableYAML(t *testing.T) {
 	}
 	if len(document["proxies"].([]any)) != 2 {
 		t.Fatalf("unexpected proxies: %#v", document["proxies"])
+	}
+	if strings.Contains(output, "pubKeySHA256") || strings.Contains(output, "hy2_spki_sha256") {
+		t.Fatal("Clash output contains the sing-box URI extension")
 	}
 }
 

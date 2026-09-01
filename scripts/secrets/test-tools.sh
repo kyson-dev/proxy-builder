@@ -23,4 +23,9 @@ ENV=development USER=missing TOFU_BIN="$fake_tofu" PROXY_BUILDER_SECRETS_ROOT="$
 status=$?
 set -e
 [[ "$status" -ne 0 ]] || { printf '%s\n' 'missing user unexpectedly produced a URL' >&2; exit 1; }
+set +e
+ENV=development USER=alice FORMAT=singbox TOFU_BIN="$fake_tofu" PROXY_BUILDER_SECRETS_ROOT="$secrets_root" "$repo_root/scripts/secrets/subscription-url.sh" >/dev/null 2>&1
+status=$?
+set -e
+[[ "$status" -ne 0 ]] || { printf '%s\n' 'unsupported sing-box format unexpectedly produced a URL' >&2; exit 1; }
 printf '%s\n' 'local secret tool tests passed'

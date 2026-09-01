@@ -60,9 +60,9 @@ private key 的字符串表示不参与 short ID 计算。实现必须用固定�
 - certificate public key 与 private key 匹配；
 - 当前时间位于 certificate `NotBefore` 与 `NotAfter` 之间；
 - SAN 包含环境清单的 `hy2_sni`；Common Name 不作为 SAN 的回退；
-- 发布使用 leaf certificate DER 的 SHA-256，输出 uppercase colon-separated hex。
+- 发布使用 leaf certificate DER 的 SHA-256，输出 uppercase colon-separated hex；同时对 `RawSubjectPublicKeyInfo` 计算 SHA-256，输出标准 Base64。
 
-本轮不向订阅服务传递 SPKI fingerprint，也不在标准 Hysteria2 URI 添加自定义 query 参数。
+部署向订阅服务同时传递 certificate fingerprint 与 SPKI fingerprint。Base64 订阅保留标准 `pinSHA256`，并用 `pubKeySHA256` 扩展字段向 sing-box 1.13+ 客户端提供 SPKI pin。
 
 ## `proxyctl` 接口
 
@@ -97,7 +97,7 @@ proxyctl render-probe-config --input <path> --protocol vless|hysteria2 \
 `inspect-certificate` 输出：
 
 ```json
-{"hy2_cert_sha256":"UPPERCASE:COLON:HEX"}
+{"hy2_cert_sha256":"UPPERCASE:COLON:HEX","hy2_spki_sha256":"STANDARD_BASE64"}
 ```
 
 JSON 输出只含公开派生值。CLI 错误只包含字段名或输入文件角色，不得包含 private key、password、token、UUID、证书正文或生成后的 sing-box 配置。
