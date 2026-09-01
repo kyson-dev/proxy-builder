@@ -2,5 +2,5 @@
   "reality_dest": "www.nvidia.com:443",
   "hy2_sni": "www.bing.com",
   "egress_probe_url": "https://connectivitycheck.gstatic.com/generate_204",
-  "sing_box_image": "ghcr.io/sagernet/sing-box@sha256:78ca1bc9f3b563b0944fd6b1126522ee631e7b44d540b91fc435ba7062ef08b2"
+  "sing_box_image": "ghcr.io/sagernet/sing-box@sha256:4bed9332a0013fef72c31200a84e8fc0ed91a5ab2fe373a69f0acbbbbfbef3c5"
 }
