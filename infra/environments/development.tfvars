@@ -1,7 +1,7 @@
 environment          = "development"
 project_id           = "kyson-proxy-dev"
 region               = "europe-west1"
-zone                 = "europe-west1-a"
+zone                 = "europe-west1-b"
 resource_prefix      = "proxy"
 network_cidr         = "10.20.0.0/24"
 network_tier         = "STANDARD"
